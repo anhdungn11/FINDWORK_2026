@@ -1,0 +1,163 @@
+.footer {
+  padding: 64px 0 24px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #172033 0%,
+      #111827 100%
+    );
+
+  color: var(--color-text-inverse);
+}
+
+.top {
+  display: grid;
+
+  grid-template-columns: 1.3fr 2fr;
+
+  gap: 64px;
+}
+
+.brand {
+  max-width: 420px;
+}
+
+.logo {
+  color: var(--color-text-inverse);
+
+  font-size: 24px;
+  font-weight: var(--font-weight-bold);
+
+  text-decoration: none;
+
+  letter-spacing: -0.5px;
+}
+
+.description {
+  margin-top: 16px;
+
+  color: #aab4c5;
+
+  line-height: 1.8;
+
+  font-size: var(--font-size-sm);
+}
+
+.badges {
+  margin-top: 24px;
+
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 10px;
+}
+
+.badges span {
+  padding: 8px 12px;
+
+  color: #cbd5e1;
+  background-color: rgb(255 255 255 / 0.06);
+
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: var(--radius-full);
+
+  font-size: var(--font-size-xs);
+}
+
+.columns {
+  display: grid;
+
+  grid-template-columns: repeat(3, 1fr);
+
+  gap: 40px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+
+  gap: 12px;
+}
+
+.column h3 {
+  margin: 0 0 8px;
+
+  color: #ffffff;
+
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.column a {
+  color: #aab4c5;
+
+  text-decoration: none;
+
+  font-size: var(--font-size-sm);
+
+  transition: var(--transition-fast);
+}
+
+.column a:hover {
+  color: #ffffff;
+
+  transform: translateX(2px);
+}
+
+.divider {
+  margin-top: 52px;
+
+  height: 1px;
+
+  background-color: rgb(255 255 255 / 0.08);
+}
+
+.bottom {
+  padding-top: 20px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  color: #7f8a9f;
+
+  font-size: var(--font-size-sm);
+}
+
+.bottom p {
+  margin: 0;
+}
+
+.bottomLinks {
+  display: flex;
+
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .top {
+    grid-template-columns: 1fr;
+  }
+
+  .columns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .footer {
+    padding-top: 48px;
+  }
+
+  .columns {
+    grid-template-columns: 1fr;
+  }
+
+  .bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,0 +1,78 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+
+  border-bottom: 1px solid var(--color-border);
+}
+
+.inner {
+  height: 72px;
+
+  display: flex;
+  align-items: center;
+
+  gap: var(--space-8);
+}
+
+.logo {
+  color: var(--color-primary);
+
+  font-size: 22px;
+  font-weight: var(--font-weight-bold);
+
+  text-decoration: none;
+
+  letter-spacing: -0.5px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+
+  gap: var(--space-6);
+}
+
+.navLink {
+  position: relative;
+
+  color: var(--color-text-secondary);
+
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+
+  text-decoration: none;
+
+  transition: var(--transition-fast);
+}
+
+.navLink:hover {
+  color: var(--color-primary);
+}
+
+.actions {
+  margin-left: auto;
+
+  display: flex;
+  align-items: center;
+
+  gap: var(--space-4);
+}
+
+.loginLink {
+  color: var(--color-text-primary);
+
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+
+  text-decoration: none;
+
+  transition: var(--transition-fast);
+}
+
+.loginLink:hover {
+  color: var(--color-primary);
+}
