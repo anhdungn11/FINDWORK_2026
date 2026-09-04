@@ -1,0 +1,161 @@
+.statusState {
+  text-align: center;
+}
+
+.statusIcon,
+.loadingIcon {
+  width: 58px;
+  height: 58px;
+
+  margin:
+    0
+    auto
+    18px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 16px;
+}
+
+.statusIcon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.successIcon {
+  color: #15803d;
+  background: #f0fdf4;
+
+  border: 1px solid #bbf7d0;
+}
+
+.errorIcon {
+  color: #b42318;
+  background: #fff7f6;
+
+  border: 1px solid #fee4e2;
+}
+
+.loadingIcon {
+  background: var(--color-primary-soft);
+
+  border: 1px solid #dbe3ff;
+}
+
+.loadingIcon span {
+  width: 22px;
+  height: 22px;
+
+  border:
+    2px solid
+    #d5ddff;
+
+  border-top-color:
+    var(--color-primary);
+
+  border-radius: 50%;
+
+  animation:
+    verifySpin
+    700ms
+    linear
+    infinite;
+}
+
+@keyframes verifySpin {
+  to {
+    transform:
+      rotate(360deg);
+  }
+}
+
+.statusState h2 {
+  margin: 0;
+
+  color: var(--color-text-primary);
+
+  font-size: 21px;
+  font-weight: 740;
+}
+
+.statusState p {
+  max-width: 400px;
+
+  margin:
+    10px
+    auto
+    22px;
+
+  color: var(--color-text-secondary);
+
+  font-size: 12px;
+
+  line-height: 1.7;
+}
+
+.loginButton,
+.resendButton {
+  min-height: 46px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  padding:
+    0
+    19px;
+
+  border-radius: 10px;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  text-decoration: none;
+}
+
+.loginButton {
+  color: #ffffff;
+  background: var(--color-primary);
+
+  box-shadow:
+    0 5px 14px
+    rgb(79 110 247 / 0.16);
+}
+
+.loginButton svg {
+  width: 15px;
+  height: 15px;
+}
+
+.resendButton {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+
+  border: 1px solid #d5ddff;
+
+  cursor: pointer;
+}
+
+.footerText {
+  margin: 0;
+
+  color: #64748b;
+
+  font-size: 12px;
+}
+
+.footerText a {
+  color: var(--color-primary);
+
+  font-weight: 700;
+
+  text-decoration: none;
+}
+
+.footerText a:hover {
+  text-decoration: underline;
+}

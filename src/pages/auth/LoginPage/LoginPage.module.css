@@ -1,0 +1,331 @@
+.socialGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 10px;
+}
+
+.socialButton {
+  min-height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 9px;
+
+  color: #334155;
+  background: #ffffff;
+
+  border: 1px solid #dfe5ed;
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.socialButton:hover {
+  background: #f8fafc;
+
+  border-color: #cbd5e1;
+
+  transform: translateY(-1px);
+}
+
+.googleIcon {
+  width: 20px;
+  height: 20px;
+
+  display: grid;
+  place-items: center;
+
+  color: #4285f4;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.linkedinIcon {
+  width: 20px;
+  height: 20px;
+
+  display: grid;
+  place-items: center;
+
+  color: #ffffff;
+  background: #0a66c2;
+
+  border-radius: 4px;
+
+  font-family: Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.divider {
+  margin: 24px 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  color: #94a3b8;
+
+  font-size: 11px;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+
+  height: 1px;
+
+  flex: 1;
+
+  background: #e8edf3;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+
+  gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+
+  gap: 8px;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+}
+
+.field label {
+  color: #253247;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  height: 50px;
+
+  padding: 0 14px;
+
+  color: var(--color-text-primary);
+  background: #ffffff;
+
+  border: 1px solid #dfe5ed;
+  border-radius: 10px;
+
+  outline: none;
+
+  font: inherit;
+  font-size: 13px;
+
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.field input::placeholder {
+  color: #a7b2c2;
+}
+
+.field input:hover {
+  border-color: #ccd6e2;
+}
+
+.field input:focus {
+  border-color: var(--color-primary);
+
+  box-shadow:
+    0 0 0 3px
+    rgb(79 110 247 / 0.09);
+}
+
+.passwordInput {
+  position: relative;
+}
+
+.passwordInput input {
+  padding-right: 64px;
+}
+
+.showPassword {
+  position: absolute;
+
+  top: 50%;
+  right: 12px;
+
+  padding: 4px;
+
+  color: var(--color-primary);
+  background: transparent;
+
+  border: 0;
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+
+  transform: translateY(-50%);
+}
+
+.forgotLink {
+  color: var(--color-primary);
+
+  font-size: 11px;
+  font-weight: 700;
+
+  text-decoration: none;
+}
+
+.forgotLink:hover {
+  text-decoration: underline;
+}
+
+.remember {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 9px;
+
+  cursor: pointer;
+}
+
+.remember input {
+  width: 15px;
+  height: 15px;
+
+  flex-shrink: 0;
+
+  margin-top: 2px;
+
+  accent-color: var(--color-primary);
+}
+
+.remember span {
+  color: #64748b;
+
+  font-size: 11px;
+
+  line-height: 1.6;
+}
+
+.error {
+  padding:
+    10px
+    12px;
+
+  color: #b42318;
+  background: #fff7f6;
+
+  border: 1px solid #fee4e2;
+  border-radius: 9px;
+
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.submitButton {
+  height: 50px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  color: #ffffff;
+  background: var(--color-primary);
+
+  border: 0;
+  border-radius: 10px;
+
+  box-shadow:
+    0 5px 14px
+    rgb(79 110 247 / 0.16);
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.submitButton svg {
+  width: 15px;
+  height: 15px;
+
+  transition: transform 150ms ease;
+}
+
+.submitButton:hover {
+  background: var(--color-primary-hover);
+
+  box-shadow:
+    0 7px 18px
+    rgb(79 110 247 / 0.2);
+
+  transform: translateY(-1px);
+}
+
+.submitButton:hover svg {
+  transform: translateX(2px);
+}
+
+.registerText {
+  margin: 0;
+
+  color: #64748b;
+
+  font-size: 12px;
+}
+
+.registerText a {
+  color: var(--color-primary);
+
+  font-weight: 700;
+
+  text-decoration: none;
+}
+
+.registerText a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .socialGrid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,151 @@
+.card {
+  padding: 24px;
+
+  background-color: var(--color-surface);
+
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+
+  transition: var(--transition-fast);
+}
+
+.card:hover {
+  border-color: #cbd5ff;
+
+  box-shadow: 0 10px 30px rgb(15 23 42 / 0.06);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.category {
+  display: inline-block;
+
+  margin-bottom: 8px;
+
+  color: var(--color-primary);
+
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.title {
+  margin: 0;
+
+  color: var(--color-text-primary);
+
+  font-size: 20px;
+  font-weight: var(--font-weight-semibold);
+
+  letter-spacing: -0.3px;
+}
+
+.company {
+  margin: 6px 0 0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 14px;
+}
+
+.saveButton {
+  padding: 4px;
+
+  color: var(--color-text-muted);
+  background: transparent;
+
+  border: none;
+
+  cursor: pointer;
+
+  font-size: 20px;
+}
+
+.saveButton:hover {
+  color: var(--color-primary);
+}
+
+.meta {
+  margin-top: 18px;
+
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 8px 16px;
+
+  color: var(--color-text-secondary);
+
+  font-size: 13px;
+}
+
+.meta span {
+  position: relative;
+}
+
+.meta span:not(:last-child)::after {
+  content: "·";
+
+  position: absolute;
+
+  right: -10px;
+
+  color: var(--color-text-muted);
+}
+
+.salary {
+  margin-top: 16px;
+
+  color: var(--color-text-primary);
+
+  font-size: 15px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.skills {
+  margin-top: 14px;
+
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 8px;
+}
+
+.skills span {
+  padding: 6px 10px;
+
+  color: var(--color-text-secondary);
+  background-color: var(--color-surface-soft);
+
+  border-radius: 8px;
+
+  font-size: 12px;
+}
+
+.footer {
+  margin-top: 20px;
+  padding-top: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.postedAt {
+  color: var(--color-text-muted);
+
+  font-size: 12px;
+}
+
+.match {
+  color: var(--color-primary);
+
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+}
