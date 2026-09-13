@@ -1,0 +1,127 @@
+.content {
+  min-width: 0;
+
+  max-width: 760px;
+}
+
+.contentHeader {
+  margin-bottom: 21px;
+}
+
+.stepCounter {
+  color: var(--color-primary);
+
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.contentHeader h2 {
+  margin:
+    7px
+    0
+    0;
+
+  color: var(--color-text-primary);
+
+  font-size: 29px;
+  font-weight: 760;
+
+  letter-spacing: -0.65px;
+}
+
+.contentHeader p {
+  margin:
+    7px
+    0
+    0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 12px;
+}
+
+.card {
+  padding: 30px;
+
+  background: #ffffff;
+
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+
+  box-shadow:
+    0 12px 36px
+    rgb(15 23 42 / 0.045);
+}
+
+.pendingStep {
+  min-height: 320px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 40px;
+
+  text-align: center;
+
+  background: #fbfcff;
+
+  border: 1px dashed #d8e0ea;
+  border-radius: 13px;
+}
+
+.pendingStep > span {
+  color: var(--color-primary);
+
+  font-size: 9px;
+  font-weight: 800;
+
+  letter-spacing: 1px;
+}
+
+.pendingStep h3 {
+  margin:
+    8px
+    0
+    0;
+
+  color: var(--color-text-primary);
+
+  font-size: 20px;
+}
+
+.pendingStep p {
+  max-width: 390px;
+
+  margin:
+    9px
+    0
+    0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 11px;
+
+  line-height: 1.7;
+}
+
+@media (max-width: 950px) {
+  .content {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding:
+      22px
+      18px;
+
+    border-radius: 15px;
+  }
+
+  .contentHeader h2 {
+    font-size: 25px;
+  }
+}
