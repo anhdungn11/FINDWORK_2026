@@ -104,7 +104,6 @@ export const useCandidateOnboarding = () => {
 
     isFirstStep,
     isLastStep,
-
     goNext,
     goPrevious,
     goToStep,

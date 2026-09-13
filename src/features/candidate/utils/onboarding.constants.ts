@@ -48,55 +48,54 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
 ];
 
-export const INITIAL_ONBOARDING_DATA: CandidateOnboardingData = {
- personal: {
-  fullName: "",
-  email: "",
-  phone: "",
+export const INITIAL_ONBOARDING_DATA:
+  CandidateOnboardingData = {
+    personal: {
+      fullName: "",
+      email: "",
+      phone: "",
+      dateOfBirth: "",
+      gender: "",
+      countryCode: "VN",
+      provinceCode: "",
+      wardCode: "",
+      addressLine: "",
+      bio: "",
+      avatarUrl: "",
+    },
 
-  dateOfBirth: "",
-  gender: "",
+    education: [],
 
-  province: "",
-  district: "",
-  address: "",
+    experience: [],
 
-  bio: "",
-  avatarUrl: "",
-},
+    skills: [],
 
-  education: [],
+    languages: [],
 
-  experience: [],
+    preferences: {
+      employmentStatus: "",
+      desiredPosition: "",
+      industry: "",
+      desiredLocation: "",
+      employmentType: "",
+      workplaceType: "",
+      expectedSalaryMin: "",
+      expectedSalaryMax: "",
+      availableFrom: "",
+    },
 
-  skills: [],
+    resume: {
+      resumeName: "",
+      resumeUrl: "",
+      hasExistingResume: false,
+      createLater: true,
+    },
 
-  languages: [],
-
-  preferences: {
-    employmentStatus: "",
-    desiredPosition: "",
-    industry: "",
-    desiredLocation: "",
-    employmentType: "",
-    workplaceType: "",
-    expectedSalaryMin: "",
-    expectedSalaryMax: "",
-    availableFrom: "",
-  },
-
-  resume: {
-    resumeName: "",
-    resumeUrl: "",
-    hasExistingResume: false,
-    createLater: true,
-  },
-
-  privacy: {
-    searchableProfile: false,
-    showEmail: false,
-    showPhone: false,
-    allowResumeDownload: false,
-    allowJobMatching: true,
-  },
-};
+    privacy: {
+      searchableProfile: false,
+      showEmail: false,
+      showPhone: false,
+      allowResumeDownload: false,
+      allowJobMatching: true,
+    },
+  };

@@ -11,6 +11,12 @@ export type OnboardingStepId =
    PERSONAL INFO
 ========================================================= */
 
+export type Gender =
+  | ""
+  | "male"
+  | "female"
+  | "other";
+
 export interface PersonalInfo {
   fullName: string;
 
@@ -20,13 +26,33 @@ export interface PersonalInfo {
 
   dateOfBirth: string;
 
-  gender: string;
+  gender: Gender;
 
-  province: string;
+  /**
+   * ISO 3166-1 alpha-2.
+   *
+   * Hiện Candidate onboarding mặc định Việt Nam.
+   */
+  countryCode: string;
 
-  district: string;
+  /**
+   * Mã hành chính cấp tỉnh / thành phố.
+   *
+   * Giữ dạng string để không mất số 0 đầu.
+   */
+  provinceCode: string;
 
-  address: string;
+  /**
+   * Mã hành chính cấp xã:
+   * phường / xã / đặc khu.
+   */
+  wardCode: string;
+
+  /**
+   * Phần địa chỉ tự do còn lại:
+   * số nhà, tên đường, khu phố...
+   */
+  addressLine: string;
 
   bio: string;
 

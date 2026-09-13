@@ -1,0 +1,105 @@
+.sectionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sectionTitle > span {
+  color: var(--color-primary);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.sectionTitle h5 {
+  margin: 5px 0 0;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.skillComposer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.skillComposer input {
+  width: 100%;
+  height: 46px;
+  padding: 0 13px;
+  color: var(--color-text-primary);
+  background: #fff;
+  border: 1px solid #dfe5ed;
+  border-radius: 10px;
+  outline: none;
+  font: inherit;
+  font-size: 11px;
+}
+
+.skillComposer input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(79 110 247 / 0.09);
+}
+
+.skillComposer button {
+  min-width: 70px;
+  padding: 0 14px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border: 1px solid #d7dfff;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.skillList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.skillList > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px 6px 10px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border: 1px solid #dce3ff;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.skillList button {
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #7180ba;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.noSkills {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 9px;
+}
+
+@media (max-width: 640px) {
+  .skillComposer {
+    grid-template-columns: 1fr;
+  }
+
+  .skillComposer button {
+    min-height: 40px;
+  }
+}
