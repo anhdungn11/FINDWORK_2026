@@ -1,0 +1,50 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  color: var(--color-text-primary);
+}
+
+.mainDivider {
+  height: 1px;
+  margin: 38px 0;
+  background: var(--color-border);
+}
+
+.notice {
+  margin-top: 30px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.noticeIcon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: 9px;
+}
+
+.noticeIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.notice strong {
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+
+.notice p {
+  margin: 5px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.65;
+}

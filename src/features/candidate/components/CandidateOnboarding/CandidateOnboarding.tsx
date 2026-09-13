@@ -5,6 +5,7 @@ import { useCandidateOnboarding } from "@/features/candidate/hooks/useCandidateO
 import EducationStep from "@/features/candidate/components/EducationStep/EducationStep";
 import styles from "./CandidateOnboarding.module.css";
 import ExperienceStep from "@/features/candidate/components/ExperienceStep/ExperienceStep";
+import SkillsLanguagesStep from "@/features/candidate/components/SkillsLanguagesStep/SkillsLanguagesStep";
 const CandidateOnboarding = () => {
     const navigate = useNavigate();
 
@@ -185,7 +186,7 @@ const CandidateOnboarding = () => {
                                 }
                             />
                         )}
-
+                        {/* EXPERIENCE */}
                         {currentStep.id === "experience" && (
                             <ExperienceStep
                                 value={data.experience}
@@ -198,9 +199,30 @@ const CandidateOnboarding = () => {
                             />
                         )}
 
+                        {/* SKILLS AND LANGUAGES */}
+                        {currentStep.id === "skills" && (
+                            <SkillsLanguagesStep
+                                skills={data.skills}
+                                languages={data.languages}
+                                onSkillsChange={(value) =>
+                                    updateSection(
+                                        "skills",
+                                        value,
+                                    )
+                                }
+                                onLanguagesChange={(value) =>
+                                    updateSection(
+                                        "languages",
+                                        value,
+                                    )
+                                }
+                            />
+                        )}
+
                         {currentStep.id !== "personal" &&
                             currentStep.id !== "education" &&
-                            currentStep.id !== "experience" && (
+                            currentStep.id !== "experience" &&
+                            currentStep.id !== "skills" && (
                                 <div className={styles.pendingStep}>
                                     <span>
                                         STEP {currentStep.number}
@@ -215,7 +237,6 @@ const CandidateOnboarding = () => {
                                     </p>
                                 </div>
                             )}
-
                         <div className={styles.actions}>
                             <button
                                 type="button"

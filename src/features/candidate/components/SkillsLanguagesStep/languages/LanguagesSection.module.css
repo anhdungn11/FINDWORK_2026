@@ -1,0 +1,139 @@
+/* Language and certificate-only presentation. */
+
+.languageSkillsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.certificateHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.certificateHeader .sectionTitle {
+  margin-bottom: 0;
+}
+
+.addCertificateButton {
+  min-height: 38px;
+  padding: 0 13px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border: 1px solid #d7dfff;
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.addCertificateButton:hover {
+  background: #eaf0ff;
+  border-color: #c9d2ff;
+  transform: translateY(-1px);
+}
+
+.certificateEmpty {
+  margin-top: 17px;
+  padding: 16px;
+  color: var(--color-text-muted);
+  background: #f8fafc;
+  border: 1px dashed #d6deea;
+  border-radius: 11px;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.certificateList {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.certificateCard {
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #e0e6ed;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 0.025);
+}
+
+.certificateCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.certificateCardHeader strong {
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.certificateSummary {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.certificateSummary span {
+  padding: 5px 8px;
+  color: var(--color-text-secondary);
+  background: #f8fafc;
+  border: 1px solid #e7ecf2;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.certificateForm {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.certificateScoreSection {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.scoreHeading {
+  margin: 22px 0 11px;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+@media (max-width: 900px) {
+  .languageSkillsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .languageSkillsGrid,
+  .certificateScoreSection {
+    grid-template-columns: 1fr;
+  }
+
+  .certificateCardHeader,
+  .certificateHeader {
+    flex-direction: column;
+  }
+
+  .addCertificateButton {
+    align-self: flex-start;
+  }
+}
