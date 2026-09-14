@@ -1,0 +1,186 @@
+.searchPanel {
+  width: 100%;
+
+  margin-top: 34px;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1.5fr)
+    1px
+    minmax(190px, 0.7fr)
+    1px
+    minmax(190px, 0.7fr);
+
+  align-items: center;
+
+  padding:
+    8px
+    10px;
+
+  background:
+    rgb(255 255 255 / 0.95);
+
+  border:
+    1px solid
+    rgb(226 232 240 / 0.92);
+
+  border-radius: 18px;
+
+  box-shadow:
+    0 20px 45px
+    rgb(15 23 42 / 0.08);
+}
+
+.searchField {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  padding:
+    0
+    14px;
+}
+
+.searchIcon {
+  width: 20px;
+  height: 20px;
+
+  flex-shrink: 0;
+
+  color:
+    var(--color-text-muted);
+}
+
+.searchIcon svg {
+  width: 100%;
+  height: 100%;
+
+  fill: none;
+
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.searchField input {
+  width: 100%;
+  height: 54px;
+
+  padding: 0;
+
+  color:
+    var(--color-text-primary);
+
+  background: transparent;
+
+  border: 0;
+  outline: 0;
+
+  font: inherit;
+  font-size: 14px;
+}
+
+.searchField input::placeholder {
+  color:
+    var(--color-text-muted);
+}
+
+.divider {
+  width: 1px;
+  height: 34px;
+
+  background:
+    var(--color-border);
+}
+
+.selectField {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 3px;
+
+  padding:
+    0
+    16px;
+
+  text-align: left;
+}
+
+.selectLabel {
+  color:
+    var(--color-text-muted);
+
+  font-size: 9px;
+  font-weight: 750;
+
+  letter-spacing: 0.4px;
+
+  text-transform: uppercase;
+}
+
+.selectField select {
+  width: 100%;
+
+  padding: 0;
+
+  color:
+    var(--color-text-primary);
+
+  background: transparent;
+
+  border: 0;
+  outline: 0;
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+  .searchPanel {
+    grid-template-columns:
+      minmax(0, 1fr)
+      1px
+      180px
+      1px
+      180px;
+  }
+}
+
+@media (max-width: 768px) {
+  .searchPanel {
+    grid-template-columns: 1fr;
+
+    gap: 0;
+
+    padding: 8px;
+  }
+
+  .divider {
+    width: 100%;
+    height: 1px;
+
+    margin:
+      2px
+      0;
+  }
+
+  .searchField {
+    padding:
+      0
+      12px;
+  }
+
+  .selectField {
+    padding: 12px;
+  }
+}

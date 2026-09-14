@@ -1,0 +1,44 @@
+.resultsSection {
+  padding:
+    52px
+    0
+    90px;
+
+  background:
+    var(--color-surface);
+}
+
+.companyGrid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    );
+
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .companyGrid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+}
+
+@media (max-width: 640px) {
+  .resultsSection {
+    padding:
+      36px
+      0
+      64px;
+  }
+
+  .companyGrid {
+    grid-template-columns: 1fr;
+  }
+}

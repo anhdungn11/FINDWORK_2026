@@ -1,0 +1,92 @@
+.resultsHeader {
+  margin-bottom: 24px;
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 24px;
+}
+
+.sectionEyebrow {
+  color:
+    var(--color-primary);
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 1.25px;
+}
+
+.resultsHeader h2 {
+  margin:
+    7px
+    0
+    0;
+
+  color:
+    var(--color-text-primary);
+
+  font-size:
+    var(--font-size-2xl);
+
+  font-weight:
+    var(--font-weight-bold);
+
+  letter-spacing: -0.45px;
+}
+
+.resultsHeader p {
+  margin:
+    7px
+    0
+    0;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size:
+    var(--font-size-sm);
+}
+
+.clearButton {
+  padding:
+    9px
+    12px;
+
+  color:
+    var(--color-primary);
+
+  background: transparent;
+
+  border:
+    1px solid
+    #d5ddff;
+
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.clearButton:hover {
+  background:
+    var(--color-primary-soft);
+
+  border-color: #c7d2fe;
+}
+
+@media (max-width: 768px) {
+  .resultsHeader {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+}
