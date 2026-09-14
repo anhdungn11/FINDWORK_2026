@@ -1,39 +1,47 @@
 import {
+  useCallback,
   useMemo,
   useState,
 } from "react";
 
-import type { Job } from "@/data/mock/jobs.mock";
+import {
+  CURRENT_JOB_FILTER_VALUES,
+  INITIAL_ADVANCED_FILTERS,
+} from "../constants/job-filter.constants";
+
+import type {
+  AdvancedFilters,
+  JobFilterRecord,
+  JobSortOption,
+  UpdateAdvancedFilter,
+} from "../types/job-filter.types";
 
 import {
+  countActiveAdvancedFilters,
   filterJobs,
   getJobCategories,
   getJobExperiences,
   getJobLocations,
   getJobTypes,
   getJobWorkplaces,
-  sortJobs,
-  type JobSortOption,
+  hasJobSearchCriteria,
 } from "../utils/job-filter.utils";
 
-export interface AdvancedFilters {
-  category: string;
-  type: string;
-  workplace: string;
-  experience: string;
-  salaryMin: number;
-}
+import {
+  sortJobs,
+} from "../utils/job-sort.utils";
 
-const initialAdvancedFilters: AdvancedFilters =
-  {
-    category: "",
-    type: "",
-    workplace: "",
-    experience: "",
-    salaryMin: 0,
-  };
+/**
+ * Compatibility export cho component cũ chưa migrate import.
+ * Consumer mới nên import trực tiếp từ ../types/job-filter.types.
+ */
+export type {
+  AdvancedFilters,
+} from "../types/job-filter.types";
 
-interface UseJobFiltersResult {
+interface UseJobFiltersResult<
+  TJob extends JobFilterRecord,
+> {
   keyword: string;
   location: string;
   sortBy: JobSortOption;
@@ -46,7 +54,7 @@ interface UseJobFiltersResult {
   workplaces: string[];
   experiences: string[];
 
-  filteredJobs: Job[];
+  filteredJobs: TJob[];
 
   isRemote: boolean;
   isFresher: boolean;
@@ -54,6 +62,7 @@ interface UseJobFiltersResult {
 
   activeFilterCount: number;
   hasActiveFilters: boolean;
+  hasSearchCriteria: boolean;
 
   setKeyword: (
     value: string,
@@ -67,23 +76,35 @@ interface UseJobFiltersResult {
     value: JobSortOption,
   ) => void;
 
-  updateAdvancedFilter: <
-    Key extends keyof AdvancedFilters,
-  >(
-    key: Key,
-    value: AdvancedFilters[Key],
+  updateAdvancedFilter:
+    UpdateAdvancedFilter;
+
+  applyAdvancedFilters: (
+    filters: AdvancedFilters,
   ) => void;
+
+  getAdvancedFilterResultCount: (
+    filters: AdvancedFilters,
+  ) => number;
 
   toggleRemote: () => void;
   toggleFresher: () => void;
   toggleInternship: () => void;
 
   clearAdvancedFilters: () => void;
+  clearAllFilters: () => void;
 }
 
-export const useJobFilters = (
-  jobs: Job[],
-): UseJobFiltersResult => {
+const createInitialAdvancedFilters =
+  (): AdvancedFilters => ({
+    ...INITIAL_ADVANCED_FILTERS,
+  });
+
+export const useJobFilters = <
+  TJob extends JobFilterRecord,
+>(
+  jobs: readonly TJob[],
+): UseJobFiltersResult<TJob> => {
   const [
     keyword,
     setKeyword,
@@ -107,7 +128,7 @@ export const useJobFilters = (
     setAdvancedFilters,
   ] =
     useState<AdvancedFilters>(
-      initialAdvancedFilters,
+      createInitialAdvancedFilters,
     );
 
   const locations = useMemo(
@@ -140,40 +161,82 @@ export const useJobFilters = (
     [jobs],
   );
 
-  const updateAdvancedFilter = <
-    Key extends keyof AdvancedFilters,
-  >(
-    key: Key,
-    value: AdvancedFilters[Key],
+  const updateAdvancedFilter:
+    UpdateAdvancedFilter = (
+      key,
+      value,
+    ) => {
+      setAdvancedFilters(
+        (current) => ({
+          ...current,
+          [key]: value,
+        }),
+      );
+    };
+
+  const applyAdvancedFilters = (
+    filters: AdvancedFilters,
   ) => {
-    setAdvancedFilters(
-      (current) => ({
-        ...current,
-        [key]: value,
-      }),
-    );
+    setAdvancedFilters({
+      ...filters,
+    });
   };
+
+  const getAdvancedFilterResultCount =
+    useCallback(
+      (
+        filters:
+          AdvancedFilters,
+      ) => {
+        return filterJobs(
+          jobs,
+          {
+            keyword,
+            location,
+            category:
+              filters.category,
+            type:
+              filters.type,
+            workplace:
+              filters.workplace,
+            experience:
+              filters.experience,
+            salaryMin:
+              filters.salaryMin,
+          },
+        ).length;
+      },
+      [
+        jobs,
+        keyword,
+        location,
+      ],
+    );
 
   const isRemote =
     advancedFilters.workplace ===
-    "Remote";
+    CURRENT_JOB_FILTER_VALUES.remoteWorkplace;
 
   const isFresher =
     advancedFilters.experience
       .toLowerCase()
       .includes(
-        "không yêu cầu",
+        CURRENT_JOB_FILTER_VALUES.fresherExperience
+          .toLowerCase(),
       );
 
   const isInternship =
     advancedFilters.type
       .toLowerCase() ===
-    "internship";
+    CURRENT_JOB_FILTER_VALUES.internshipType
+      .toLowerCase();
 
   const toggleRemote = () => {
     updateAdvancedFilter(
       "workplace",
-      isRemote ? "" : "Remote",
+      isRemote
+        ? ""
+        : CURRENT_JOB_FILTER_VALUES.remoteWorkplace,
     );
   };
 
@@ -182,7 +245,7 @@ export const useJobFilters = (
       "experience",
       isFresher
         ? ""
-        : "Không yêu cầu",
+        : CURRENT_JOB_FILTER_VALUES.fresherExperience,
     );
   };
 
@@ -191,45 +254,39 @@ export const useJobFilters = (
       "type",
       isInternship
         ? ""
-        : "Internship",
+        : CURRENT_JOB_FILTER_VALUES.internshipType,
     );
   };
 
   const clearAdvancedFilters =
     () => {
       setAdvancedFilters(
-        initialAdvancedFilters,
+        createInitialAdvancedFilters(),
       );
     };
 
+  const clearAllFilters = () => {
+    setKeyword("");
+    setLocation("");
+    setAdvancedFilters(
+      createInitialAdvancedFilters(),
+    );
+  };
+
   const activeFilterCount =
-    Number(
-      Boolean(
-        advancedFilters.category,
-      ),
-    ) +
-    Number(
-      Boolean(
-        advancedFilters.type,
-      ),
-    ) +
-    Number(
-      Boolean(
-        advancedFilters.workplace,
-      ),
-    ) +
-    Number(
-      Boolean(
-        advancedFilters.experience,
-      ),
-    ) +
-    Number(
-      advancedFilters.salaryMin >
-        0,
+    countActiveAdvancedFilters(
+      advancedFilters,
     );
 
   const hasActiveFilters =
     activeFilterCount > 0;
+
+  const hasSearchCriteria =
+    hasJobSearchCriteria(
+      keyword,
+      location,
+      advancedFilters,
+    );
 
   const filteredJobs = useMemo(
     () => {
@@ -289,17 +346,21 @@ export const useJobFilters = (
 
     activeFilterCount,
     hasActiveFilters,
+    hasSearchCriteria,
 
     setKeyword,
     setLocation,
     setSortBy,
 
     updateAdvancedFilter,
+    applyAdvancedFilters,
+    getAdvancedFilterResultCount,
 
     toggleRemote,
     toggleFresher,
     toggleInternship,
 
     clearAdvancedFilters,
+    clearAllFilters,
   };
 };

@@ -1,6 +1,20 @@
-import type { AdvancedFilters } from "../../hooks/useJobFilters";
+import {
+  countActiveAdvancedFilters,
+} from "../../utils/job-filter.utils";
 
-import styles from "./JobAdvancedFilters.module.css";
+import type {
+  AdvancedFilters,
+} from "../../types/job-filter.types";
+
+import AdvancedFilterFields from "./components/AdvancedFilterFields";
+import AdvancedFilterFooter from "./components/AdvancedFilterFooter";
+import AdvancedFilterHeader from "./components/AdvancedFilterHeader";
+
+import {
+  useAdvancedFilterDraft,
+} from "./hooks/useAdvancedFilterDraft";
+
+import styles from "./styles/AdvancedFilterPanel.module.css";
 
 interface JobAdvancedFiltersProps {
   isOpen: boolean;
@@ -11,17 +25,14 @@ interface JobAdvancedFiltersProps {
   workplaces: string[];
   experiences: string[];
 
-  resultCount: number;
-  hasActiveFilters: boolean;
+  getResultCount: (
+    filters: AdvancedFilters,
+  ) => number;
 
   onClose: () => void;
-  onClear: () => void;
 
-  onUpdate: <
-    Key extends keyof AdvancedFilters,
-  >(
-    key: Key,
-    value: AdvancedFilters[Key],
+  onApply: (
+    filters: AdvancedFilters,
   ) => void;
 }
 
@@ -32,200 +43,66 @@ const JobAdvancedFilters = ({
   jobTypes,
   workplaces,
   experiences,
-  resultCount,
-  hasActiveFilters,
+  getResultCount,
   onClose,
-  onClear,
-  onUpdate,
+  onApply,
 }: JobAdvancedFiltersProps) => {
+  const {
+    draftFilters,
+    isDirty,
+    updateDraftFilter,
+    resetDraftFilters,
+  } = useAdvancedFilterDraft({
+    isOpen,
+    filters,
+  });
+
   if (!isOpen) {
     return null;
   }
 
+  const resultCount =
+    getResultCount(
+      draftFilters,
+    );
+
+  const hasDraftFilters =
+    countActiveAdvancedFilters(
+      draftFilters,
+    ) > 0;
+
+  const handleApply = () => {
+    onApply(draftFilters);
+    onClose();
+  };
+
   return (
     <div className={styles.filterPanel}>
-      <div className={styles.filterPanelHeader}>
-        <div>
-          <span className={styles.filterEyebrow}>
-            FINDWORK FILTER
-          </span>
+      <AdvancedFilterHeader
+        onClose={onClose}
+      />
 
-          <h3>Tinh chỉnh kết quả tìm kiếm</h3>
+      <AdvancedFilterFields
+        filters={draftFilters}
+        categories={categories}
+        jobTypes={jobTypes}
+        workplaces={workplaces}
+        experiences={experiences}
+        onUpdate={updateDraftFilter}
+      />
 
-          <p>
-            Chọn những tiêu chí phù hợp với công việc
-            bạn đang tìm.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          className={styles.closeFilterButton}
-          onClick={onClose}
-          aria-label="Đóng bộ lọc"
-        >
-          ×
-        </button>
-      </div>
-
-      <div className={styles.filterGrid}>
-        <FilterSelect
-          label="Ngành nghề"
-          value={filters.category}
-          placeholder="Tất cả ngành nghề"
-          options={categories}
-          onChange={(value) =>
-            onUpdate("category", value)
-          }
-        />
-
-        <FilterSelect
-          label="Loại công việc"
-          value={filters.type}
-          placeholder="Tất cả loại việc"
-          options={jobTypes}
-          onChange={(value) =>
-            onUpdate("type", value)
-          }
-        />
-
-        <FilterSelect
-          label="Hình thức làm việc"
-          value={filters.workplace}
-          placeholder="Tất cả hình thức"
-          options={workplaces}
-          onChange={(value) =>
-            onUpdate("workplace", value)
-          }
-        />
-
-        <FilterSelect
-          label="Kinh nghiệm"
-          value={filters.experience}
-          placeholder="Tất cả kinh nghiệm"
-          options={experiences}
-          onChange={(value) =>
-            onUpdate("experience", value)
-          }
-        />
-
-        <label
-          className={`${styles.filterField} ${styles.salaryField}`}
-        >
-          <span>Mức lương tối thiểu</span>
-
-          <div className={styles.selectWrapper}>
-            <select
-              value={filters.salaryMin}
-              onChange={(event) =>
-                onUpdate(
-                  "salaryMin",
-                  Number(event.target.value),
-                )
-              }
-            >
-              <option value={0}>
-                Không yêu cầu
-              </option>
-
-              <option value={10}>
-                Từ 10 triệu
-              </option>
-
-              <option value={12}>
-                Từ 12 triệu
-              </option>
-
-              <option value={15}>
-                Từ 15 triệu
-              </option>
-
-              <option value={20}>
-                Từ 20 triệu
-              </option>
-
-              <option value={25}>
-                Từ 25 triệu
-              </option>
-            </select>
-          </div>
-        </label>
-      </div>
-
-      <div className={styles.filterPanelFooter}>
-        <div className={styles.filterResultInfo}>
-          <span className={styles.liveDot} />
-
-          <span>
-            {resultCount} công việc phù hợp với bộ lọc
-          </span>
-        </div>
-
-        <div className={styles.filterActions}>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className={styles.resetFilterButton}
-              onClick={onClear}
-            >
-              Đặt lại
-            </button>
-          )}
-
-          <button
-            type="button"
-            className={styles.applyFilterButton}
-            onClick={onClose}
-          >
-            Xem kết quả
-          </button>
-        </div>
-      </div>
+      <AdvancedFilterFooter
+        resultCount={resultCount}
+        hasDraftFilters={
+          hasDraftFilters
+        }
+        isDirty={isDirty}
+        onReset={
+          resetDraftFilters
+        }
+        onApply={handleApply}
+      />
     </div>
-  );
-};
-
-interface FilterSelectProps {
-  label: string;
-  value: string;
-  placeholder: string;
-  options: string[];
-  onChange: (value: string) => void;
-}
-
-const FilterSelect = ({
-  label,
-  value,
-  placeholder,
-  options,
-  onChange,
-}: FilterSelectProps) => {
-  return (
-    <label className={styles.filterField}>
-      <span>{label}</span>
-
-      <div className={styles.selectWrapper}>
-        <select
-          value={value}
-          onChange={(event) =>
-            onChange(event.target.value)
-          }
-        >
-          <option value="">
-            {placeholder}
-          </option>
-
-          {options.map((option) => (
-            <option
-              key={option}
-              value={option}
-            >
-              {option}
-            </option>
-          ))}
-        </select>
-      </div>
-    </label>
   );
 };
 

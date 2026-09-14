@@ -1,0 +1,40 @@
+.page {
+  min-height: 100vh;
+
+  background-color:
+    var(--color-background);
+}
+
+.resultsSection {
+  padding: 42px 0 80px;
+
+  background-color:
+    var(--color-surface);
+}
+
+.contentLayout {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    320px;
+
+  gap: 34px;
+
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .contentLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .resultsSection {
+    padding:
+      32px
+      0
+      60px;
+  }
+}

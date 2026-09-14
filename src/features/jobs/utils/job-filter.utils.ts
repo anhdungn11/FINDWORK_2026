@@ -1,91 +1,48 @@
-import type { Job } from "@/data/mock/jobs.mock";
+import type {
+  AdvancedFilters,
+  JobFilterOptions,
+  JobFilterRecord,
+  JobSortOption,
+} from "../types/job-filter.types";
 
-export type JobSortOption =
-  | "match"
-  | "latest"
-  | "salary";
-
-export interface JobFilterOptions {
-  keyword: string;
-  location: string;
-
-  category: string;
-  type: string;
-  workplace: string;
-  experience: string;
-
-  salaryMin: number;
-}
-
-const normalizeText = (
-  value: string,
-) => {
-  return value
-    .trim()
-    .toLowerCase();
-};
-
-export const getPostedAge = (
-  postedAt: string,
-) => {
-  const value =
-    normalizeText(postedAt);
-
-  if (value.includes("giờ")) {
-    return Number(
-      value.match(/\d+/)?.[0] ?? 0,
-    );
-  }
-
-  if (value.includes("hôm nay")) {
-    return 12;
-  }
-
-  if (value.includes("ngày")) {
-    const days = Number(
-      value.match(/\d+/)?.[0] ?? 0,
-    );
-
-    return days * 24;
-  }
-
-  return Number.MAX_SAFE_INTEGER;
-};
-
-export const getSalaryValue = (
-  salary: string,
-) => {
-  const value =
-    salary.match(/\d+/);
-
-  return value
-    ? Number(value[0])
-    : 0;
-};
+import {
+  getLegacySalaryValue,
+  normalizeLegacyJobText,
+} from "./job-legacy-value.utils";
 
 const matchesKeyword = (
-  job: Job,
+  job: JobFilterRecord,
   keyword: string,
 ) => {
   const normalizedKeyword =
-    normalizeText(keyword);
+    normalizeLegacyJobText(
+      keyword,
+    );
 
   if (!normalizedKeyword) {
     return true;
   }
 
   return (
-    normalizeText(job.title).includes(
+    normalizeLegacyJobText(
+      job.title,
+    ).includes(
       normalizedKeyword,
     ) ||
-    normalizeText(job.company).includes(
+    normalizeLegacyJobText(
+      job.company,
+    ).includes(
       normalizedKeyword,
     ) ||
-    normalizeText(job.category).includes(
+    normalizeLegacyJobText(
+      job.category,
+    ).includes(
       normalizedKeyword,
     ) ||
     job.skills.some((skill) =>
-      normalizeText(skill).includes(
+      normalizeLegacyJobText(
+        skill,
+      ).includes(
         normalizedKeyword,
       ),
     )
@@ -93,7 +50,7 @@ const matchesKeyword = (
 };
 
 const matchesLocation = (
-  job: Job,
+  job: JobFilterRecord,
   location: string,
 ) => {
   if (!location) {
@@ -104,7 +61,7 @@ const matchesLocation = (
 };
 
 const matchesCategory = (
-  job: Job,
+  job: JobFilterRecord,
   category: string,
 ) => {
   if (!category) {
@@ -115,7 +72,7 @@ const matchesCategory = (
 };
 
 const matchesType = (
-  job: Job,
+  job: JobFilterRecord,
   type: string,
 ) => {
   if (!type) {
@@ -126,7 +83,7 @@ const matchesType = (
 };
 
 const matchesWorkplace = (
-  job: Job,
+  job: JobFilterRecord,
   workplace: string,
 ) => {
   if (!workplace) {
@@ -137,7 +94,7 @@ const matchesWorkplace = (
 };
 
 const matchesExperience = (
-  job: Job,
+  job: JobFilterRecord,
   experience: string,
 ) => {
   if (!experience) {
@@ -148,7 +105,7 @@ const matchesExperience = (
 };
 
 const matchesSalary = (
-  job: Job,
+  job: JobFilterRecord,
   salaryMin: number,
 ) => {
   if (salaryMin <= 0) {
@@ -156,15 +113,18 @@ const matchesSalary = (
   }
 
   return (
-    getSalaryValue(job.salary) >=
-    salaryMin
+    getLegacySalaryValue(
+      job.salary,
+    ) >= salaryMin
   );
 };
 
-export const filterJobs = (
-  jobs: Job[],
+export const filterJobs = <
+  TJob extends JobFilterRecord,
+>(
+  jobs: readonly TJob[],
   filters: JobFilterOptions,
-) => {
+): TJob[] => {
   return jobs.filter((job) => {
     return (
       matchesKeyword(
@@ -199,101 +159,132 @@ export const filterJobs = (
   });
 };
 
-export const sortJobs = (
-  jobs: Job[],
-  sortBy: JobSortOption,
-) => {
-  const sortedJobs = [...jobs];
-
-  switch (sortBy) {
-    case "latest":
-      return sortedJobs.sort(
-        (a, b) =>
-          getPostedAge(
-            a.postedAt,
-          ) -
-          getPostedAge(
-            b.postedAt,
-          ),
-      );
-
-    case "salary":
-      return sortedJobs.sort(
-        (a, b) =>
-          getSalaryValue(
-            b.salary,
-          ) -
-          getSalaryValue(
-            a.salary,
-          ),
-      );
-
-    case "match":
-    default:
-      return sortedJobs.sort(
-        (a, b) =>
-          b.matchScore -
-          a.matchScore,
-      );
-  }
-};
-
-export const getJobLocations = (
-  jobs: Job[],
+const getUniqueValues = <
+  TJob extends JobFilterRecord,
+>(
+  jobs: readonly TJob[],
+  selectValue: (
+    job: TJob,
+  ) => string,
 ) => {
   return Array.from(
     new Set(
-      jobs.map(
-        (job) => job.location,
-      ),
+      jobs.map(selectValue),
     ),
   );
 };
 
-export const getJobCategories = (
-  jobs: Job[],
+export const getJobLocations = <
+  TJob extends JobFilterRecord,
+>(
+  jobs: readonly TJob[],
 ) => {
-  return Array.from(
-    new Set(
-      jobs.map(
-        (job) => job.category,
-      ),
-    ),
+  return getUniqueValues(
+    jobs,
+    (job) => job.location,
   );
 };
 
-export const getJobTypes = (
-  jobs: Job[],
+export const getJobCategories = <
+  TJob extends JobFilterRecord,
+>(
+  jobs: readonly TJob[],
 ) => {
-  return Array.from(
-    new Set(
-      jobs.map(
-        (job) => job.type,
-      ),
-    ),
+  return getUniqueValues(
+    jobs,
+    (job) => job.category,
   );
 };
 
-export const getJobWorkplaces = (
-  jobs: Job[],
+export const getJobTypes = <
+  TJob extends JobFilterRecord,
+>(
+  jobs: readonly TJob[],
 ) => {
-  return Array.from(
-    new Set(
-      jobs.map(
-        (job) => job.workplace,
-      ),
-    ),
+  return getUniqueValues(
+    jobs,
+    (job) => job.type,
   );
 };
 
-export const getJobExperiences = (
-  jobs: Job[],
+export const getJobWorkplaces = <
+  TJob extends JobFilterRecord,
+>(
+  jobs: readonly TJob[],
 ) => {
-  return Array.from(
-    new Set(
-      jobs.map(
-        (job) => job.experience,
-      ),
-    ),
+  return getUniqueValues(
+    jobs,
+    (job) => job.workplace,
   );
 };
+
+export const getJobExperiences = <
+  TJob extends JobFilterRecord,
+>(
+  jobs: readonly TJob[],
+) => {
+  return getUniqueValues(
+    jobs,
+    (job) => job.experience,
+  );
+};
+
+export const countActiveAdvancedFilters = (
+  filters: AdvancedFilters,
+) => {
+  return (
+    Number(
+      Boolean(
+        filters.category,
+      ),
+    ) +
+    Number(
+      Boolean(
+        filters.type,
+      ),
+    ) +
+    Number(
+      Boolean(
+        filters.workplace,
+      ),
+    ) +
+    Number(
+      Boolean(
+        filters.experience,
+      ),
+    ) +
+    Number(
+      filters.salaryMin > 0,
+    )
+  );
+};
+
+export const hasJobSearchCriteria = (
+  keyword: string,
+  location: string,
+  filters: AdvancedFilters,
+) => {
+  return (
+    Boolean(keyword.trim()) ||
+    Boolean(location) ||
+    countActiveAdvancedFilters(
+      filters,
+    ) > 0
+  );
+};
+
+/**
+ * Compatibility exports để consumer cũ vẫn build được trong batch 1.
+ */
+export type {
+  JobSortOption,
+};
+
+export {
+  getLegacyPostedAgeHours as getPostedAge,
+  getLegacySalaryValue as getSalaryValue,
+} from "./job-legacy-value.utils";
+
+export {
+  sortJobs,
+} from "./job-sort.utils";

@@ -1,0 +1,188 @@
+.marketCard {
+  padding: 24px;
+
+  background-color:
+    var(--color-surface);
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius:
+    var(--radius-lg);
+
+  box-shadow:
+    0 10px 28px
+    rgb(15 23 42 / 0.04);
+}
+
+.marketHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+}
+
+.eyebrow {
+  color:
+    var(--color-primary);
+
+  font-size:
+    var(--font-size-xs);
+
+  font-weight:
+    var(--font-weight-bold);
+
+  letter-spacing: 0.5px;
+}
+
+.trendIcon {
+  color:
+    var(--color-primary);
+
+  font-size: 20px;
+
+  line-height: 1;
+}
+
+.marketCard h3 {
+  margin: 16px 0 0;
+
+  color:
+    var(--color-text-primary);
+
+  font-size:
+    var(--font-size-xl);
+
+  font-weight:
+    var(--font-weight-bold);
+
+  line-height: 1.35;
+}
+
+.marketDescription {
+  margin: 8px 0 0;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size:
+    var(--font-size-sm);
+}
+
+.trendList {
+  margin-top: 22px;
+
+  display: grid;
+}
+
+.trendItem {
+  padding: 16px 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  border-top:
+    1px solid
+    var(--color-border-soft);
+}
+
+.trendItem div {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+}
+
+.trendItem strong {
+  color:
+    var(--color-text-primary);
+
+  font-size:
+    var(--font-size-sm);
+}
+
+.trendItem span {
+  color:
+    var(--color-text-secondary);
+
+  font-size:
+    var(--font-size-xs);
+
+  line-height: 1.4;
+}
+
+.trendItem b {
+  flex-shrink: 0;
+
+  color:
+    var(--color-success);
+
+  font-size:
+    var(--font-size-sm);
+}
+
+.analysisButton {
+  width: 100%;
+
+  margin-top: 8px;
+  padding: 11px 14px;
+
+  color:
+    var(--color-primary);
+
+  background-color:
+    var(--color-primary-soft);
+
+  border: none;
+
+  border-radius:
+    var(--radius-md);
+
+  cursor: pointer;
+
+  font: inherit;
+
+  font-size:
+    var(--font-size-sm);
+
+  font-weight:
+    var(--font-weight-semibold);
+
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.analysisButton:hover {
+  background-color: #e6ebff;
+}
+
+.analysisButton:active {
+  transform:
+    translateY(1px);
+}
+
+@media (max-width: 1024px) {
+  .marketCard {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .marketCard {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .marketCard {
+    padding: 20px;
+  }
+}
