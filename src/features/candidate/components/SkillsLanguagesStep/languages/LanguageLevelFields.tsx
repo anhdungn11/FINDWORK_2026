@@ -1,6 +1,6 @@
 import type { LanguageProficiency } from "@/features/candidate/types/onboarding.types";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
+import formStyles from "../SkillsLanguagesForm.module.css";
 import styles from "./LanguagesSection.module.css";
 
 interface LanguageLevelFieldProps {
@@ -25,7 +25,7 @@ const LanguageLevelField = ({
   value,
   onChange,
 }: LanguageLevelFieldProps) => (
-  <div className={sharedStyles.field}>
+  <div className={formStyles.field}>
     <label>{label}</label>
     <select
       value={value}

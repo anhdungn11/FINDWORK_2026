@@ -5,7 +5,7 @@ import {
   getCertificateTypeByCode,
 } from "@/features/candidate/utils/language.constants";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
+import cardStyles from "../SkillsLanguagesCard.module.css";
 import styles from "./LanguagesSection.module.css";
 import CertificateEditor from "./CertificateEditor";
 import type { LanguagesEditor } from "./useLanguagesEditor";
@@ -60,11 +60,11 @@ const CertificateCard = ({
           )}
         </div>
 
-        <div className={sharedStyles.cardActions}>
+        <div className={cardStyles.cardActions}>
           {!isEditing && (
             <button
               type="button"
-              className={sharedStyles.editButton}
+              className={cardStyles.editButton}
               onClick={() => editor.editCertificate(languageId, certificate.id)}
             >
               Sửa
@@ -73,7 +73,7 @@ const CertificateCard = ({
 
           <button
             type="button"
-            className={sharedStyles.removeButton}
+            className={cardStyles.removeButton}
             onClick={() => editor.removeCertificate(languageId, certificate.id)}
           >
             Xóa

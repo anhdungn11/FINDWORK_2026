@@ -4,8 +4,7 @@ import type {
 } from "@/features/candidate/types/onboarding.types";
 import { getLanguageLabel } from "@/features/candidate/utils/language.constants";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
-
+import cardStyles from "../SkillsLanguagesCard.module.css";
 import LanguageEditor from "./LanguageEditor";
 import type { LanguagesEditor } from "./useLanguagesEditor";
 
@@ -31,10 +30,10 @@ const LanguageCard = ({ language, index, editor }: LanguageCardProps) => {
   const isEditing = editor.editingLanguageId === language.id;
 
   return (
-    <article className={sharedStyles.itemCard}>
-      <div className={sharedStyles.cardHeader}>
+    <article className={cardStyles.itemCard}>
+      <div className={cardStyles.cardHeader}>
         <div>
-          <span className={sharedStyles.itemNumber}>NGÔN NGỮ {index + 1}</span>
+          <span className={cardStyles.itemNumber}>NGÔN NGỮ {index + 1}</span>
           <h4>
             {getLanguageLabel(
               language.languageCode,
@@ -43,18 +42,18 @@ const LanguageCard = ({ language, index, editor }: LanguageCardProps) => {
           </h4>
 
           {!isEditing && (
-            <div className={sharedStyles.summary}>
+            <div className={cardStyles.summary}>
               <p>{getLanguageLevelLabel(language.overallLevel)}</p>
               <span>{language.certificates.length} chứng chỉ</span>
             </div>
           )}
         </div>
 
-        <div className={sharedStyles.cardActions}>
+        <div className={cardStyles.cardActions}>
           {!isEditing && (
             <button
               type="button"
-              className={sharedStyles.editButton}
+              className={cardStyles.editButton}
               onClick={() => editor.editLanguage(language.id)}
             >
               Sửa
@@ -63,7 +62,7 @@ const LanguageCard = ({ language, index, editor }: LanguageCardProps) => {
 
           <button
             type="button"
-            className={sharedStyles.removeButton}
+            className={cardStyles.removeButton}
             onClick={() => editor.removeLanguage(language.id)}
           >
             Xóa

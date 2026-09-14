@@ -5,7 +5,7 @@ import {
   getSkillName,
 } from "@/features/candidate/utils/skill.constants";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
+import cardStyles from "../SkillsLanguagesCard.module.css";
 import styles from "./SkillsSection.module.css";
 import SkillEditor from "./SkillEditor";
 
@@ -87,10 +87,10 @@ const SkillCard = ({
   );
 
   return (
-    <article className={sharedStyles.itemCard}>
-      <div className={sharedStyles.cardHeader}>
+    <article className={cardStyles.itemCard}>
+      <div className={cardStyles.cardHeader}>
         <div>
-          <span className={sharedStyles.itemNumber}>
+          <span className={cardStyles.itemNumber}>
             KỸ NĂNG {index + 1}
           </span>
 
@@ -101,7 +101,7 @@ const SkillCard = ({
           </h4>
 
           {!isEditing && (
-            <div className={sharedStyles.summary}>
+            <div className={cardStyles.summary}>
               <p>
                 {categoryName ||
                   (skill.skillCode === OTHER_SKILL_CODE
@@ -126,11 +126,11 @@ const SkillCard = ({
           )}
         </div>
 
-        <div className={sharedStyles.cardActions}>
+        <div className={cardStyles.cardActions}>
           {!isEditing && (
             <button
               type="button"
-              className={sharedStyles.editButton}
+              className={cardStyles.editButton}
               onClick={() =>
                 onEdit(skill)
               }
@@ -141,7 +141,7 @@ const SkillCard = ({
 
           <button
             type="button"
-            className={sharedStyles.removeButton}
+            className={cardStyles.removeButton}
             onClick={() =>
               onRemove(skill.id)
             }

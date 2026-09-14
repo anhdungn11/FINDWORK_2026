@@ -7,3 +7,4 @@ export type { CareerPreferences } from "./onboarding/preferences.types";
 export type { PrivacySettings } from "./onboarding/privacy.types";
 export type { ResumeInfo } from "./onboarding/resume.types";
 export type { CandidateSkillItem, SkillLevel } from "./onboarding/skill.types";
+

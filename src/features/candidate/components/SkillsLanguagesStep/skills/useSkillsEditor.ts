@@ -1,29 +1,33 @@
 import { useState } from "react";
 
-import type { CandidateSkillItem } from "@/features/candidate/types/onboarding.types";
+import type {
+  CandidateSkillItem,
+} from "@/features/candidate/types/onboarding.types";
 
 import {
   OTHER_SKILL_CODE,
-  getSkillIdentity,
   getSkillName,
 } from "@/features/candidate/utils/skill.constants";
 
-const createSkill = (): CandidateSkillItem => ({
-  id: crypto.randomUUID(),
+import {
+  clearSkillSelection,
+  removeSkillItem,
+  selectSkillIdentity,
+  updateSkillItem,
+} from "./skill-editor.operations";
 
-  skillCode: "",
-  customSkillName: "",
+import {
+  createSkill,
+  getHighlightValidationError,
+  getSkillValidationError,
+} from "./skill-editor.utils";
 
-  level: "",
-
-  yearsOfExperience: "",
-
-  isHighlighted: false,
-});
+import useSkillSearchState from "./useSkillSearchState";
 
 const useSkillsEditor = (
   skills: CandidateSkillItem[],
-  onSkillsChange: (value: CandidateSkillItem[]) => void,
+  onSkillsChange:
+    (value: CandidateSkillItem[]) => void,
 ) => {
   const [editingSkillId, setEditingSkillId] =
     useState<string | null>(null);
@@ -31,24 +35,20 @@ const useSkillsEditor = (
   const [skillError, setSkillError] =
     useState("");
 
-  const [skillSearchValues, setSkillSearchValues] =
-    useState<Record<string, string>>({});
+  const search =
+    useSkillSearchState();
 
   const addSkill = () => {
     const skill = createSkill();
 
-    onSkillsChange([
-      ...skills,
-      skill,
-    ]);
+    onSkillsChange([...skills, skill]);
 
-    setSkillSearchValues((current) => ({
-      ...current,
-      [skill.id]: "",
-    }));
+    search.setSearchValue(
+      skill.id,
+      "",
+    );
 
     setEditingSkillId(skill.id);
-
     setSkillError("");
   };
 
@@ -60,35 +60,21 @@ const useSkillsEditor = (
     value: CandidateSkillItem[Key],
   ) => {
     onSkillsChange(
-      skills.map((skill) =>
-        skill.id === id
-          ? {
-              ...skill,
-              [key]: value,
-            }
-          : skill,
+      updateSkillItem(
+        skills,
+        id,
+        key,
+        value,
       ),
     );
   };
 
-  const removeSkill = (
-    id: string,
-  ) => {
+  const removeSkill = (id: string) => {
     onSkillsChange(
-      skills.filter(
-        (skill) => skill.id !== id,
-      ),
+      removeSkillItem(skills, id),
     );
 
-    setSkillSearchValues((current) => {
-      const next = {
-        ...current,
-      };
-
-      delete next[id];
-
-      return next;
-    });
+    search.removeSearchValue(id);
 
     if (editingSkillId === id) {
       setEditingSkillId(null);
@@ -101,23 +87,16 @@ const useSkillsEditor = (
     skill: CandidateSkillItem,
     value: string,
   ) => {
-    setSkillSearchValues((current) => ({
-      ...current,
-      [skill.id]: value,
-    }));
+    search.setSearchValue(
+      skill.id,
+      value,
+    );
 
     if (skill.skillCode) {
       onSkillsChange(
-        skills.map((item) =>
-          item.id === skill.id
-            ? {
-                ...item,
-
-                skillCode: "",
-
-                customSkillName: "",
-              }
-            : item,
+        clearSkillSelection(
+          skills,
+          skill.id,
         ),
       );
     }
@@ -131,24 +110,18 @@ const useSkillsEditor = (
     skillName: string,
   ) => {
     onSkillsChange(
-      skills.map((skill) =>
-        skill.id === skillId
-          ? {
-              ...skill,
-
-              skillCode,
-
-              customSkillName: "",
-            }
-          : skill,
+      selectSkillIdentity(
+        skills,
+        skillId,
+        skillCode,
+        "",
       ),
     );
 
-    setSkillSearchValues((current) => ({
-      ...current,
-
-      [skillId]: skillName,
-    }));
+    search.setSearchValue(
+      skillId,
+      skillName,
+    );
 
     setSkillError("");
   };
@@ -164,156 +137,64 @@ const useSkillsEditor = (
       setSkillError(
         "Vui lòng nhập tên kỹ năng.",
       );
-
       return;
     }
 
     onSkillsChange(
-      skills.map((skill) =>
-        skill.id === skillId
-          ? {
-              ...skill,
-
-              skillCode:
-                OTHER_SKILL_CODE,
-
-              customSkillName:
-                normalizedName,
-            }
-          : skill,
+      selectSkillIdentity(
+        skills,
+        skillId,
+        OTHER_SKILL_CODE,
+        normalizedName,
       ),
     );
 
-    setSkillSearchValues((current) => ({
-      ...current,
-
-      [skillId]:
-        normalizedName,
-    }));
+    search.setSearchValue(
+      skillId,
+      normalizedName,
+    );
 
     setSkillError("");
-  };
-
-  const skillExists = (
-    skill: CandidateSkillItem,
-  ) => {
-    if (!skill.skillCode) {
-      return false;
-    }
-
-    const identity =
-      getSkillIdentity(
-        skill.skillCode,
-        skill.customSkillName,
-      );
-
-    return skills.some(
-      (item) =>
-        item.id !==
-          skill.id &&
-        Boolean(
-          item.skillCode,
-        ) &&
-        getSkillIdentity(
-          item.skillCode,
-          item.customSkillName,
-        ) === identity,
-    );
   };
 
   const completeSkill = (
     skill: CandidateSkillItem,
   ) => {
-    if (!skill.skillCode) {
-      setSkillError(
-        "Vui lòng chọn kỹ năng từ danh sách hoặc sử dụng kỹ năng khác.",
+    const error =
+      getSkillValidationError(
+        skills,
+        skill,
       );
 
+    if (error) {
+      setSkillError(error);
       return;
     }
 
-    if (
-      skill.skillCode ===
-        OTHER_SKILL_CODE &&
-      !skill.customSkillName.trim()
-    ) {
-      setSkillError(
-        "Vui lòng nhập tên kỹ năng.",
-      );
-
-      return;
-    }
-
-    if (skillExists(skill)) {
-      setSkillError(
-        "Kỹ năng này đã tồn tại trong hồ sơ.",
-      );
-
-      return;
-    }
-
-    if (!skill.level) {
-      setSkillError(
-        "Vui lòng chọn mức độ kỹ năng.",
-      );
-
-      return;
-    }
-
-    if (
-      skill.yearsOfExperience
-    ) {
-      const years =
-        Number(
-          skill.yearsOfExperience,
-        );
-
-      if (
-        Number.isNaN(years) ||
-        years < 0 ||
-        years > 60
-      ) {
-        setSkillError(
-          "Số năm kinh nghiệm không hợp lệ.",
-        );
-
-        return;
-      }
-    }
-
-    setSkillSearchValues((current) => ({
-      ...current,
-
-      [skill.id]:
-        getSkillName(
-          skill.skillCode,
-          skill.customSkillName,
-        ),
-    }));
+    search.setSearchValue(
+      skill.id,
+      getSkillName(
+        skill.skillCode,
+        skill.customSkillName,
+      ),
+    );
 
     setSkillError("");
-
-    setEditingSkillId(
-      null,
-    );
+    setEditingSkillId(null);
   };
 
   const editSkill = (
     skill: CandidateSkillItem,
   ) => {
-    setEditingSkillId(
+    setEditingSkillId(skill.id);
+
+    search.setSearchValue(
       skill.id,
+      getSkillName(
+        skill.skillCode,
+        skill.customSkillName,
+      ),
     );
-
-    setSkillSearchValues((current) => ({
-      ...current,
-
-      [skill.id]:
-        getSkillName(
-          skill.skillCode,
-          skill.customSkillName,
-        ),
-    }));
 
     setSkillError("");
   };
@@ -321,24 +202,15 @@ const useSkillsEditor = (
   const toggleHighlighted = (
     skill: CandidateSkillItem,
   ) => {
-    if (!skill.isHighlighted) {
-      const currentCount =
-        skills.filter(
-          (item) =>
-            item.isHighlighted &&
-            item.id !==
-              skill.id,
-        ).length;
+    const error =
+      getHighlightValidationError(
+        skills,
+        skill,
+      );
 
-      if (
-        currentCount >= 5
-      ) {
-        setSkillError(
-          "Bạn chỉ có thể chọn tối đa 5 kỹ năng nổi bật.",
-        );
-
-        return;
-      }
+    if (error) {
+      setSkillError(error);
+      return;
     }
 
     setSkillError("");
@@ -350,43 +222,20 @@ const useSkillsEditor = (
     );
   };
 
-  const getSkillSearchValue = (
-    skill: CandidateSkillItem,
-  ) =>
-    skillSearchValues[
-      skill.id
-    ] ??
-    (skill.skillCode
-      ? getSkillName(
-          skill.skillCode,
-          skill.customSkillName,
-        )
-      : "");
-
   return {
     editingSkillId,
-
     skillError,
-
     addSkill,
-
     updateSkill,
-
     removeSkill,
-
     handleSkillSearchChange,
-
     selectCatalogSkill,
-
     selectCustomSkill,
-
     completeSkill,
-
     editSkill,
-
     toggleHighlighted,
-
-    getSkillSearchValue,
+    getSkillSearchValue:
+      search.getSearchValue,
   };
 };
 

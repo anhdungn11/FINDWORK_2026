@@ -4,8 +4,7 @@ import type {
 } from "@/features/candidate/types/onboarding.types";
 import { LANGUAGE_OPTIONS } from "@/features/candidate/utils/language.constants";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
-
+import formStyles from "../SkillsLanguagesForm.module.css";
 import CertificateList from "./CertificateList";
 import LanguageLevelFields, {
   LanguageLevelOptions,
@@ -19,14 +18,14 @@ interface LanguageEditorProps {
 
 const LanguageEditor = ({ language, editor }: LanguageEditorProps) => {
   return (
-    <div className={sharedStyles.editArea}>
-      <div className={sharedStyles.sectionTitle}>
+    <div className={formStyles.editArea}>
+      <div className={formStyles.sectionTitle}>
         <span>THÔNG TIN NGÔN NGỮ</span>
         <h5>Ngôn ngữ & trình độ</h5>
       </div>
 
-      <div className={sharedStyles.grid}>
-        <div className={sharedStyles.field}>
+      <div className={formStyles.grid}>
+        <div className={formStyles.field}>
           <label>
             Ngôn ngữ <span>*</span>
           </label>
@@ -47,7 +46,7 @@ const LanguageEditor = ({ language, editor }: LanguageEditorProps) => {
         </div>
 
         {language.languageCode === "other" && (
-          <div className={sharedStyles.field}>
+          <div className={formStyles.field}>
             <label>
               Tên ngôn ngữ <span>*</span>
             </label>
@@ -66,7 +65,7 @@ const LanguageEditor = ({ language, editor }: LanguageEditorProps) => {
           </div>
         )}
 
-        <div className={sharedStyles.field}>
+        <div className={formStyles.field}>
           <label>
             Trình độ tổng quát <span>*</span>
           </label>
@@ -85,9 +84,9 @@ const LanguageEditor = ({ language, editor }: LanguageEditorProps) => {
         </div>
       </div>
 
-      <div className={sharedStyles.sectionDivider} />
+      <div className={formStyles.sectionDivider} />
 
-      <div className={sharedStyles.sectionTitle}>
+      <div className={formStyles.sectionTitle}>
         <span>KỸ NĂNG NGÔN NGỮ</span>
         <h5>Nghe · Nói · Đọc · Viết</h5>
       </div>
@@ -111,18 +110,18 @@ const LanguageEditor = ({ language, editor }: LanguageEditorProps) => {
         }
       />
 
-      <div className={sharedStyles.sectionDivider} />
+      <div className={formStyles.sectionDivider} />
 
       <CertificateList language={language} editor={editor} />
 
       {editor.languageError && (
-        <div className={sharedStyles.validationNotice}>{editor.languageError}</div>
+        <div className={formStyles.validationNotice}>{editor.languageError}</div>
       )}
 
-      <div className={sharedStyles.editActions}>
+      <div className={formStyles.editActions}>
         <button
           type="button"
-          className={sharedStyles.doneButton}
+          className={formStyles.doneButton}
           onClick={() => editor.completeLanguage(language)}
         >
           Hoàn tất ngôn ngữ

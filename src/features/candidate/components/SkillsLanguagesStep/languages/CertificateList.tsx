@@ -1,7 +1,7 @@
 import type { CandidateLanguageItem } from "@/features/candidate/types/onboarding.types";
 import { getCertificateTypesForLanguage } from "@/features/candidate/utils/language.constants";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
+import formStyles from "../SkillsLanguagesForm.module.css";
 import styles from "./LanguagesSection.module.css";
 import CertificateCard from "./CertificateCard";
 import type { LanguagesEditor } from "./useLanguagesEditor";
@@ -19,7 +19,7 @@ const CertificateList = ({ language, editor }: CertificateListProps) => {
   return (
     <>
       <div className={styles.certificateHeader}>
-        <div className={sharedStyles.sectionTitle}>
+        <div className={`${formStyles.sectionTitle} ${styles.certificateTitle}`}>
           <span>CHỨNG CHỈ</span>
           <h5>Chứng chỉ ngôn ngữ</h5>
         </div>

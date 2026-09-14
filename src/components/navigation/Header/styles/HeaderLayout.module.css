@@ -1,0 +1,53 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  background:
+    rgb(255 255 255 / 0.92);
+
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+
+  border-bottom:
+    1px solid
+    rgb(226 232 240 / 0.88);
+}
+
+.inner {
+  min-height: 72px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 30px;
+}
+
+.logo {
+  flex-shrink: 0;
+
+  color: var(--color-primary);
+
+  font-size: 22px;
+  font-weight: var(--font-weight-bold);
+
+  text-decoration: none;
+
+  letter-spacing: -0.7px;
+}
+
+@media (max-width: 1180px) {
+  .inner {
+    gap: 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .inner {
+    min-height: 64px;
+  }
+
+  .logo {
+    font-size: 20px;
+  }
+}

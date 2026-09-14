@@ -5,7 +5,7 @@ import {
   searchSkills,
 } from "@/features/candidate/utils/skill.constants";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
+import formStyles from "../SkillsLanguagesForm.module.css";
 import styles from "./SkillsSection.module.css";
 
 interface SkillPickerProps {
@@ -44,7 +44,7 @@ const SkillPicker = ({
     : [];
 
   return (
-    <div className={`${sharedStyles.field} ${sharedStyles.fullWidth}`}>
+    <div className={`${formStyles.field} ${formStyles.fullWidth}`}>
       <label>
         Kỹ năng
         <span>*</span>

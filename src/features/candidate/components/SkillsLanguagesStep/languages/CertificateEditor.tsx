@@ -2,7 +2,7 @@ import type { LanguageCertificateItem } from "@/features/candidate/types/onboard
 import type { LanguageCertificateType } from "@/features/candidate/utils/language.constants";
 import { getCertificateTypeByCode } from "@/features/candidate/utils/language.constants";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
+import formStyles from "../SkillsLanguagesForm.module.css";
 import styles from "./LanguagesSection.module.css";
 import type { LanguagesEditor } from "./useLanguagesEditor";
 
@@ -23,8 +23,8 @@ const CertificateEditor = ({
 
   return (
     <div className={styles.certificateForm}>
-      <div className={sharedStyles.grid}>
-        <div className={sharedStyles.field}>
+      <div className={formStyles.grid}>
+        <div className={formStyles.field}>
           <label>
             Loại chứng chỉ <span>*</span>
           </label>
@@ -49,7 +49,7 @@ const CertificateEditor = ({
         </div>
 
         {certificate.certificateTypeCode === "other" && (
-          <div className={sharedStyles.field}>
+          <div className={formStyles.field}>
             <label>
               Tên chứng chỉ <span>*</span>
             </label>
@@ -75,7 +75,7 @@ const CertificateEditor = ({
           <div className={styles.certificateScoreSection}>
             {(definition?.supportsLevel ||
               certificate.certificateTypeCode === "other") && (
-              <div className={sharedStyles.field}>
+              <div className={formStyles.field}>
                 <label>Cấp độ</label>
                 {definition?.levelOptions && definition.levelOptions.length > 0 ? (
                   <select
@@ -116,7 +116,7 @@ const CertificateEditor = ({
 
             {(definition?.supportsOverallScore ||
               certificate.certificateTypeCode === "other") && (
-              <div className={sharedStyles.field}>
+              <div className={formStyles.field}>
                 <label>Điểm tổng / Overall</label>
                 <input
                   type="text"
@@ -145,7 +145,7 @@ const CertificateEditor = ({
                   );
 
                   return (
-                    <div key={field.code} className={sharedStyles.field}>
+                    <div key={field.code} className={formStyles.field}>
                       <label>{field.label}</label>
                       <input
                         type="number"
@@ -172,10 +172,10 @@ const CertificateEditor = ({
         </>
       )}
 
-      <div className={sharedStyles.sectionDivider} />
+      <div className={formStyles.sectionDivider} />
 
-      <div className={sharedStyles.grid}>
-        <div className={sharedStyles.field}>
+      <div className={formStyles.grid}>
+        <div className={formStyles.field}>
           <label>Ngày cấp / Ngày thi</label>
           <input
             type="date"
@@ -191,7 +191,7 @@ const CertificateEditor = ({
           />
         </div>
 
-        <div className={sharedStyles.field}>
+        <div className={formStyles.field}>
           <label>Ngày hết hạn</label>
           <input
             type="date"
@@ -208,7 +208,7 @@ const CertificateEditor = ({
           <small>Để trống nếu không áp dụng.</small>
         </div>
 
-        <div className={sharedStyles.field}>
+        <div className={formStyles.field}>
           <label>Đơn vị cấp</label>
           <input
             type="text"
@@ -225,7 +225,7 @@ const CertificateEditor = ({
           />
         </div>
 
-        <div className={sharedStyles.field}>
+        <div className={formStyles.field}>
           <label>Mã chứng chỉ</label>
           <input
             type="text"
@@ -242,7 +242,7 @@ const CertificateEditor = ({
           />
         </div>
 
-        <div className={`${sharedStyles.field} ${sharedStyles.fullWidth}`}>
+        <div className={`${formStyles.field} ${formStyles.fullWidth}`}>
           <label>Link xác minh</label>
           <input
             type="url"
@@ -261,15 +261,15 @@ const CertificateEditor = ({
       </div>
 
       {editor.certificateError && (
-        <div className={sharedStyles.validationNotice}>
+        <div className={formStyles.validationNotice}>
           {editor.certificateError}
         </div>
       )}
 
-      <div className={sharedStyles.editActions}>
+      <div className={formStyles.editActions}>
         <button
           type="button"
-          className={sharedStyles.doneButton}
+          className={formStyles.doneButton}
           onClick={() => editor.completeCertificate(certificate)}
         >
           Hoàn tất chứng chỉ

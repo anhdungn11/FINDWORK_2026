@@ -1,6 +1,6 @@
 import type { CandidateSkillItem } from "@/features/candidate/types/onboarding.types";
 
-import sharedStyles from "../SkillsLanguagesShared.module.css";
+import formStyles from "../SkillsLanguagesForm.module.css";
 import styles from "./SkillsSection.module.css";
 import SkillPicker from "./SkillPicker";
 
@@ -46,8 +46,8 @@ const SkillEditor = ({
   onComplete,
 }: SkillEditorProps) => {
   return (
-    <div className={sharedStyles.editArea}>
-      <div className={sharedStyles.grid}>
+    <div className={formStyles.editArea}>
+      <div className={formStyles.grid}>
         <SkillPicker
           skill={skill}
           searchValue={searchValue}
@@ -56,7 +56,7 @@ const SkillEditor = ({
           onSelectCustom={onSelectCustom}
         />
 
-        <div className={sharedStyles.field}>
+        <div className={formStyles.field}>
           <label>
             Mức độ
             <span>*</span>
@@ -81,7 +81,7 @@ const SkillEditor = ({
           </select>
         </div>
 
-        <div className={sharedStyles.field}>
+        <div className={formStyles.field}>
           <label>Số năm kinh nghiệm</label>
 
           <input
@@ -126,15 +126,15 @@ const SkillEditor = ({
       </small>
 
       {error && (
-        <div className={sharedStyles.validationNotice}>
+        <div className={formStyles.validationNotice}>
           {error}
         </div>
       )}
 
-      <div className={sharedStyles.editActions}>
+      <div className={formStyles.editActions}>
         <button
           type="button"
-          className={sharedStyles.doneButton}
+          className={formStyles.doneButton}
           onClick={() =>
             onComplete(skill)
           }

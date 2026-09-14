@@ -3,64 +3,69 @@ import { useState } from "react";
 import type {
   CandidateLanguageItem,
   LanguageCertificateItem,
-  LanguageCertificateScoreItem,
 } from "@/features/candidate/types/onboarding.types";
 
-import { getCertificateTypeByCode } from "@/features/candidate/utils/language.constants";
+import {
+  addCertificateToLanguage,
+  removeCertificateItem,
+  replaceCertificateItem,
+  updateCertificateItem,
+  updateCertificateScoreItem,
+} from "./certificate-editor.operations";
+
+import {
+  applyCertificateType,
+  createCertificate,
+  getCertificateValidationError,
+} from "./certificate-editor.utils";
 
 export interface EditingCertificate {
   languageId: string;
   certificateId: string;
 }
 
-const createCertificate = (): LanguageCertificateItem => ({
-  id: crypto.randomUUID(),
-  certificateTypeCode: "",
-  customCertificateName: "",
-  level: "",
-  overallScore: "",
-  scores: [],
-  issuedDate: "",
-  expiryDate: "",
-  issuer: "",
-  credentialId: "",
-  verificationUrl: "",
-});
-
 const useCertificatesEditor = (
-  languages: CandidateLanguageItem[],
-  onLanguagesChange: (value: CandidateLanguageItem[]) => void,
+  languages:
+    CandidateLanguageItem[],
+  onLanguagesChange:
+    (value: CandidateLanguageItem[]) => void,
 ) => {
-  const [editingCertificate, setEditingCertificate] =
-    useState<EditingCertificate | null>(null);
+  const [
+    editingCertificate,
+    setEditingCertificate,
+  ] =
+    useState<EditingCertificate | null>(
+      null,
+    );
 
-  const [certificateError, setCertificateError] = useState("");
+  const [
+    certificateError,
+    setCertificateError,
+  ] = useState("");
 
   const resetCertificateEditor = () => {
     setEditingCertificate(null);
     setCertificateError("");
   };
 
-  const addCertificate = (languageId: string) => {
-    const certificate = createCertificate();
+  const addCertificate = (
+    languageId: string,
+  ) => {
+    const certificate =
+      createCertificate();
 
     onLanguagesChange(
-      languages.map((language) =>
-        language.id === languageId
-          ? {
-              ...language,
-              certificates: [
-                ...language.certificates,
-                certificate,
-              ],
-            }
-          : language,
+      addCertificateToLanguage(
+        languages,
+        languageId,
+        certificate,
       ),
     );
 
     setEditingCertificate({
       languageId,
-      certificateId: certificate.id,
+      certificateId:
+        certificate.id,
     });
 
     setCertificateError("");
@@ -72,26 +77,16 @@ const useCertificatesEditor = (
     languageId: string,
     certificateId: string,
     key: Key,
-    value: LanguageCertificateItem[Key],
+    value:
+      LanguageCertificateItem[Key],
   ) => {
     onLanguagesChange(
-      languages.map((language) =>
-        language.id === languageId
-          ? {
-              ...language,
-              certificates:
-                language.certificates.map(
-                  (certificate) =>
-                    certificate.id ===
-                    certificateId
-                      ? {
-                          ...certificate,
-                          [key]: value,
-                        }
-                      : certificate,
-                ),
-            }
-          : language,
+      updateCertificateItem(
+        languages,
+        languageId,
+        certificateId,
+        key,
+        value,
       ),
     );
   };
@@ -101,18 +96,10 @@ const useCertificatesEditor = (
     certificateId: string,
   ) => {
     onLanguagesChange(
-      languages.map((language) =>
-        language.id === languageId
-          ? {
-              ...language,
-              certificates:
-                language.certificates.filter(
-                  (certificate) =>
-                    certificate.id !==
-                    certificateId,
-                ),
-            }
-          : language,
+      removeCertificateItem(
+        languages,
+        languageId,
+        certificateId,
       ),
     );
 
@@ -140,88 +127,29 @@ const useCertificatesEditor = (
     setCertificateError("");
   };
 
-  const handleCertificateTypeChange = (
-    languageId: string,
-    certificate: LanguageCertificateItem,
-    certificateTypeCode: string,
-  ) => {
-    const definition =
-      getCertificateTypeByCode(
-        certificateTypeCode,
+  const handleCertificateTypeChange =
+    (
+      languageId: string,
+      certificate:
+        LanguageCertificateItem,
+      certificateTypeCode: string,
+    ) => {
+      const nextCertificate =
+        applyCertificateType(
+          certificate,
+          certificateTypeCode,
+        );
+
+      onLanguagesChange(
+        replaceCertificateItem(
+          languages,
+          languageId,
+          nextCertificate,
+        ),
       );
 
-    const oldScores = new Map(
-      certificate.scores.map((score) => [
-        score.componentCode,
-        score.value,
-      ]),
-    );
-
-    const scores: LanguageCertificateScoreItem[] =
-      definition
-        ? definition.scoreFields.map(
-            (field) => ({
-              id: crypto.randomUUID(),
-
-              componentCode:
-                field.code,
-
-              value:
-                oldScores.get(
-                  field.code,
-                ) ?? "",
-            }),
-          )
-        : [];
-
-    const updatedCertificate: LanguageCertificateItem =
-      {
-        ...certificate,
-
-        certificateTypeCode,
-
-        customCertificateName:
-          certificateTypeCode ===
-          "other"
-            ? certificate.customCertificateName
-            : "",
-
-        level:
-          definition?.supportsLevel
-            ? certificate.level
-            : "",
-
-        overallScore:
-          definition?.supportsOverallScore ||
-          certificateTypeCode ===
-            "other"
-            ? certificate.overallScore
-            : "",
-
-        scores,
-      };
-
-    onLanguagesChange(
-      languages.map((language) =>
-        language.id === languageId
-          ? {
-              ...language,
-
-              certificates:
-                language.certificates.map(
-                  (item) =>
-                    item.id ===
-                    certificate.id
-                      ? updatedCertificate
-                      : item,
-                ),
-            }
-          : language,
-      ),
-    );
-
-    setCertificateError("");
-  };
+      setCertificateError("");
+    };
 
   const updateCertificateScore = (
     languageId: string,
@@ -230,98 +158,31 @@ const useCertificatesEditor = (
     value: string,
   ) => {
     onLanguagesChange(
-      languages.map((language) =>
-        language.id === languageId
-          ? {
-              ...language,
-
-              certificates:
-                language.certificates.map(
-                  (certificate) =>
-                    certificate.id ===
-                    certificateId
-                      ? {
-                          ...certificate,
-
-                          scores:
-                            certificate.scores.map(
-                              (score) =>
-                                score.componentCode ===
-                                componentCode
-                                  ? {
-                                      ...score,
-                                      value,
-                                    }
-                                  : score,
-                            ),
-                        }
-                      : certificate,
-                ),
-            }
-          : language,
+      updateCertificateScoreItem(
+        languages,
+        languageId,
+        certificateId,
+        componentCode,
+        value,
       ),
     );
   };
 
   const completeCertificate = (
-    certificate: LanguageCertificateItem,
+    certificate:
+      LanguageCertificateItem,
   ) => {
-    if (
-      !certificate.certificateTypeCode
-    ) {
-      setCertificateError(
-        "Vui lòng chọn loại chứng chỉ.",
+    const error =
+      getCertificateValidationError(
+        certificate,
       );
 
-      return;
-    }
-
-    if (
-      certificate.certificateTypeCode ===
-        "other" &&
-      !certificate.customCertificateName.trim()
-    ) {
-      setCertificateError(
-        "Vui lòng nhập tên chứng chỉ.",
-      );
-
-      return;
-    }
-
-    const definition =
-      getCertificateTypeByCode(
-        certificate.certificateTypeCode,
-      );
-
-    if (
-      definition?.supportsLevel &&
-      definition.levelOptions &&
-      definition.levelOptions.length >
-        0 &&
-      !certificate.level
-    ) {
-      setCertificateError(
-        "Vui lòng chọn cấp độ của chứng chỉ.",
-      );
-
-      return;
-    }
-
-    if (
-      certificate.issuedDate &&
-      certificate.expiryDate &&
-      certificate.expiryDate <
-        certificate.issuedDate
-    ) {
-      setCertificateError(
-        "Ngày hết hạn không thể trước ngày cấp.",
-      );
-
+    if (error) {
+      setCertificateError(error);
       return;
     }
 
     setCertificateError("");
-
     setEditingCertificate(null);
   };
 
@@ -337,18 +198,14 @@ const useCertificatesEditor = (
   return {
     editingCertificate,
     certificateError,
-
     resetCertificateEditor,
-
     addCertificate,
     updateCertificate,
     removeCertificate,
     editCertificate,
-
     handleCertificateTypeChange,
     updateCertificateScore,
     completeCertificate,
-
     isCertificateEditing,
   };
 };

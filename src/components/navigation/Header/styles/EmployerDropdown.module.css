@@ -1,0 +1,130 @@
+.employerMenu {
+  width: 330px;
+
+  padding: 10px;
+}
+
+.employerIntro {
+  padding:
+    8px
+    10px
+    10px;
+}
+
+.employerEyebrow {
+  padding:
+    0
+    0
+    7px;
+
+  color: var(--color-primary);
+}
+
+.employerIntro strong {
+  display: block;
+
+  color: var(--color-text-primary);
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.employerIntro p {
+  margin:
+    5px
+    0
+    0;
+
+  color: var(--color-text-secondary);
+
+  font-size: 11px;
+
+  line-height: 1.5;
+}
+
+.menuDivider {
+  height: 1px;
+
+  margin:
+    2px
+    8px
+    7px;
+
+  background: #edf0f4;
+}
+
+.employerMenuItem {
+  display: flex;
+  align-items: center;
+
+  gap: 11px;
+
+  padding:
+    10px
+    9px;
+
+  color: inherit;
+
+  border-radius: 11px;
+
+  text-decoration: none;
+
+  transition:
+    background-color 150ms ease;
+}
+
+.employerMenuItem:hover {
+  background: #f8fafc;
+}
+
+.menuItemIcon {
+  width: 35px;
+  height: 35px;
+
+  flex-shrink: 0;
+
+  display: grid;
+  place-items: center;
+
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+
+  border: 1px solid #e0e5ff;
+  border-radius: 10px;
+}
+
+.menuItemIcon svg {
+  width: 17px;
+  height: 17px;
+
+  fill: none;
+
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.employerMenuItem > span:last-child {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.employerMenuItem strong {
+  color: var(--color-text-primary);
+
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.employerMenuItem small {
+  color: var(--color-text-muted);
+
+  font-size: 10px;
+
+  line-height: 1.4;
+}
