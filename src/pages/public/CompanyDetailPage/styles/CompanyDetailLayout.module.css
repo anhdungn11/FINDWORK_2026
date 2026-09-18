@@ -1,0 +1,38 @@
+.page {
+  min-height: 100vh;
+
+  background:
+    var(--color-background);
+}
+
+.contentSection {
+  padding:
+    20px
+    0
+    90px;
+}
+
+.contentGrid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    320px;
+
+  gap: 24px;
+
+  align-items: start;
+}
+
+.mainContent {
+  display: flex;
+  flex-direction: column;
+
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+}

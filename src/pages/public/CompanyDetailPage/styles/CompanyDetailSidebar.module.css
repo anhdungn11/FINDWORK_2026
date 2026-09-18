@@ -1,0 +1,156 @@
+.sidebar {
+  position: sticky;
+
+  top: 96px;
+}
+
+.infoCard {
+  padding: 28px;
+
+  background:
+    var(--color-surface);
+
+  border:
+    1px solid
+    var(--color-border);
+
+  border-radius: 18px;
+
+  box-shadow:
+    0 8px 24px
+    rgb(15 23 42 / 0.04);
+}
+
+.sectionLabel {
+  color:
+    var(--color-primary);
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 1.1px;
+}
+
+.infoList {
+  margin-top: 20px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 18px;
+}
+
+.infoItem {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 12px;
+}
+
+.infoIcon {
+  width: 34px;
+  height: 34px;
+
+  flex-shrink: 0;
+
+  display: grid;
+  place-items: center;
+
+  color:
+    var(--color-primary);
+
+  background:
+    var(--color-primary-soft);
+
+  border-radius: 9px;
+}
+
+.infoIcon svg {
+  width: 17px;
+  height: 17px;
+
+  fill: none;
+
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.infoItem div {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+}
+
+.infoItem span:not(.infoIcon) {
+  color:
+    var(--color-text-muted);
+
+  font-size: 10px;
+  font-weight: 600;
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.35px;
+}
+
+.infoItem strong,
+.infoItem a {
+  overflow-wrap: anywhere;
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 12px;
+  font-weight: 650;
+
+  text-decoration: none;
+}
+
+.infoItem a {
+  color:
+    var(--color-primary);
+}
+
+.infoItem a:hover {
+  text-decoration: underline;
+}
+
+.backLink {
+  margin-top: 14px;
+
+  display: inline-flex;
+  align-items: center;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+  font-weight: 600;
+
+  text-decoration: none;
+
+  transition:
+    color 150ms ease;
+}
+
+.backLink:hover {
+  color:
+    var(--color-primary);
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .infoCard {
+    padding: 22px;
+  }
+}

@@ -1,0 +1,2 @@
+.divider { margin: 24px 0; display: flex; align-items: center; gap: 12px; color: #94a3b8; font-size: 11px; }
+.divider::before, .divider::after { content: ""; height: 1px; flex: 1; background: #e8edf3; }

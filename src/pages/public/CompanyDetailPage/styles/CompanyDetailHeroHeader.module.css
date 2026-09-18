@@ -1,0 +1,184 @@
+.companyHeader {
+  position: relative;
+
+  margin-top: -50px;
+
+  display: flex;
+  align-items: flex-end;
+
+  gap: 20px;
+
+  padding:
+    0
+    28px
+    32px;
+}
+
+.logo {
+  position: relative;
+
+  width: 108px;
+  height: 108px;
+
+  flex-shrink: 0;
+
+  display: grid;
+  place-items: center;
+
+  overflow: hidden;
+
+  color:
+    var(--color-primary);
+
+  background:
+    var(--color-surface);
+
+  border:
+    5px solid
+    var(--color-surface);
+
+  border-radius: 22px;
+
+  box-shadow:
+    0 14px 32px
+    rgb(15 23 42 / 0.12);
+
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.logo img {
+  position: absolute;
+
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: contain;
+
+  background:
+    var(--color-surface);
+}
+
+.logo span {
+  position: relative;
+  z-index: 0;
+}
+
+.companyInfo {
+  min-width: 0;
+
+  flex: 1;
+
+  padding-bottom: 5px;
+}
+
+.eyebrow {
+  color:
+    var(--color-primary);
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 1.1px;
+}
+
+.companyInfo h1 {
+  margin:
+    7px
+    0
+    0;
+
+  color:
+    var(--color-text-primary);
+
+  font-size:
+    clamp(
+      28px,
+      3vw,
+      38px
+    );
+
+  font-weight:
+    var(--font-weight-bold);
+
+  letter-spacing: -0.9px;
+}
+
+.meta {
+  margin-top: 10px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size:
+    var(--font-size-sm);
+}
+
+.dot {
+  width: 4px;
+  height: 4px;
+
+  background: #cbd5e1;
+
+  border-radius: 50%;
+}
+
+@media (max-width: 900px) {
+  .companyHeader {
+    align-items: flex-start;
+
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .companyHeader {
+    margin-top: -36px;
+
+    padding:
+      0
+      12px
+      24px;
+
+    gap: 14px;
+  }
+
+  .logo {
+    width: 82px;
+    height: 82px;
+
+    border-radius: 17px;
+
+    font-size: 26px;
+  }
+
+  .companyInfo {
+    width:
+      calc(
+        100% - 96px
+      );
+  }
+
+  .companyInfo h1 {
+    font-size: 24px;
+  }
+
+  .meta {
+    align-items: flex-start;
+
+    flex-direction: column;
+
+    gap: 4px;
+  }
+
+  .dot {
+    display: none;
+  }
+}

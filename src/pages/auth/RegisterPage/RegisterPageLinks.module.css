@@ -1,0 +1,9 @@
+.termsLink {
+  color: var(--color-primary);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.termsLink:hover {
+  text-decoration: underline;
+}

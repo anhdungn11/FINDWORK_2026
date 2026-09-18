@@ -1,0 +1,15 @@
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field label { color: #253247; font-size: 13px; font-weight: 700; }
+.field input {
+  width: 100%; height: 50px; padding: 0 14px;
+  color: var(--color-text-primary); background: #ffffff;
+  border: 1px solid #dfe5ed; border-radius: 10px; outline: none;
+  font: inherit; font-size: 13px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.field input::placeholder { color: #a7b2c2; }
+.field input:hover { border-color: #ccd6e2; }
+.field input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(79 110 247 / 0.09);
+}

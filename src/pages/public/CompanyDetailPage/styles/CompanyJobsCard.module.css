@@ -1,0 +1,108 @@
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 20px;
+}
+
+.jobCount {
+  flex-shrink: 0;
+
+  padding:
+    7px
+    10px;
+
+  color:
+    var(--color-primary);
+
+  background:
+    var(--color-primary-soft);
+
+  border-radius: 9px;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.emptyJobs {
+  margin-top: 24px;
+
+  padding:
+    42px
+    24px;
+
+  text-align: center;
+
+  background: #fbfcff;
+
+  border:
+    1px dashed #dbe3ef;
+
+  border-radius: 14px;
+}
+
+.emptyJobsIcon {
+  width: 46px;
+  height: 46px;
+
+  margin:
+    0
+    auto
+    14px;
+
+  display: grid;
+  place-items: center;
+
+  color:
+    var(--color-primary);
+
+  background:
+    var(--color-primary-soft);
+
+  border-radius: 13px;
+}
+
+.emptyJobsIcon svg {
+  width: 22px;
+  height: 22px;
+
+  fill: none;
+
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.emptyJobs h3 {
+  margin: 0;
+
+  color:
+    var(--color-text-primary);
+
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.emptyJobs p {
+  max-width: 480px;
+
+  margin:
+    8px
+    auto
+    0;
+
+  color:
+    var(--color-text-secondary);
+
+  font-size: 12px;
+
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .sectionHeader {
+    flex-direction: column;
+  }
+}

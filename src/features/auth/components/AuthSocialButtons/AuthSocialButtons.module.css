@@ -1,0 +1,15 @@
+.socialGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.socialButton {
+  min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 9px;
+  color: #334155; background: #ffffff; border: 1px solid #dfe5ed; border-radius: 10px;
+  cursor: pointer; font: inherit; font-size: 13px; font-weight: 650;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+.socialButton:hover { background: #f8fafc; border-color: #cbd5e1; transform: translateY(-1px); }
+.googleIcon, .linkedinIcon {
+  width: 20px; height: 20px; display: grid; place-items: center;
+  font-size: 10px; font-weight: 800;
+}
+.googleIcon { color: #4285f4; border: 1px solid #e2e8f0; border-radius: 50%; }
+.linkedinIcon { color: #ffffff; background: #0a66c2; border-radius: 4px; font-family: Arial, sans-serif; }
+@media (max-width: 640px) { .socialGrid { grid-template-columns: 1fr; } }
