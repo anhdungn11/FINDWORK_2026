@@ -1,0 +1,176 @@
+.page {
+  min-height: 100vh;
+  padding: 44px 24px 72px;
+  background: #f8fafc;
+}
+
+.container {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+
+.hero {
+  display: flex;
+  gap: 28px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.hero > div:first-child {
+  max-width: 680px;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(32px, 5vw, 46px);
+  letter-spacing: -0.035em;
+}
+
+.hero p {
+  margin: 12px 0 0;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.heroActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.counter {
+  padding: 9px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.addButton:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.addButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.infoStrip {
+  display: flex;
+  gap: 13px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  background: #eff6ff;
+}
+
+.infoIcon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.infoStrip strong {
+  color: #1e3a8a;
+}
+
+.infoStrip p {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.errorBanner,
+.limitNotice,
+.loadingCard {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+}
+
+.errorBanner {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.errorBanner button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.limitNotice {
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.loadingCard {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 32px 16px 56px;
+  }
+
+  .hero {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .heroActions {
+    justify-content: space-between;
+  }
+}
+.secondaryAddButton{border:1px solid #cbd5e1;border-radius:10px;padding:11px 15px;background:#fff;color:#334155;font-weight:800;cursor:pointer}.secondaryAddButton:disabled{opacity:.45;cursor:not-allowed}

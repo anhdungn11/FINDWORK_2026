@@ -2,6 +2,8 @@ import CareerPreferencesStep from "@/features/candidate/components/CareerPrefere
 import EducationStep from "@/features/candidate/components/EducationStep/EducationStep";
 import ExperienceStep from "@/features/candidate/components/ExperienceStep/ExperienceStep";
 import PersonalInfoStep from "@/features/candidate/components/PersonalInfoStep/PersonalInfoStep";
+import PrivacyStep from "@/features/candidate/components/PrivacyStep";
+import ResumeStep from "@/features/candidate/components/ResumeStep";
 import SkillsLanguagesStep from "@/features/candidate/components/SkillsLanguagesStep/SkillsLanguagesStep";
 import type {
   CandidateOnboardingData,
@@ -73,6 +75,26 @@ const OnboardingStepContent = ({
           value={data.preferences}
           onChange={(value) =>
             updateSection("preferences", value)
+          }
+        />
+      );
+
+    case "resume":
+      return (
+        <ResumeStep
+          value={data.resume}
+          onChange={(value) =>
+            updateSection("resume", value)
+          }
+        />
+      );
+
+    case "privacy":
+      return (
+        <PrivacyStep
+          value={data.privacy}
+          onChange={(value) =>
+            updateSection("privacy", value)
           }
         />
       );

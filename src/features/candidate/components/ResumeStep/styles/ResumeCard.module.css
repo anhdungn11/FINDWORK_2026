@@ -1,0 +1,193 @@
+.card {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+.fileSummary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fileIcon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  place-items: center;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.fileDetails {
+  min-width: 0;
+  flex: 1;
+}
+
+.fileDetails strong {
+  display: block;
+  overflow: hidden;
+  color: #172033;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileDetails span {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.readyBadge {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.nameField {
+  display: grid;
+  gap: 7px;
+}
+
+.nameField label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.nameField label span {
+  margin-left: 3px;
+  color: #dc2626;
+}
+
+.nameField input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  outline: none;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 14px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.nameField input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.09);
+}
+
+.nameField p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.errorMessage {
+  margin: -4px 0 0;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding-top: 2px;
+}
+
+.secondaryButton,
+.removeButton {
+  display: inline-flex;
+  min-height: 38px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 13px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.secondaryButton {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.secondaryButton:hover {
+  border-color: #93c5fd;
+  background: #f8fbff;
+}
+
+.removeButton {
+  border: 1px solid #fecaca;
+  background: #fffafa;
+  color: #b91c1c;
+}
+
+.removeButton:hover {
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 16px;
+  }
+
+  .fileSummary {
+    align-items: flex-start;
+  }
+
+  .readyBadge {
+    display: none;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .removeButton {
+    grid-column: 1 / -1;
+  }
+}

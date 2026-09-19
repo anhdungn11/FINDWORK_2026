@@ -1,0 +1,134 @@
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  padding: 18px 20px;
+  border: 1px solid #e5eaf3;
+  border-radius: 16px;
+  background: #ffffff;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.option:hover:not(.disabled) {
+  border-color: #cbd8ff;
+  background: #fbfcff;
+  box-shadow: 0 8px 24px rgba(33, 68, 148, 0.06);
+}
+
+.disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: #f8fafc;
+}
+
+.copy {
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.titleRow strong {
+  color: #172033;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #315bea;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.description {
+  display: block;
+  max-width: 650px;
+  color: #69758a;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.switchWrap {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 26px;
+}
+
+.input {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.disabled .input {
+  cursor: not-allowed;
+}
+
+.switch {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #d5dbe6;
+  transition: background 160ms ease;
+}
+
+.thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
+  transition: transform 160ms ease;
+}
+
+.input:checked + .switch {
+  background: #4f6df5;
+}
+
+.input:checked + .switch .thumb {
+  transform: translateX(20px);
+}
+
+.input:focus-visible + .switch {
+  outline: 3px solid rgba(79, 109, 245, 0.2);
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .option {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .switchWrap {
+    margin-top: 2px;
+  }
+}

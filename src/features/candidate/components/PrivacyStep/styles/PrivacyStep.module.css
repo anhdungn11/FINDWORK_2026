@@ -1,0 +1,145 @@
+.root {
+  display: grid;
+  gap: 24px;
+}
+
+.intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid #d9e4ff;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f5f8ff 0%, #fbfcff 100%);
+}
+
+.introIcon,
+.noticeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #e8efff;
+  color: #4163e8;
+}
+
+.introIcon svg,
+.noticeIcon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.intro strong,
+.notice strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #182238;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.intro p,
+.notice p {
+  margin: 0;
+  color: #66758b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.section {
+  padding: 22px;
+  border: 1px solid #e6eaf1;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.sectionHeader {
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: #3f62e7;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.sectionHeader h3 {
+  margin: 0 0 7px;
+  color: #151e30;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.sectionHeader p {
+  max-width: 720px;
+  margin: 0;
+  color: #6f7b8f;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.primaryOption {
+  margin-bottom: 12px;
+}
+
+.dependentOptions {
+  display: grid;
+  gap: 10px;
+  padding-left: 22px;
+}
+
+.disabledHint {
+  margin: 12px 0 0 22px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: #f7f9fc;
+  color: #778398;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 17px 18px;
+  border-radius: 16px;
+  background: #f7f9fc;
+}
+
+.noticeIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #edf1f7;
+  color: #64748b;
+}
+
+.noticeIcon svg {
+  width: 19px;
+  height: 19px;
+}
+
+@media (max-width: 720px) {
+  .root {
+    gap: 18px;
+  }
+
+  .section {
+    padding: 18px;
+  }
+
+  .dependentOptions {
+    padding-left: 0;
+  }
+
+  .disabledHint {
+    margin-left: 0;
+  }
+}

@@ -105,8 +105,11 @@ export const INITIAL_ONBOARDING_DATA:
     resume: {
       resumeName: "",
       resumeUrl: "",
+      fileName: "",
+      fileSize: null,
+      mimeType: "",
       hasExistingResume: false,
-      createLater: true,
+      createLater: false,
     },
 
     privacy: {

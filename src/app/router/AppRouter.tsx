@@ -14,6 +14,7 @@ import PublicLayout from "@/layouts/PublicLayout";
 
 import CandidateDashboardPage from "@/pages/candidate/CandidateDashboardPage";
 import CandidateProfilePage from "@/pages/candidate/CandidateProfilePage";
+import CvCenterPage from "@/pages/candidate/CvCenterPage";
 
 import CompaniesPage from "@/pages/public/CompaniesPage";
 import CompanyDetailPage from "@/pages/public/CompanyDetailPage";
@@ -26,6 +27,8 @@ import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage/ForgotPasswordPa
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage/ResetPasswordPage";
 import VerifyEmailPage from "@/pages/auth/VerifyEmailPage/VerifyEmailPage";
 import CandidateOnboardingPage from "@/pages/candidate/CandidateOnboardingPage";
+import ResumeBuilderPage from "@/pages/candidate/ResumeBuilderPage";
+
 const AppRouter = () => {
     return (
         <BrowserRouter>
@@ -58,7 +61,12 @@ const AppRouter = () => {
 
                     <Route
                         path={ROUTES.CV}
-                        element={<h1>CV Builder Page</h1>}
+                        element={<CvCenterPage />}
+                    />
+
+                    <Route
+                        path={ROUTES.CV_CREATE}
+                        element={<ResumeBuilderPage />}
                     />
 
                     <Route

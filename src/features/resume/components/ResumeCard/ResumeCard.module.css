@@ -1,0 +1,143 @@
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+}
+
+.documentIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 16px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.documentIcon svg {
+  width: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.body {
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.titleRow h3 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 18px;
+  color: #0f172a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.defaultBadge {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.fileName {
+  margin: 7px 0 0;
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.secondaryButton,
+.defaultButton {
+  min-height: 40px;
+  padding: 0 13px;
+  border-radius: 10px;
+  background: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.secondaryButton {
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.defaultButton {
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+.secondaryButton:hover,
+.defaultButton:hover {
+  background: #f8fafc;
+}
+
+.secondaryButton:focus-visible,
+.defaultButton:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.2);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 520px) {
+  .card {
+    padding: 18px;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .secondaryButton,
+  .defaultButton {
+    width: 100%;
+  }
+}
