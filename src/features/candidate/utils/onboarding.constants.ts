@@ -73,15 +73,33 @@ export const INITIAL_ONBOARDING_DATA:
     languages: [],
 
     preferences: {
-      employmentStatus: "",
-      desiredPosition: "",
-      industry: "",
-      desiredLocation: "",
-      employmentType: "",
-      workplaceType: "",
-      expectedSalaryMin: "",
-      expectedSalaryMax: "",
-      availableFrom: "",
+      desiredPositions: [],
+      preferredCategoryCodes: [],
+
+      locationPreference: {
+        mode: "selected",
+        provinceCodes: [],
+      },
+
+      employmentTypes: [],
+      workplaceTypes: [],
+
+      salaryExpectation: {
+        type: "range",
+        min: null,
+        max: null,
+        currency: "VND",
+        period: "month",
+      },
+
+      desiredCareerLevel: "",
+
+      availability: {
+        type: "",
+        availableFrom: "",
+      },
+
+      willingToRelocate: false,
     },
 
     resume: {

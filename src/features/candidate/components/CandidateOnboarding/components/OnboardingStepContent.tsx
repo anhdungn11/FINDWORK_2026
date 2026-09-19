@@ -1,3 +1,4 @@
+import CareerPreferencesStep from "@/features/candidate/components/CareerPreferencesStep";
 import EducationStep from "@/features/candidate/components/EducationStep/EducationStep";
 import ExperienceStep from "@/features/candidate/components/ExperienceStep/ExperienceStep";
 import PersonalInfoStep from "@/features/candidate/components/PersonalInfoStep/PersonalInfoStep";
@@ -7,6 +8,7 @@ import type {
   OnboardingStep,
   UpdateCandidateOnboardingSection,
 } from "@/features/candidate/types/onboarding.types";
+
 import PendingOnboardingStep from "./PendingOnboardingStep";
 
 interface OnboardingStepContentProps {
@@ -15,25 +17,72 @@ interface OnboardingStepContentProps {
   updateSection: UpdateCandidateOnboardingSection;
 }
 
-const OnboardingStepContent = ({ currentStep, data, updateSection }: OnboardingStepContentProps) => {
+const OnboardingStepContent = ({
+  currentStep,
+  data,
+  updateSection,
+}: OnboardingStepContentProps) => {
   switch (currentStep.id) {
     case "personal":
-      return <PersonalInfoStep value={data.personal} onChange={(value) => updateSection("personal", value)} />;
+      return (
+        <PersonalInfoStep
+          value={data.personal}
+          onChange={(value) =>
+            updateSection("personal", value)
+          }
+        />
+      );
+
     case "education":
-      return <EducationStep value={data.education} onChange={(value) => updateSection("education", value)} />;
+      return (
+        <EducationStep
+          value={data.education}
+          onChange={(value) =>
+            updateSection("education", value)
+          }
+        />
+      );
+
     case "experience":
-      return <ExperienceStep value={data.experience} onChange={(value) => updateSection("experience", value)} />;
+      return (
+        <ExperienceStep
+          value={data.experience}
+          onChange={(value) =>
+            updateSection("experience", value)
+          }
+        />
+      );
+
     case "skills":
       return (
         <SkillsLanguagesStep
           skills={data.skills}
           languages={data.languages}
-          onSkillsChange={(value) => updateSection("skills", value)}
-          onLanguagesChange={(value) => updateSection("languages", value)}
+          onSkillsChange={(value) =>
+            updateSection("skills", value)
+          }
+          onLanguagesChange={(value) =>
+            updateSection("languages", value)
+          }
         />
       );
+
+    case "preferences":
+      return (
+        <CareerPreferencesStep
+          value={data.preferences}
+          onChange={(value) =>
+            updateSection("preferences", value)
+          }
+        />
+      );
+
     default:
-      return <PendingOnboardingStep step={currentStep} />;
+      return (
+        <PendingOnboardingStep
+          step={currentStep}
+        />
+      );
   }
 };
 
