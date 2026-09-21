@@ -8,6 +8,8 @@ export const ROUTES = {
     COMPANY_DETAIL: "companies/:id",
     CV: "cv",
     CV_CREATE: "cv/create",
+    CV_EDIT: "cv/:resumeId/edit",
+    CV_PREVIEW: "cv/:resumeId/preview",
     CAREER: "career",
 
     // AUTH

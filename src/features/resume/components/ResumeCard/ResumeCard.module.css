@@ -5,19 +5,34 @@
   align-items: center;
   padding: 22px;
   border: 1px solid #e2e8f0;
-  border-radius: 20px;
+  border-radius: 18px;
   background: #ffffff;
-  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.045);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.07);
+  transform: translateY(-1px);
 }
 
 .documentIcon {
   display: grid;
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   place-items: center;
-  border-radius: 16px;
+  border-radius: 15px;
+}
+
+.builderIcon {
   background: #eff6ff;
   color: #2563eb;
+}
+
+.pdfIcon {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .documentIcon svg {
@@ -43,18 +58,20 @@
 .titleRow h3 {
   margin: 0;
   overflow: hidden;
-  font-size: 18px;
   color: #0f172a;
+  font-size: 17px;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .defaultBadge {
   padding: 5px 9px;
+  border: 1px solid #fed7aa;
   border-radius: 999px;
   background: #fff7ed;
   color: #c2410c;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -64,7 +81,7 @@
   gap: 7px;
   margin-top: 8px;
   color: #64748b;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .fileName {
@@ -82,40 +99,100 @@
   align-items: center;
 }
 
-.secondaryButton,
-.defaultButton {
+.previewButton,
+.secondaryButton {
   min-height: 40px;
   padding: 0 13px;
   border-radius: 10px;
-  background: #ffffff;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
 
-.secondaryButton {
-  border: 1px solid #cbd5e1;
-  color: #334155;
-}
-
-.defaultButton {
+.previewButton {
   border: 1px solid #bfdbfe;
+  background: #eff6ff;
   color: #1d4ed8;
 }
 
-.secondaryButton:hover,
-.defaultButton:hover {
+.secondaryButton {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.previewButton:hover,
+.secondaryButton:hover {
   background: #f8fafc;
 }
 
+.moreMenu {
+  position: relative;
+}
+
+.moreMenu summary {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
+  font-weight: 900;
+  letter-spacing: 2px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.moreMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.menuPanel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  min-width: 210px;
+  padding: 7px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+}
+
+.menuPanel button {
+  padding: 10px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuPanel button:hover {
+  background: #f8fafc;
+}
+
+.menuPanel .dangerAction {
+  color: #b91c1c;
+}
+
+.previewButton:focus-visible,
 .secondaryButton:focus-visible,
-.defaultButton:focus-visible {
+.moreMenu summary:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.2);
   outline-offset: 2px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   .card {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -126,18 +203,18 @@
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 560px) {
   .card {
     padding: 18px;
   }
 
   .actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr auto;
   }
 
-  .secondaryButton,
-  .defaultButton {
+  .previewButton,
+  .secondaryButton {
     width: 100%;
   }
 }

@@ -3,14 +3,24 @@ import { useNavigate } from "react-router-dom";
 
 import ResumeEmptyState from "@/features/resume/components/ResumeEmptyState";
 import ResumeList from "@/features/resume/components/ResumeList";
+import {
+  ResumeDeleteDialog,
+  ResumeRenameModal,
+  ResumeReplaceModal,
+} from "@/features/resume/components/ResumeManagementDialogs";
 import ResumeUploadModal from "@/features/resume/components/ResumeUploadModal";
 import { useResumeCenter } from "@/features/resume/hooks/useResumeCenter";
+import type { Resume } from "@/features/resume/types/resume.types";
 
 import styles from "./CvCenterPage.module.css";
 
 const CvCenterPage = () => {
   const navigate = useNavigate();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<Resume | null>(null);
+  const [replaceTarget, setReplaceTarget] = useState<Resume | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Resume | null>(null);
+
   const {
     resumes,
     isLoading,
@@ -19,8 +29,20 @@ const CvCenterPage = () => {
     maxResumeCount,
     addResume,
     setDefaultResume,
+    renameResume,
+    replaceResume,
+    deleteResume,
     retry,
   } = useResumeCenter();
+
+  const handlePreview = (resume: Resume) => {
+    navigate(`/cv/${resume.id}/preview`);
+  };
+
+  const handleEdit = (resume: Resume) => {
+    if (resume.sourceType !== "builder") return;
+    navigate(`/cv/${resume.id}/edit`);
+  };
 
   return (
     <main className={styles.page}>
@@ -91,7 +113,15 @@ const CvCenterPage = () => {
         ) : resumes.length === 0 ? (
           <ResumeEmptyState onAddResume={() => setIsUploadOpen(true)} />
         ) : (
-          <ResumeList resumes={resumes} onSetDefault={setDefaultResume} />
+          <ResumeList
+            resumes={resumes}
+            onPreview={handlePreview}
+            onEdit={handleEdit}
+            onReplace={setReplaceTarget}
+            onRename={setRenameTarget}
+            onDelete={setDeleteTarget}
+            onSetDefault={setDefaultResume}
+          />
         )}
       </div>
 
@@ -99,6 +129,25 @@ const CvCenterPage = () => {
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onSubmit={addResume}
+      />
+
+      <ResumeRenameModal
+        resume={renameTarget}
+        onClose={() => setRenameTarget(null)}
+        onSubmit={renameResume}
+      />
+
+      <ResumeReplaceModal
+        resume={replaceTarget}
+        onClose={() => setReplaceTarget(null)}
+        onSubmit={replaceResume}
+      />
+
+      <ResumeDeleteDialog
+        resume={deleteTarget}
+        hasOtherResumes={resumes.length > 1}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={deleteResume}
       />
     </main>
   );

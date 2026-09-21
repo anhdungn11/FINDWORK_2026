@@ -36,8 +36,7 @@ export const useResumeCenter = () => {
 
     try {
       await resumeService.createUploadedResume({ file, name });
-      const items = await resumeService.list();
-      setResumes(items);
+      setResumes(await resumeService.list());
       return true;
     } catch (uploadError) {
       setError(
@@ -53,14 +52,61 @@ export const useResumeCenter = () => {
     setError("");
 
     try {
-      const items = await resumeService.setDefaultResume(resumeId);
-      setResumes(items);
+      setResumes(await resumeService.setDefaultResume(resumeId));
     } catch (defaultError) {
       setError(
         defaultError instanceof Error
           ? defaultError.message
           : "Không thể đặt CV mặc định.",
       );
+    }
+  }, []);
+
+  const renameResume = useCallback(async (resumeId: string, name: string) => {
+    setError("");
+
+    try {
+      setResumes(await resumeService.renameResume({ resumeId, name }));
+      return true;
+    } catch (renameError) {
+      setError(
+        renameError instanceof Error
+          ? renameError.message
+          : "Không thể đổi tên CV.",
+      );
+      return false;
+    }
+  }, []);
+
+  const replaceResume = useCallback(async (resumeId: string, file: File) => {
+    setError("");
+
+    try {
+      setResumes(await resumeService.replaceUploadedResume({ resumeId, file }));
+      return true;
+    } catch (replaceError) {
+      setError(
+        replaceError instanceof Error
+          ? replaceError.message
+          : "Không thể thay file CV.",
+      );
+      return false;
+    }
+  }, []);
+
+  const deleteResume = useCallback(async (resumeId: string) => {
+    setError("");
+
+    try {
+      setResumes(await resumeService.deleteResume(resumeId));
+      return true;
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Không thể xóa CV.",
+      );
+      return false;
     }
   }, []);
 
@@ -80,6 +126,9 @@ export const useResumeCenter = () => {
     maxResumeCount: MAX_RESUME_COUNT,
     addResume,
     setDefaultResume,
+    renameResume,
+    replaceResume,
+    deleteResume,
     retry: loadResumes,
   };
 };

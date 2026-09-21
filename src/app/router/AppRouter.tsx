@@ -28,6 +28,7 @@ import ResetPasswordPage from "@/pages/auth/ResetPasswordPage/ResetPasswordPage"
 import VerifyEmailPage from "@/pages/auth/VerifyEmailPage/VerifyEmailPage";
 import CandidateOnboardingPage from "@/pages/candidate/CandidateOnboardingPage";
 import ResumeBuilderPage from "@/pages/candidate/ResumeBuilderPage";
+import ResumePreviewPage from "@/pages/candidate/ResumePreviewPage";
 
 const AppRouter = () => {
     return (
@@ -67,6 +68,16 @@ const AppRouter = () => {
                     <Route
                         path={ROUTES.CV_CREATE}
                         element={<ResumeBuilderPage />}
+                    />
+
+                    <Route
+                        path={ROUTES.CV_EDIT}
+                        element={<ResumeBuilderPage />}
+                    />
+
+                    <Route
+                        path={ROUTES.CV_PREVIEW}
+                        element={<ResumePreviewPage />}
                     />
 
                     <Route
