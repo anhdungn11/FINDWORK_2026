@@ -36,6 +36,12 @@ const AppRouter = () => {
   return (
     <BrowserRouter>
       <Routes>
+        {/* TEST ROUTE */}
+        <Route
+          path="/route-test"
+          element={<h1>ROUTER TEST OK</h1>}
+        />
+
         {/* PUBLIC */}
         <Route element={<PublicLayout />}>
           <Route
@@ -44,52 +50,52 @@ const AppRouter = () => {
           />
 
           <Route
-            path={ROUTES.JOBS}
+            path="jobs"
             element={<JobsPage />}
           />
 
           <Route
-            path={ROUTES.JOB_APPLY}
+            path="/jobs/:id/apply"
             element={<JobApplicationPage />}
           />
 
           <Route
-            path={ROUTES.JOB_DETAIL}
+            path="jobs/:id"
             element={<JobDetailPage />}
           />
 
           <Route
-            path={ROUTES.COMPANIES}
+            path="companies"
             element={<CompaniesPage />}
           />
 
           <Route
-            path={ROUTES.COMPANY_DETAIL}
+            path="companies/:id"
             element={<CompanyDetailPage />}
           />
 
           <Route
-            path={ROUTES.CV}
+            path="cv"
             element={<CvCenterPage />}
           />
 
           <Route
-            path={ROUTES.CV_CREATE}
+            path="cv/create"
             element={<ResumeBuilderPage />}
           />
 
           <Route
-            path={ROUTES.CV_EDIT}
+            path="cv/:resumeId/edit"
             element={<ResumeBuilderPage />}
           />
 
           <Route
-            path={ROUTES.CV_PREVIEW}
+            path="cv/:resumeId/preview"
             element={<ResumePreviewPage />}
           />
 
           <Route
-            path={ROUTES.CAREER}
+            path="career"
             element={<h1>Career Discovery Page</h1>}
           />
         </Route>
@@ -97,44 +103,44 @@ const AppRouter = () => {
         {/* AUTH */}
         <Route element={<AuthLayout />}>
           <Route
-            path={ROUTES.LOGIN}
+            path="login"
             element={<LoginPage />}
           />
 
           <Route
-            path={ROUTES.REGISTER}
+            path="register"
             element={<RegisterPage />}
           />
 
           <Route
-            path={ROUTES.FORGOT_PASSWORD}
+            path="forgot-password"
             element={<ForgotPasswordPage />}
           />
 
           <Route
-            path={ROUTES.RESET_PASSWORD}
+            path="reset-password"
             element={<ResetPasswordPage />}
           />
 
           <Route
-            path={ROUTES.VERIFY_EMAIL}
+            path="verify-email"
             element={<VerifyEmailPage />}
           />
 
           <Route
-            path={ROUTES.EMPLOYER_LOGIN}
+            path="employer/login"
             element={<h1>Employer Login Page</h1>}
           />
 
           <Route
-            path={ROUTES.EMPLOYER_REGISTER}
+            path="employer/register"
             element={<h1>Employer Register Page</h1>}
           />
         </Route>
 
         {/* CANDIDATE */}
         <Route
-          path={ROUTES.CANDIDATE}
+          path="candidate"
           element={<CandidateLayout />}
         >
           <Route
@@ -148,14 +154,14 @@ const AppRouter = () => {
           />
 
           <Route
-            path={ROUTES.CANDIDATE_ONBOARDING}
+            path="onboarding"
             element={<CandidateOnboardingPage />}
           />
         </Route>
 
         {/* EMPLOYER */}
         <Route
-          path={ROUTES.EMPLOYER}
+          path="employer"
           element={<EmployerLayout />}
         >
           <Route
@@ -164,14 +170,14 @@ const AppRouter = () => {
           />
 
           <Route
-            path={ROUTES.EMPLOYER_CREATE_JOB}
+            path="jobs/create"
             element={<h1>Create Employer Job Page</h1>}
           />
         </Route>
 
         {/* ADMIN */}
         <Route
-          path={ROUTES.ADMIN}
+          path="admin"
           element={<AdminLayout />}
         >
           <Route
