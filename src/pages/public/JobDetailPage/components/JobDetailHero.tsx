@@ -16,7 +16,7 @@ import {
 
 import actionStyles from "../styles/JobDetailHeroActions.module.css";
 import styles from "../styles/JobDetailHero.module.css";
-
+import JobApplicationPage from "@/pages/candidate/JobApplicationPage";
 interface JobDetailHeroProps {
   job: JobDetailRecord;
 }
@@ -77,14 +77,14 @@ const JobDetailHero = ({
               Lưu
             </button>
 
-            <button
-              type="button"
+            =<Link
+              to={`/jobs/${job.id}/apply`}
               className={actionStyles.applyButton}
             >
               Ứng tuyển ngay
 
               <ArrowRightIcon />
-            </button>
+            </Link>
           </div>
         </div>
       </div>

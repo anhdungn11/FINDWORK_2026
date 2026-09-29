@@ -290,7 +290,7 @@ export const useResumeBuilder = (initialState?: ResumeBuilderInitialState) => {
   );
 
   const completionPercent = useMemo(() => {
-    const important: ResumeBuilderEditorSection[] = ["basics", "summary", "experience", "education", "skills", "design"];
+    const important: ResumeBuilderEditorSection[] = ["basics", "summary", "experience", "education", "skills"];
     const completed = important.filter((id) => sectionCompletion[id]).length;
     return Math.round((completed / important.length) * 100);
   }, [sectionCompletion]);

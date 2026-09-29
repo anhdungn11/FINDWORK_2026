@@ -149,7 +149,7 @@ const ResumeBuilderEditor = ({ existingResume }: { existingResume: Resume | null
           <strong>{isEditing ? "Chỉnh sửa CV hiện có" : "Tạo CV chuyên nghiệp cho mọi ngành nghề"}</strong>
           <span>
             {isEditing
-              ? "Khi lưu, CV sẽ chuyển sang phiên bản mới mà không thay đổi các Application Snapshot cũ trong kiến trúc backend sau này."
+              ? "Các thay đổi chỉ được áp dụng sau khi bạn lưu CV."
               : "Điền nội dung, chọn mẫu và kiểm tra bản xem trước theo thời gian thực."}
           </span>
         </div>

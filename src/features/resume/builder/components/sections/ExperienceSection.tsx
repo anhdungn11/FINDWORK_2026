@@ -113,7 +113,7 @@ const ExperienceSection = ({ items, onAdd, onUpdate, onRemove }: Props) => (
               rows={7}
               value={joinLines(item.highlights)}
               onChange={(event) => onUpdate(item.id, { highlights: splitLines(event.target.value) })}
-              placeholder={"Ví dụ:\nTăng doanh số nhóm 18% trong 6 tháng\nRút ngắn thời gian xử lý đơn hàng từ 2 ngày xuống 1 ngày"}
+              placeholder={"Ví dụ:\nHoàn thành mục tiêu công việc vượt 15% so với kế hoạch\nCải tiến quy trình giúp giảm 20% thời gian xử lý\nPhối hợp với đội nhóm để hoàn thành công việc đúng thời hạn"}
             />
           </Field>
         </article>
