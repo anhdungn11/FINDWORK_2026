@@ -1,0 +1,369 @@
+1:import {
+2:  useEffect,
+3:  useMemo,
+4:  useState,
+5:} from "react";
+6:
+7:import type {
+8:  ApplicationContactInfo,
+9:  ApplicationDetailsForm,
+10:  ApplicationStep,
+11:} from "@/features/applications/types/application.types";
+12:
+13:import {
+14:  isApplicationDetailsValid,
+15:  validateApplicationDetails,
+16:} from "@/features/applications/utils/applicationValidation";
+17:
+18:import { jobService } from "@/features/jobs/services/jobService";
+19:import type {
+20:  JobRecord,
+21:} from "@/features/jobs/types/job.types";
+22:
+23:import { resumeService } from "@/features/resume/services/resumeService";
+24:import type {
+25:  Resume,
+26:} from "@/features/resume/types/resume.types";
+27:
+28:interface UseApplicationFlowOptions {
+29:  jobId: number;
+30:}
+31:
+32:const INITIAL_DETAILS:
+33:  ApplicationDetailsForm = {
+34:  contact: {
+35:    fullName: "",
+36:    email: "",
+37:    phone: "",
+38:  },
+39:
+40:  currentLocation: "",
+41:
+42:  availability: "",
+43:
+44:  preferredContactMethod:
+45:    "email",
+46:
+47:  coverLetter: "",
+48:};
+49:
+50:const getResumeContactData = (
+51:  resume: Resume | null,
+52:) => {
+53:  const content =
+54:    resume?.currentVersion
+55:      .builderContent;
+56:
+57:  if (!content) {
+58:    return null;
+59:  }
+60:
+61:  return {
+62:    fullName:
+63:      content.fullName.trim(),
+64:
+65:    email:
+66:      content.email.trim(),
+67:
+68:    phone:
+69:      content.phone.trim(),
+70:
+71:    location:
+72:      content.location.trim(),
+73:  };
+74:};
+75:
+76:export const useApplicationFlow = ({
+77:  jobId,
+78:}: UseApplicationFlowOptions) => {
+79:  const [
+80:    job,
+81:    setJob,
+82:  ] = useState<JobRecord | null>(
+83:    null,
+84:  );
+85:
+86:  const [
+87:    resumes,
+88:    setResumes,
+89:  ] = useState<Resume[]>([]);
+90:
+91:  const [
+92:    selectedResumeId,
+93:    setSelectedResumeId,
+94:  ] = useState("");
+95:
+96:  const [
+97:    currentStep,
+98:    setCurrentStep,
+99:  ] = useState<ApplicationStep>(
+100:    "resume",
+101:  );
+102:
+103:  const [
+104:    details,
+105:    setDetails,
+106:  ] = useState<ApplicationDetailsForm>(
+107:    INITIAL_DETAILS,
+108:  );
+109:
+110:  const [
+111:    isLoading,
+112:    setIsLoading,
+113:  ] = useState(true);
+114:
+115:  const [
+116:    errorMessage,
+117:    setErrorMessage,
+118:  ] = useState("");
+119:
+120:  useEffect(() => {
+121:    let active = true;
+122:
+123:    const loadApplicationData =
+124:      async () => {
+125:        try {
+126:          setIsLoading(true);
+127:
+128:          setErrorMessage("");
+129:
+130:          const [
+131:            jobResult,
+132:            resumeResult,
+133:          ] = await Promise.all([
+134:            jobService.getById(
+135:              jobId,
+136:            ),
+137:
+138:            resumeService.list(),
+139:          ]);
+140:
+141:          if (!active) {
+142:            return;
+143:          }
+144:
+145:          setJob(jobResult);
+146:
+147:          const readyResumes =
+148:            resumeResult.filter(
+149:              (resume) =>
+150:                resume.status ===
+151:                "ready",
+152:            );
+153:
+154:          setResumes(
+155:            readyResumes,
+156:          );
+157:
+158:          const defaultResume =
+159:            readyResumes.find(
+160:              (resume) =>
+161:                resume.isDefault,
+162:            ) ??
+163:            readyResumes[0] ??
+164:            null;
+165:
+166:          setSelectedResumeId(
+167:            defaultResume?.id ??
+168:              "",
+169:          );
+170:
+171:          const resumeData =
+172:            getResumeContactData(
+173:              defaultResume,
+174:            );
+175:
+176:          if (resumeData) {
+177:            setDetails(
+178:              (current) => ({
+179:                ...current,
+180:
+181:                contact: {
+182:                  fullName:
+183:                    current.contact
+184:                      .fullName ||
+185:                    resumeData.fullName,
+186:
+187:                  email:
+188:                    current.contact
+189:                      .email ||
+190:                    resumeData.email,
+191:
+192:                  phone:
+193:                    current.contact
+194:                      .phone ||
+195:                    resumeData.phone,
+196:                },
+197:
+198:                currentLocation:
+199:                  current
+200:                    .currentLocation ||
+201:                  resumeData.location,
+202:              }),
+203:            );
+204:          }
+205:        } catch {
+206:          if (!active) {
+207:            return;
+208:          }
+209:
+210:          setErrorMessage(
+211:            "Không thể tải dữ liệu ứng tuyển.",
+212:          );
+213:        } finally {
+214:          if (active) {
+215:            setIsLoading(false);
+216:          }
+217:        }
+218:      };
+219:
+220:    void loadApplicationData();
+221:
+222:    return () => {
+223:      active = false;
+224:    };
+225:  }, [jobId]);
+226:
+227:  const selectedResume =
+228:    useMemo(
+229:      () =>
+230:        resumes.find(
+231:          (resume) =>
+232:            resume.id ===
+233:            selectedResumeId,
+234:        ) ?? null,
+235:      [
+236:        resumes,
+237:        selectedResumeId,
+238:      ],
+239:    );
+240:
+241:  const detailsErrors =
+242:    useMemo(
+243:      () =>
+244:        validateApplicationDetails(
+245:          details,
+246:        ),
+247:      [details],
+248:    );
+249:
+250:  const canContinueDetails =
+251:    useMemo(
+252:      () =>
+253:        isApplicationDetailsValid(
+254:          details,
+255:        ),
+256:      [details],
+257:    );
+258:
+259:  const selectResume = (
+260:    resumeId: string,
+261:  ) => {
+262:    setSelectedResumeId(
+263:      resumeId,
+264:    );
+265:
+266:    const resume =
+267:      resumes.find(
+268:        (item) =>
+269:          item.id === resumeId,
+270:      ) ?? null;
+271:
+272:    const resumeData =
+273:      getResumeContactData(
+274:        resume,
+275:      );
+276:
+277:    if (!resumeData) {
+278:      return;
+279:    }
+280:
+281:    setDetails(
+282:      (current) => ({
+283:        ...current,
+284:
+285:        contact: {
+286:          fullName:
+287:            current.contact
+288:              .fullName ||
+289:            resumeData.fullName,
+290:
+291:          email:
+292:            current.contact.email ||
+293:            resumeData.email,
+294:
+295:          phone:
+296:            current.contact.phone ||
+297:            resumeData.phone,
+298:        },
+299:
+300:        currentLocation:
+301:          current.currentLocation ||
+302:          resumeData.location,
+303:      }),
+304:    );
+305:  };
+306:
+307:  const updateContact = <
+308:    Key extends keyof ApplicationContactInfo,
+309:  >(
+310:    field: Key,
+311:    value:
+312:      ApplicationContactInfo[Key],
+313:  ) => {
+314:    setDetails(
+315:      (current) => ({
+316:        ...current,
+317:
+318:        contact: {
+319:          ...current.contact,
+320:
+321:          [field]: value,
+322:        },
+323:      }),
+324:    );
+325:  };
+326:
+327:  const updateDetails = <
+328:    Key extends keyof ApplicationDetailsForm,
+329:  >(
+330:    field: Key,
+331:    value:
+332:      ApplicationDetailsForm[Key],
+333:  ) => {
+334:    setDetails(
+335:      (current) => ({
+336:        ...current,
+337:        [field]: value,
+338:      }),
+339:    );
+340:  };
+341:
+342:  const goToStep = (
+343:    step: ApplicationStep,
+344:  ) => {
+345:    setCurrentStep(step);
+346:  };
+347:
+348:  return {
+349:    job,
+350:    resumes,
+351:
+352:    selectedResumeId,
+353:    selectedResume,
+354:
+355:    currentStep,
+356:
+357:    details,
+358:    detailsErrors,
+359:    canContinueDetails,
+360:
+361:    isLoading,
+362:    errorMessage,
+363:
+364:    selectResume,
+365:    updateContact,
+366:    updateDetails,
+367:    goToStep,
+368:  };
+369:};

@@ -1,19 +1,8 @@
-export interface Job {
-  id: number;
-  title: string;
-  company: string;
-  category: string;
-  location: string;
-  salary: string;
-  type: string;
-  workplace: "On-site" | "Remote" | "Hybrid";
-  experience: string;
-  skills: string[];
-  matchScore: number;
-  postedAt: string;
-}
+import type {
+  JobRecord,
+} from "@/features/jobs/types/job.types";
 
-export const jobs: Job[] = [
+export const jobs: JobRecord[] = [
   {
     id: 1,
     title: "Frontend Developer",
@@ -66,7 +55,11 @@ export const jobs: Job[] = [
     type: "Full-time",
     workplace: "On-site",
     experience: "Không yêu cầu",
-    skills: ["Giao tiếp", "Tư vấn", "Chăm sóc khách hàng"],
+    skills: [
+      "Giao tiếp",
+      "Tư vấn",
+      "Chăm sóc khách hàng",
+    ],
     matchScore: 76,
     postedAt: "Hôm nay",
   },
@@ -80,7 +73,11 @@ export const jobs: Job[] = [
     type: "Full-time",
     workplace: "On-site",
     experience: "1 - 3 năm",
-    skills: ["AutoCAD", "SolidWorks", "Technical Drawing"],
+    skills: [
+      "AutoCAD",
+      "SolidWorks",
+      "Technical Drawing",
+    ],
     matchScore: 74,
     postedAt: "1 ngày trước",
   },
@@ -94,7 +91,11 @@ export const jobs: Job[] = [
     type: "Full-time",
     workplace: "Hybrid",
     experience: "1 năm",
-    skills: ["Recruitment", "HR Operations", "Communication"],
+    skills: [
+      "Recruitment",
+      "HR Operations",
+      "Communication",
+    ],
     matchScore: 72,
     postedAt: "1 ngày trước",
   },
@@ -108,7 +109,11 @@ export const jobs: Job[] = [
     type: "Full-time",
     workplace: "On-site",
     experience: "Không yêu cầu",
-    skills: ["Kiểm hàng", "Sắp xếp hàng hóa", "Làm việc nhóm"],
+    skills: [
+      "Kiểm hàng",
+      "Sắp xếp hàng hóa",
+      "Làm việc nhóm",
+    ],
     matchScore: 68,
     postedAt: "2 ngày trước",
   },
@@ -122,7 +127,11 @@ export const jobs: Job[] = [
     type: "Full-time",
     workplace: "On-site",
     experience: "1 năm",
-    skills: ["English", "Teaching", "Communication"],
+    skills: [
+      "English",
+      "Teaching",
+      "Communication",
+    ],
     matchScore: 70,
     postedAt: "2 ngày trước",
   },

@@ -1,0 +1,135 @@
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 28px 0;
+  padding: 20px 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.045);
+}
+
+.step {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  min-height: 52px;
+  padding-right: 46px;
+}
+
+.step:last-child {
+  padding-right: 0;
+}
+
+.stepNumber {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 800;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.stepContent {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.stepContent span {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stepContent strong {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connector {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  width: 28px;
+  height: 1px;
+  background: #dbe3ee;
+  transform: translateY(-50%);
+}
+
+.active .stepNumber {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.09);
+}
+
+.active .stepContent span {
+  color: #2563eb;
+}
+
+.active .stepContent strong {
+  color: #0f172a;
+}
+
+.completed .stepNumber {
+  border-color: #bbf7d0;
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.completed .stepContent span {
+  color: #16a34a;
+}
+
+.completed .stepContent strong {
+  color: #334155;
+}
+
+.completed .connector {
+  background: #86efac;
+}
+
+@media (max-width: 1000px) {
+  .stepper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 24px;
+  }
+
+  .step {
+    padding-right: 0;
+  }
+
+  .connector {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .stepper {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .step {
+    min-height: 46px;
+  }
+}

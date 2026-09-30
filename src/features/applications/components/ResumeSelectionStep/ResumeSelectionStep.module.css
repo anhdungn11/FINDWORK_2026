@@ -1,0 +1,221 @@
+.card {
+  padding: 28px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+}
+
+.heading span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.heading h2 {
+  margin: 6px 0 0;
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.heading p {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.headingRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.manageLink {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.emptyState {
+  margin-top: 24px;
+  padding: 48px 24px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 15px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 16px;
+  place-items: center;
+  border-radius: 16px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 900;
+}
+
+.emptyState h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 17px;
+}
+
+.emptyState p {
+  max-width: 480px;
+  margin: 10px auto 20px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.emptyActions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.primaryAction,
+.secondaryAction {
+  padding: 10px 15px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.primaryAction {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.secondaryAction {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.resumeList {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.resumeCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.selected {
+  border-color: #60a5fa;
+  background: #f8fbff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.resumeCard input {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+}
+
+.resumeTitle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.resumeTitle strong {
+  color: #0f172a;
+}
+
+.resumeTitle span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.resumeInfo p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.previewLink {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.footer span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.footer button {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.footer button:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 20px;
+  }
+
+  .headingRow,
+  .footer {
+    display: grid;
+  }
+
+  .resumeCard {
+    grid-template-columns: auto 1fr;
+  }
+
+  .previewLink {
+    grid-column: 2;
+  }
+
+  .emptyActions {
+    display: grid;
+  }
+}

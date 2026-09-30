@@ -1,0 +1,35 @@
+.notice {
+  display: grid;
+  grid-template-columns:
+    auto minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 24px;
+  padding: 15px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.notice strong {
+  color: #1e3a8a;
+  font-size: 12px;
+}
+
+.notice p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.6;
+}

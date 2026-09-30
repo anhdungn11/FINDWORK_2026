@@ -1,14 +1,13 @@
 import type {
-  JobFilterRecord,
-} from "@/features/jobs/types/job-filter.types";
+  JobRecord,
+} from "@/features/jobs/types/job.types";
 
 /**
- * View-model contract tối thiểu cho trang chi tiết việc làm.
+ * View-model của trang Job Detail.
  *
- * Không phải Prisma model / database entity.
- * Không import type từ mock.
+ * Alias này được giữ tại page layer để các component hiện tại
+ * không phải thay đổi hàng loạt import.
+ *
+ * Domain contract thật nằm tại features/jobs/types/job.types.ts.
  */
-export interface JobDetailRecord
-  extends JobFilterRecord {
-  id: number;
-}
+export type JobDetailRecord = JobRecord;

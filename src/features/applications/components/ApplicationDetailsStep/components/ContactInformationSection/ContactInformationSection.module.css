@@ -1,0 +1,98 @@
+.section {
+  padding: 24px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.header {
+  margin-bottom: 16px;
+}
+
+.header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.header p {
+  margin: 5px 0 0;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.grid label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.label {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.label strong {
+  margin-left: 3px;
+  color: #dc2626;
+}
+
+.grid input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  box-sizing: border-box;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.grid input::placeholder {
+  color: #94a3b8;
+}
+
+.grid input:focus {
+  border-color: #60a5fa;
+  box-shadow:
+    0 0 0 3px
+    rgba(37, 99, 235, 0.08);
+}
+
+.grid input[aria-invalid="true"] {
+  border-color: #fca5a5;
+}
+
+.error {
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fullWidth {
+    grid-column: auto;
+  }
+}

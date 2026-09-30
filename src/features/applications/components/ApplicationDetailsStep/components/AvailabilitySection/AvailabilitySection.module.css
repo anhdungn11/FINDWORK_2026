@@ -1,0 +1,68 @@
+.section {
+  padding: 24px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.header {
+  margin-bottom: 16px;
+}
+
+.header h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.header p {
+  margin: 5px 0 0;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field > span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.field strong {
+  margin-left: 3px;
+  color: #dc2626;
+}
+
+.field select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 40px 0 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.field select:focus {
+  border-color: #60a5fa;
+  box-shadow:
+    0 0 0 3px
+    rgba(37, 99, 235, 0.08);
+}
+
+.field select[aria-invalid="true"] {
+  border-color: #fca5a5;
+}
+
+.error {
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 600;
+}
