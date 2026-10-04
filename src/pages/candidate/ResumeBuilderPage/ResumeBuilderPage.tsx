@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import ResumeBuilderForm from "@/features/resume/builder/components/ResumeBuilderForm";
 import ResumeBuilderNav from "@/features/resume/builder/components/ResumeBuilderNav";
 import ResumePreview from "@/features/resume/builder/components/ResumePreview";
+import ResumeTemplateDocument from "@/features/resume/builder/components/ResumeTemplateDocument";
 import {
   useResumeBuilder,
   type ResumeBuilderInitialState,
@@ -32,7 +33,9 @@ const ResumeBuilderPage = () => {
       if (!resume) {
         setLoadError("Không tìm thấy CV cần chỉnh sửa.");
       } else if (resume.sourceType !== "builder") {
-        setLoadError("CV PDF chỉ có thể thay file, không thể chỉnh sửa bằng CV Builder.");
+        setLoadError(
+          "CV PDF chỉ có thể thay file, không thể chỉnh sửa bằng CV Builder.",
+        );
       } else {
         setExistingResume(resume);
       }
@@ -46,7 +49,11 @@ const ResumeBuilderPage = () => {
   }, [resumeId]);
 
   if (isLoading) {
-    return <main className={styles.page}><div className={styles.pageState}>Đang tải CV...</div></main>;
+    return (
+      <main className={styles.page}>
+        <div className={styles.pageState}>Đang tải CV...</div>
+      </main>
+    );
   }
 
   if (loadError) {
@@ -68,16 +75,24 @@ const BuilderLoadError = ({ message }: { message: string }) => {
     <main className={styles.page}>
       <div className={styles.pageState}>
         <strong>{message}</strong>
-        <button type="button" onClick={() => navigate("/cv")}>Quay lại CV Center</button>
+        <button type="button" onClick={() => navigate("/cv")}>
+          Quay lại CV Center
+        </button>
       </div>
     </main>
   );
 };
 
-const ResumeBuilderEditor = ({ existingResume }: { existingResume: Resume | null }) => {
+const ResumeBuilderEditor = ({
+  existingResume,
+}: {
+  existingResume: Resume | null;
+}) => {
   const navigate = useNavigate();
   const [saveError, setSaveError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   const initialState = getInitialState(existingResume);
   const builder = useResumeBuilder(initialState);
   const isEditing = Boolean(existingResume);
@@ -108,7 +123,9 @@ const ResumeBuilderEditor = ({ existingResume }: { existingResume: Resume | null
 
       navigate("/cv");
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Không thể lưu CV.");
+      setSaveError(
+        error instanceof Error ? error.message : "Không thể lưu CV.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -118,50 +135,103 @@ const ResumeBuilderEditor = ({ existingResume }: { existingResume: Resume | null
     <main className={styles.page}>
       <header className={styles.topbar}>
         <div className={styles.topbarLeft}>
-          <button type="button" className={styles.backButton} onClick={() => navigate("/cv")}>← CV của tôi</button>
-          <div className={styles.breadcrumbDivider} />
-          <div className={styles.productTitle}>
+          <button
+            type="button"
+            className={styles.backButton}
+            onClick={() => navigate("/cv")}
+          >
+            <span aria-hidden="true">←</span>
+            CV của tôi
+          </button>
+
+          <div className={styles.brandBlock}>
             <span>FINDWORK</span>
-            <strong>{isEditing ? "Chỉnh sửa CV" : "Trình tạo CV"}</strong>
+            <strong>{isEditing ? "Resume Studio" : "Tạo CV mới"}</strong>
           </div>
         </div>
 
         <label className={styles.documentName}>
           <span>Tên CV</span>
-          <input value={builder.resumeName} onChange={(event) => builder.setResumeName(event.target.value)} maxLength={80} aria-label="Tên CV" />
+          <input
+            value={builder.resumeName}
+            onChange={(event) => builder.setResumeName(event.target.value)}
+            maxLength={80}
+            aria-label="Tên CV"
+            placeholder="Ví dụ: CV Kế toán tổng hợp"
+          />
         </label>
 
         <div className={styles.topbarActions}>
           <div className={styles.saveState}>
             <span className={styles.saveDot} />
-            {existingResume ? `Phiên bản ${existingResume.currentVersion.versionNumber}` : "Bản nháp"}
+            <div>
+              <strong>{existingResume ? "Đã lưu" : "Bản nháp"}</strong>
+              <small>
+                {existingResume
+                  ? `Phiên bản ${existingResume.currentVersion.versionNumber}`
+                  : "Chưa lưu lên CV Center"}
+              </small>
+            </div>
           </div>
-          <button type="button" className={styles.saveButton} disabled={!builder.isSavable || isSaving} onClick={() => void handleSave()}>
-            {isSaving ? "Đang lưu..." : isEditing ? "Lưu thay đổi" : "Lưu CV"}
+
+          <button
+            type="button"
+            className={styles.previewButton}
+            onClick={() => setIsPreviewOpen(true)}
+          >
+            Xem toàn màn hình
+          </button>
+
+          <button
+            type="button"
+            className={styles.saveButton}
+            disabled={!builder.isSavable || isSaving}
+            onClick={() => void handleSave()}
+          >
+            {isSaving
+              ? "Đang lưu..."
+              : isEditing
+                ? "Lưu thay đổi"
+                : "Lưu CV"}
           </button>
         </div>
       </header>
 
-      {saveError && <div className={styles.errorBanner} role="alert">{saveError}</div>}
+      {saveError && (
+        <div className={styles.errorBanner} role="alert">
+          {saveError}
+        </div>
+      )}
 
-      <section className={styles.contextBar}>
+      <section className={styles.studioIntro}>
         <div>
-          <strong>{isEditing ? "Chỉnh sửa CV hiện có" : "Tạo CV chuyên nghiệp cho mọi ngành nghề"}</strong>
-          <span>
+          <span className={styles.studioEyebrow}>RESUME STUDIO</span>
+          <strong>
             {isEditing
-              ? "Các thay đổi chỉ được áp dụng sau khi bạn lưu CV."
+              ? "Khi lưu, CV sẽ chuyển sang phiên bản mới mà không thay đổi các Application Snapshot cũ trong kiến trúc backend sau này."
               : "Điền nội dung, chọn mẫu và kiểm tra bản xem trước theo thời gian thực."}
           </span>
         </div>
-        <div className={styles.contextMeta}>
-          <span>{builder.completionPercent}% hồ sơ chính</span>
-          <span>•</span>
-          <span>Dữ liệu chỉ được lưu khi bạn bấm nút lưu</span>
+
+        <div className={styles.completionCard}>
+          <div>
+            <span>Hồ sơ chính</span>
+            <strong>{builder.completionPercent}%</strong>
+          </div>
+          <div className={styles.completionTrack}>
+            <span style={{ width: `${builder.completionPercent}%` }} />
+          </div>
         </div>
       </section>
 
       <div className={styles.workspace}>
-        <ResumeBuilderNav value={builder.activeSection} completion={builder.sectionCompletion} completionPercent={builder.completionPercent} onChange={builder.setActiveSection} />
+        <ResumeBuilderNav
+          value={builder.activeSection}
+          completion={builder.sectionCompletion}
+          completionPercent={builder.completionPercent}
+          onChange={builder.setActiveSection}
+        />
+
         <ResumeBuilderForm
           activeSection={builder.activeSection}
           content={builder.content}
@@ -214,13 +284,54 @@ const ResumeBuilderEditor = ({ existingResume }: { existingResume: Resume | null
           onToggleSectionVisibility={builder.toggleSectionVisibility}
           onMoveSection={builder.moveSection}
         />
-        <ResumePreview content={builder.content} settings={builder.settings} templateCode={builder.templateCode} />
+
+        <ResumePreview
+          content={builder.content}
+          settings={builder.settings}
+          templateCode={builder.templateCode}
+        />
       </div>
+
+      {isPreviewOpen && (
+        <div
+          className={styles.previewOverlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xem trước CV toàn màn hình"
+        >
+          <div className={styles.previewOverlayToolbar}>
+            <div>
+              <span>BẢN XEM TRƯỚC</span>
+              <strong>{builder.resumeName || "CV chưa đặt tên"}</strong>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsPreviewOpen(false)}
+              aria-label="Đóng xem trước"
+            >
+              Đóng
+            </button>
+          </div>
+
+          <div className={styles.previewOverlayStage}>
+            <div className={styles.previewOverlayPaper}>
+              <ResumeTemplateDocument
+                content={builder.content}
+                settings={builder.settings}
+                templateCode={builder.templateCode}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };
 
-const getInitialState = (resume: Resume | null): ResumeBuilderInitialState | undefined => {
+const getInitialState = (
+  resume: Resume | null,
+): ResumeBuilderInitialState | undefined => {
   if (!resume || resume.sourceType !== "builder") return undefined;
 
   const { currentVersion } = resume;

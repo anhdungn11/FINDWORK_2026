@@ -12,7 +12,38 @@ import {
   validateResumeFile,
 } from "@/features/resume/utils/resume.utils";
 
-let resumeStore: Resume[] = [];
+const STORAGE_KEY = "findwork.mock.builder-resumes.v7";
+
+const readStoredBuilderResumes = (): Resume[] => {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as Resume[];
+    return Array.isArray(parsed)
+      ? parsed.filter((resume) => resume.sourceType === "builder")
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+let resumeStore: Resume[] = readStoredBuilderResumes();
+
+const persistBuilderResumes = () => {
+  if (typeof window === "undefined") return;
+
+  try {
+    const builderResumes = resumeStore.filter(
+      (resume) => resume.sourceType === "builder",
+    );
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(builderResumes));
+  } catch {
+    // Mock persistence is best-effort only. Real persistence belongs to backend.
+  }
+};
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const cloneResumes = () => clone(resumeStore);
@@ -97,6 +128,7 @@ const createUploadedResume = async ({
   };
 
   resumeStore = [resume, ...resumeStore];
+  persistBuilderResumes();
   return clone(resume);
 };
 
@@ -129,6 +161,7 @@ const createBuilderResume = async ({
   };
 
   resumeStore = [resume, ...resumeStore];
+  persistBuilderResumes();
   return clone(resume);
 };
 
@@ -146,6 +179,7 @@ const renameResume = async ({
       : resume,
   );
 
+  persistBuilderResumes();
   return cloneResumes();
 };
 
@@ -225,6 +259,7 @@ const updateBuilderResume = async ({
     return updatedResume;
   });
 
+  persistBuilderResumes();
   return clone(updatedResume ?? current);
 };
 
@@ -238,6 +273,7 @@ const setDefaultResume = async (resumeId: string): Promise<Resume[]> => {
     updatedAt: resume.id === resumeId ? now : resume.updatedAt,
   }));
 
+  persistBuilderResumes();
   return cloneResumes();
 };
 
@@ -263,6 +299,7 @@ const deleteResume = async (resumeId: string): Promise<Resume[]> => {
     URL.revokeObjectURL(previewUrl);
   }
 
+  persistBuilderResumes();
   return cloneResumes();
 };
 
