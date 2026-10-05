@@ -1,11 +1,13 @@
 import { useNavigate } from "react-router-dom";
 
-import type { Job } from "@/data/mock/jobs.mock";
+import type {
+  JobRecord,
+} from "@/features/jobs/types/job.types";
 
 import styles from "./JobDiscoveryCard.module.css";
 
 interface JobDiscoveryCardProps {
-  job: Job;
+  job: JobRecord;
 }
 
 const JobDiscoveryCard = ({ job }: JobDiscoveryCardProps) => {

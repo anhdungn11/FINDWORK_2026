@@ -1,9 +1,11 @@
-import type { Job } from "@/data/mock/jobs.mock";
+import type {
+  JobRecord,
+} from "@/features/jobs/types/job.types";
 
 import styles from "./JobCard.module.css";
 
 interface JobCardProps {
-  job: Job;
+  job: JobRecord;
 }
 
 const JobCard = ({ job }: JobCardProps) => {

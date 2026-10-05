@@ -1,92 +1,59 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
 
-import type {
-  ApplicationContactInfo,
-  ApplicationDetailsForm,
-  ApplicationStep,
-} from "@/features/applications/types/application.types";
+import {
+  useApplicationData,
+} from "@/features/applications/hooks/useApplicationData";
 
 import {
-  isApplicationDetailsValid,
-  validateApplicationDetails,
-} from "@/features/applications/utils/applicationValidation";
+  useApplicationDetails,
+} from "@/features/applications/hooks/useApplicationDetails";
 
-import { jobService } from "@/features/jobs/services/jobService";
 import type {
-  JobRecord,
-} from "@/features/jobs/types/job.types";
-
-import { resumeService } from "@/features/resume/services/resumeService";
-import type {
-  Resume,
-} from "@/features/resume/types/resume.types";
+  ApplicationStep,
+} from "@/features/applications/types/application.types";
 
 interface UseApplicationFlowOptions {
   jobId: number;
 }
 
-const INITIAL_DETAILS:
-  ApplicationDetailsForm = {
-  contact: {
-    fullName: "",
-    email: "",
-    phone: "",
-  },
-
-  currentLocation: "",
-
-  availability: "",
-
-  preferredContactMethod:
-    "email",
-
-  coverLetter: "",
-};
-
-const getResumeContactData = (
-  resume: Resume | null,
-) => {
-  const content =
-    resume?.currentVersion
-      .builderContent;
-
-  if (!content) {
-    return null;
-  }
-
-  return {
-    fullName:
-      content.fullName.trim(),
-
-    email:
-      content.email.trim(),
-
-    phone:
-      content.phone.trim(),
-
-    location:
-      content.location.trim(),
-  };
-};
-
+/**
+ * Orchestrator của Candidate Application Flow.
+ *
+ * Trách nhiệm:
+ * - điều phối các step
+ * - quản lý CV đang chọn
+ * - kết nối application data với application details
+ *
+ * Không trực tiếp gọi service.
+ * Không chứa validation implementation.
+ * Không chứa Resume -> Application mapping.
+ */
 export const useApplicationFlow = ({
   jobId,
 }: UseApplicationFlowOptions) => {
-  const [
+  const {
     job,
-    setJob,
-  ] = useState<JobRecord | null>(
-    null,
-  );
-
-  const [
     resumes,
-    setResumes,
-  ] = useState<Resume[]>([]);
+    isLoading,
+    errorMessage,
+  } = useApplicationData({
+    jobId,
+  });
+
+  const {
+    details,
+    detailsErrors,
+    canContinueDetails,
+    updateContact,
+    updateDetails,
+    prefillFromResume,
+    resetDetails,
+  } = useApplicationDetails();
 
   const [
     selectedResumeId,
@@ -100,129 +67,58 @@ export const useApplicationFlow = ({
     "resume",
   );
 
-  const [
-    details,
-    setDetails,
-  ] = useState<ApplicationDetailsForm>(
-    INITIAL_DETAILS,
-  );
-
-  const [
-    isLoading,
-    setIsLoading,
-  ] = useState(true);
-
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
-
+  /**
+   * Một Application Flow mới phải bắt đầu lại
+   * khi jobId thay đổi.
+   *
+   * Tránh giữ state của Job A khi chuyển trực tiếp
+   * sang URL ứng tuyển Job B.
+   */
   useEffect(() => {
-    let active = true;
+    setCurrentStep("resume");
+    setSelectedResumeId("");
+    resetDetails();
+  }, [
+    jobId,
+    resetDetails,
+  ]);
 
-    const loadApplicationData =
-      async () => {
-        try {
-          setIsLoading(true);
+  /**
+   * Khi danh sách CV sẵn sàng:
+   * - giữ CV hiện tại nếu vẫn tồn tại
+   * - nếu chưa có thì chọn CV default
+   * - nếu không có default thì lấy CV đầu tiên
+   */
+  useEffect(() => {
+    if (resumes.length === 0) {
+      setSelectedResumeId("");
+      return;
+    }
 
-          setErrorMessage("");
-
-          const [
-            jobResult,
-            resumeResult,
-          ] = await Promise.all([
-            jobService.getById(
-              jobId,
-            ),
-
-            resumeService.list(),
-          ]);
-
-          if (!active) {
-            return;
-          }
-
-          setJob(jobResult);
-
-          const readyResumes =
-            resumeResult.filter(
-              (resume) =>
-                resume.status ===
-                "ready",
-            );
-
-          setResumes(
-            readyResumes,
+    setSelectedResumeId(
+      (currentId) => {
+        const currentStillExists =
+          Boolean(currentId) &&
+          resumes.some(
+            (resume) =>
+              resume.id === currentId,
           );
 
-          const defaultResume =
-            readyResumes.find(
-              (resume) =>
-                resume.isDefault,
-            ) ??
-            readyResumes[0] ??
-            null;
-
-          setSelectedResumeId(
-            defaultResume?.id ??
-              "",
-          );
-
-          const resumeData =
-            getResumeContactData(
-              defaultResume,
-            );
-
-          if (resumeData) {
-            setDetails(
-              (current) => ({
-                ...current,
-
-                contact: {
-                  fullName:
-                    current.contact
-                      .fullName ||
-                    resumeData.fullName,
-
-                  email:
-                    current.contact
-                      .email ||
-                    resumeData.email,
-
-                  phone:
-                    current.contact
-                      .phone ||
-                    resumeData.phone,
-                },
-
-                currentLocation:
-                  current
-                    .currentLocation ||
-                  resumeData.location,
-              }),
-            );
-          }
-        } catch {
-          if (!active) {
-            return;
-          }
-
-          setErrorMessage(
-            "Không thể tải dữ liệu ứng tuyển.",
-          );
-        } finally {
-          if (active) {
-            setIsLoading(false);
-          }
+        if (currentStillExists) {
+          return currentId;
         }
-      };
 
-    void loadApplicationData();
+        const defaultResume =
+          resumes.find(
+            (resume) =>
+              resume.isDefault,
+          ) ??
+          resumes[0];
 
-    return () => {
-      active = false;
-    };
-  }, [jobId]);
+        return defaultResume.id;
+      },
+    );
+  }, [resumes]);
 
   const selectedResume =
     useMemo(
@@ -238,112 +134,57 @@ export const useApplicationFlow = ({
       ],
     );
 
-  const detailsErrors =
-    useMemo(
-      () =>
-        validateApplicationDetails(
-          details,
-        ),
-      [details],
-    );
-
-  const canContinueDetails =
-    useMemo(
-      () =>
-        isApplicationDetailsValid(
-          details,
-        ),
-      [details],
-    );
-
-  const selectResume = (
-    resumeId: string,
-  ) => {
-    setSelectedResumeId(
-      resumeId,
-    );
-
-    const resume =
-      resumes.find(
-        (item) =>
-          item.id === resumeId,
-      ) ?? null;
-
-    const resumeData =
-      getResumeContactData(
-        resume,
-      );
-
-    if (!resumeData) {
+  /**
+   * CV được chọn có thể prefill những field
+   * Application còn trống.
+   *
+   * Mapper đảm bảo không ghi đè dữ liệu
+   * ứng viên đã nhập.
+   */
+  useEffect(() => {
+    if (!selectedResume) {
       return;
     }
 
-    setDetails(
-      (current) => ({
-        ...current,
-
-        contact: {
-          fullName:
-            current.contact
-              .fullName ||
-            resumeData.fullName,
-
-          email:
-            current.contact.email ||
-            resumeData.email,
-
-          phone:
-            current.contact.phone ||
-            resumeData.phone,
-        },
-
-        currentLocation:
-          current.currentLocation ||
-          resumeData.location,
-      }),
+    prefillFromResume(
+      selectedResume,
     );
-  };
+  }, [
+    selectedResume,
+    prefillFromResume,
+  ]);
 
-  const updateContact = <
-    Key extends keyof ApplicationContactInfo,
-  >(
-    field: Key,
-    value:
-      ApplicationContactInfo[Key],
-  ) => {
-    setDetails(
-      (current) => ({
-        ...current,
+  const selectResume =
+    useCallback(
+      (
+        resumeId: string,
+      ) => {
+        const exists =
+          resumes.some(
+            (resume) =>
+              resume.id === resumeId,
+          );
 
-        contact: {
-          ...current.contact,
+        if (!exists) {
+          return;
+        }
 
-          [field]: value,
-        },
-      }),
+        setSelectedResumeId(
+          resumeId,
+        );
+      },
+      [resumes],
     );
-  };
 
-  const updateDetails = <
-    Key extends keyof ApplicationDetailsForm,
-  >(
-    field: Key,
-    value:
-      ApplicationDetailsForm[Key],
-  ) => {
-    setDetails(
-      (current) => ({
-        ...current,
-        [field]: value,
-      }),
+  const goToStep =
+    useCallback(
+      (
+        step: ApplicationStep,
+      ) => {
+        setCurrentStep(step);
+      },
+      [],
     );
-  };
-
-  const goToStep = (
-    step: ApplicationStep,
-  ) => {
-    setCurrentStep(step);
-  };
 
   return {
     job,

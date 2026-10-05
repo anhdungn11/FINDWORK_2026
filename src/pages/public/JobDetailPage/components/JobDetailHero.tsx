@@ -16,7 +16,6 @@ import {
 
 import actionStyles from "../styles/JobDetailHeroActions.module.css";
 import styles from "../styles/JobDetailHero.module.css";
-import JobApplicationPage from "@/pages/candidate/JobApplicationPage";
 interface JobDetailHeroProps {
   job: JobDetailRecord;
 }

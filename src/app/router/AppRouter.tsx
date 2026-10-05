@@ -4,7 +4,6 @@ import {
   Routes,
 } from "react-router-dom";
 
-import { ROUTES } from "@/app/router/router";
 
 import AdminLayout from "@/layouts/AdminLayout";
 import AuthLayout from "@/layouts/AuthLayout";

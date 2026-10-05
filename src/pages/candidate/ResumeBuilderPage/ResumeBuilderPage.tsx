@@ -210,7 +210,7 @@ const ResumeBuilderEditor = ({
             {isEditing
               ? "Khi lưu, CV sẽ chuyển sang phiên bản mới mà không thay đổi các Application Snapshot cũ trong kiến trúc backend sau này."
               : "Điền nội dung, chọn mẫu và kiểm tra bản xem trước theo thời gian thực."}
-          </span>
+          </strong>
         </div>
 
         <div className={styles.completionCard}>
