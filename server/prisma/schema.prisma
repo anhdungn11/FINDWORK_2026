@@ -46,6 +46,16 @@ enum CareerLevel {
   MANAGER
 }
 
+enum CandidateCareerStatus {
+  STUDENT
+  INTERN
+  LOOKING_FOR_JOB
+  EMPLOYED
+  UNEMPLOYED
+  FREELANCER
+  OTHER
+}
+
 enum LocationPreferenceMode {
   SELECTED
   NATIONWIDE
@@ -95,6 +105,13 @@ enum CompanyStatus {
   ARCHIVED
 }
 
+enum CompanyVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 enum CompanyMemberStatus {
   ACTIVE
   INACTIVE
@@ -113,6 +130,7 @@ enum JobStatus {
   PUBLISHED
   PAUSED
   CLOSED
+  EXPIRED
   ARCHIVED
 }
 
@@ -198,26 +216,27 @@ enum AssignmentType {
 }
 
 model User {
-  id                String     @id @default(uuid()) @db.Uuid
-  email             String     @db.VarChar(320)
-  emailNormalized   String     @unique @db.VarChar(320)
-  passwordHash      String     @db.VarChar(255)
-  status            UserStatus @default(ACTIVE)
-  emailVerifiedAt   DateTime?  @db.Timestamptz(6)
-  createdAt         DateTime   @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime   @updatedAt @db.Timestamptz(6)
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @db.VarChar(320)
+  emailNormalized String     @unique @db.VarChar(320)
+  passwordHash    String     @db.VarChar(255)
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?  @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime   @updatedAt @db.Timestamptz(6)
 
-  candidateProfile       CandidateProfile?
-  companyMemberships     CompanyMember[]
-  authSessions           AuthSession[]
-  systemRoleAssignments  SystemUserRole[]       @relation("SystemRoleAssignee")
-  systemRolesAssigned    SystemUserRole[]       @relation("SystemRoleAssigner")
-  systemPermissionGrants SystemUserPermission[] @relation("SystemPermissionAssignee")
-  systemPermissionsGiven SystemUserPermission[] @relation("SystemPermissionAssigner")
-  companyRolesAssigned   CompanyMemberRole[]     @relation("CompanyRoleAssigner")
-  companyPermissionsGiven CompanyMemberPermission[] @relation("CompanyPermissionAssigner")
-  applicationStatusEdits ApplicationStatusHistory[] @relation("ApplicationStatusActor")
-  auditLogs              AuditLog[]             @relation("AuditActor")
+  candidateProfile        CandidateProfile?
+  companyMemberships      CompanyMember[]
+  companiesCreated        Company[]                  @relation("CompanyCreator")
+  authSessions            AuthSession[]
+  systemRoleAssignments   SystemUserRole[]           @relation("SystemRoleAssignee")
+  systemRolesAssigned     SystemUserRole[]           @relation("SystemRoleAssigner")
+  systemPermissionGrants  SystemUserPermission[]     @relation("SystemPermissionAssignee")
+  systemPermissionsGiven  SystemUserPermission[]     @relation("SystemPermissionAssigner")
+  companyRolesAssigned    CompanyMemberRole[]        @relation("CompanyRoleAssigner")
+  companyPermissionsGiven CompanyMemberPermission[]  @relation("CompanyPermissionAssigner")
+  applicationStatusEdits  ApplicationStatusHistory[] @relation("ApplicationStatusActor")
+  auditLogs               AuditLog[]                 @relation("AuditActor")
 
   @@index([status])
 }
@@ -240,35 +259,37 @@ model AuthSession {
 }
 
 model CandidateProfile {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @unique @db.Uuid
-  fullName       String   @db.VarChar(160)
-  phone          String?  @db.VarChar(32)
-  dateOfBirth    DateTime? @db.Date
+  id             String                 @id @default(uuid()) @db.Uuid
+  userId         String                 @unique @db.Uuid
+  fullName       String                 @db.VarChar(160)
+  phone          String?                @db.VarChar(32)
+  dateOfBirth    DateTime?              @db.Date
   gender         Gender?
-  countryCode    String?  @db.VarChar(2)
-  provinceId     String?  @db.Uuid
-  wardId         String?  @db.Uuid
-  addressLine    String?  @db.VarChar(255)
-  bio            String?  @db.Text
-  avatarAssetKey String?  @db.VarChar(512)
-  createdAt      DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+  countryCode    String?                @db.VarChar(2)
+  provinceId     String?                @db.Uuid
+  wardId         String?                @db.Uuid
+  addressLine    String?                @db.VarChar(255)
+  bio            String?                @db.Text
+  avatarAssetKey String?                @db.VarChar(512)
+  careerStatus   CandidateCareerStatus?
+  createdAt      DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @db.Timestamptz(6)
 
-  user              User                         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  province          Province?                    @relation(fields: [provinceId], references: [id], onDelete: Restrict)
-  ward              Ward?                        @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "CandidateProfile_ward_same_province_fkey")
-  education         CandidateEducation[]
-  experience        CandidateExperience[]
-  skills            CandidateSkill[]
-  languages         CandidateLanguage[]
-  careerPreference  CandidateCareerPreference?
-  privacySetting    CandidatePrivacySetting?
-  resumes           Resume[]
-  applications      Application[]
+  user             User                       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  province         Province?                  @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  ward             Ward?                      @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "CandidateProfile_ward_same_province_fkey")
+  education        CandidateEducation[]
+  experience       CandidateExperience[]
+  skills           CandidateSkill[]
+  languages        CandidateLanguage[]
+  careerPreference CandidateCareerPreference?
+  privacySetting   CandidatePrivacySetting?
+  resumes          Resume[]
+  applications     Application[]
 
   @@index([provinceId])
   @@index([wardId])
+  @@index([careerStatus])
 }
 
 model CandidateEducation {
@@ -313,7 +334,7 @@ model CandidateExperience {
   createdAt          DateTime       @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime       @updatedAt @db.Timestamptz(6)
 
-  candidateProfile CandidateProfile          @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  candidateProfile CandidateProfile           @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
   skills           CandidateExperienceSkill[]
 
   @@index([candidateProfileId])
@@ -351,17 +372,17 @@ model CandidateSkill {
 }
 
 model CandidateLanguage {
-  id                 String               @id @default(uuid()) @db.Uuid
-  candidateProfileId String               @db.Uuid
-  languageId         String?              @db.Uuid
-  customLanguageName String?              @db.VarChar(160)
+  id                 String              @id @default(uuid()) @db.Uuid
+  candidateProfileId String              @db.Uuid
+  languageId         String?             @db.Uuid
+  customLanguageName String?             @db.VarChar(160)
   overallLevel       LanguageProficiency
   listeningLevel     LanguageProficiency
   speakingLevel      LanguageProficiency
   readingLevel       LanguageProficiency
   writingLevel       LanguageProficiency
-  createdAt          DateTime             @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime             @updatedAt @db.Timestamptz(6)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(6)
 
   candidateProfile CandidateProfile               @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
   language         Language?                      @relation(fields: [languageId], references: [id], onDelete: Restrict)
@@ -372,22 +393,22 @@ model CandidateLanguage {
 }
 
 model CandidateLanguageCertificate {
-  id                    String   @id @default(uuid()) @db.Uuid
-  candidateLanguageId   String   @db.Uuid
-  certificateTypeId     String?  @db.Uuid
-  customCertificateName String?  @db.VarChar(180)
-  level                 String?  @db.VarChar(120)
-  overallScore          String?  @db.VarChar(80)
+  id                    String    @id @default(uuid()) @db.Uuid
+  candidateLanguageId   String    @db.Uuid
+  certificateTypeId     String?   @db.Uuid
+  customCertificateName String?   @db.VarChar(180)
+  level                 String?   @db.VarChar(120)
+  overallScore          String?   @db.VarChar(80)
   scores                Json?
   issuedDate            DateTime? @db.Date
   expiryDate            DateTime? @db.Date
-  issuer                String?  @db.VarChar(180)
-  credentialId          String?  @db.VarChar(180)
-  verificationUrl       String?  @db.VarChar(1000)
-  createdAt             DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt             DateTime @updatedAt @db.Timestamptz(6)
+  issuer                String?   @db.VarChar(180)
+  credentialId          String?   @db.VarChar(180)
+  verificationUrl       String?   @db.VarChar(1000)
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(6)
 
-  candidateLanguage CandidateLanguage       @relation(fields: [candidateLanguageId], references: [id], onDelete: Cascade)
+  candidateLanguage CandidateLanguage        @relation(fields: [candidateLanguageId], references: [id], onDelete: Cascade)
   certificateType   LanguageCertificateType? @relation(fields: [certificateTypeId], references: [id], onDelete: Restrict)
 
   @@index([candidateLanguageId])
@@ -395,27 +416,27 @@ model CandidateLanguageCertificate {
 }
 
 model CandidateCareerPreference {
-  id                 String                   @id @default(uuid()) @db.Uuid
-  candidateProfileId String                   @unique @db.Uuid
+  id                 String                 @id @default(uuid()) @db.Uuid
+  candidateProfileId String                 @unique @db.Uuid
   locationMode       LocationPreferenceMode
   salaryType         SalaryExpectationType
-  salaryMin          Decimal?                 @db.Decimal(19, 2)
-  salaryMax          Decimal?                 @db.Decimal(19, 2)
-  currency           String                   @default("VND") @db.VarChar(3)
-  salaryPeriod       SalaryPeriod             @default(MONTH)
+  salaryMin          Decimal?               @db.Decimal(19, 2)
+  salaryMax          Decimal?               @db.Decimal(19, 2)
+  currency           String                 @default("VND") @db.VarChar(3)
+  salaryPeriod       SalaryPeriod           @default(MONTH)
   desiredCareerLevel CareerLevel?
   availabilityType   AvailabilityType?
-  availableFrom      DateTime?                @db.Date
-  willingToRelocate  Boolean                  @default(false)
-  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime                 @updatedAt @db.Timestamptz(6)
+  availableFrom      DateTime?              @db.Date
+  willingToRelocate  Boolean                @default(false)
+  createdAt          DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime               @updatedAt @db.Timestamptz(6)
 
-  candidateProfile        CandidateProfile                    @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
-  desiredPositions        CandidateDesiredPosition[]
-  preferredCategories     CandidatePreferredCategory[]
-  preferredLocations      CandidatePreferredLocation[]
+  candidateProfile         CandidateProfile                   @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  desiredPositions         CandidateDesiredPosition[]
+  preferredCategories      CandidatePreferredCategory[]
+  preferredLocations       CandidatePreferredLocation[]
   preferredEmploymentTypes CandidatePreferredEmploymentType[]
-  preferredWorkplaceTypes CandidatePreferredWorkplaceType[]
+  preferredWorkplaceTypes  CandidatePreferredWorkplaceType[]
 }
 
 model CandidateDesiredPosition {
@@ -471,7 +492,7 @@ model CandidatePreferredWorkplaceType {
 
 model CandidatePrivacySetting {
   candidateProfileId  String   @id @db.Uuid
-  searchableProfile   Boolean  @default(true)
+  searchableProfile   Boolean  @default(false)
   showEmail           Boolean  @default(false)
   showPhone           Boolean  @default(false)
   allowResumeDownload Boolean  @default(false)
@@ -522,40 +543,63 @@ model ResumeVersion {
 }
 
 model Company {
-  id                String        @id @default(uuid()) @db.Uuid
-  name              String        @db.VarChar(255)
-  industryId        String?       @db.Uuid
-  description       String?       @db.Text
-  website           String?       @db.VarChar(1000)
-  employeeSizeRange String?       @db.VarChar(120)
-  foundedYear       Int?
-  countryCode       String?       @db.VarChar(2)
-  provinceId        String?       @db.Uuid
-  wardId            String?       @db.Uuid
-  addressLine       String?       @db.VarChar(255)
-  logoAssetKey      String?       @db.VarChar(512)
-  coverAssetKey     String?       @db.VarChar(512)
-  status            CompanyStatus @default(ACTIVE)
-  createdAt         DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt         DateTime      @updatedAt @db.Timestamptz(6)
+  id                 String                    @id @default(uuid()) @db.Uuid
+  createdByUserId    String                    @db.Uuid
+  name               String                    @db.VarChar(255)
+  slug               String                    @unique @db.VarChar(220)
+  legalName          String?                   @db.VarChar(220)
+  taxCode            String?                   @db.VarChar(80)
+  industryId         String?                   @db.Uuid
+  description        String?                   @db.Text
+  website            String?                   @db.VarChar(1000)
+  employeeSizeRange  String?                   @db.VarChar(120)
+  foundedYear        Int?
+  logoAssetKey       String?                   @db.VarChar(512)
+  coverAssetKey      String?                   @db.VarChar(512)
+  verificationStatus CompanyVerificationStatus @default(UNVERIFIED)
+  verifiedAt         DateTime?                 @db.Timestamptz(6)
+  status             CompanyStatus             @default(ACTIVE)
+  createdAt          DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                  @updatedAt @db.Timestamptz(6)
 
-  industry     Industry?           @relation(fields: [industryId], references: [id], onDelete: Restrict)
-  province     Province?           @relation(fields: [provinceId], references: [id], onDelete: Restrict)
-  ward         Ward?               @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "Company_ward_same_province_fkey")
-  members      CompanyMember[]
-  invitations  CompanyInvitation[]
-  roles        Role[]
-  memberRoles  CompanyMemberRole[]
+  createdBy                 User                      @relation("CompanyCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  industry                  Industry?                 @relation(fields: [industryId], references: [id], onDelete: Restrict)
+  locations                 CompanyLocation[]
+  members                   CompanyMember[]
+  invitations               CompanyInvitation[]
+  roles                     Role[]
+  memberRoles               CompanyMemberRole[]
   memberPermissionOverrides CompanyMemberPermission[]
-  jobs         Job[]
-  applications Application[]
-  assignments  ApplicationAssignment[]
-  interviews   Interview[]
-  auditLogs     AuditLog[]
+  jobs                      Job[]
+  applications              Application[]
+  assignments               ApplicationAssignment[]
+  interviews                Interview[]
+  auditLogs                 AuditLog[]
 
+  @@index([createdByUserId])
   @@index([industryId])
-  @@index([provinceId])
+  @@index([verificationStatus])
   @@index([status])
+}
+
+model CompanyLocation {
+  id             String   @id @default(uuid()) @db.Uuid
+  companyId      String   @db.Uuid
+  countryCode    String?  @db.VarChar(2)
+  provinceId     String?  @db.Uuid
+  wardId         String?  @db.Uuid
+  addressLine    String?  @db.VarChar(255)
+  isHeadquarters Boolean  @default(false)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  province Province? @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  ward     Ward?     @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "CompanyLocation_ward_same_province_fkey")
+
+  @@index([companyId])
+  @@index([provinceId])
+  @@index([wardId])
 }
 
 model CompanyMember {
@@ -569,16 +613,16 @@ model CompanyMember {
   createdAt DateTime            @default(now()) @db.Timestamptz(6)
   updatedAt DateTime            @updatedAt @db.Timestamptz(6)
 
-  company            Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  user               User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
-  roles              CompanyMemberRole[]
-  permissionOverrides CompanyMemberPermission[]
-  createdJobs        Job[]                     @relation("JobCreator")
-  invitationsSent    CompanyInvitation[]       @relation("CompanyInviter")
-  assignedApplications ApplicationAssignment[] @relation("ApplicationAssignee")
-  assignmentsMade    ApplicationAssignment[]   @relation("ApplicationAssigner")
-  interviewsCreated  Interview[]               @relation("InterviewCreator")
-  interviewParticipation InterviewParticipant[] @relation("InterviewParticipantMember")
+  company                Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user                   User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  roles                  CompanyMemberRole[]
+  permissionOverrides    CompanyMemberPermission[]
+  createdJobs            Job[]                     @relation("JobCreator")
+  invitationsSent        CompanyInvitation[]       @relation("CompanyInviter")
+  assignedApplications   ApplicationAssignment[]   @relation("ApplicationAssignee")
+  assignmentsMade        ApplicationAssignment[]   @relation("ApplicationAssigner")
+  interviewsCreated      Interview[]               @relation("InterviewCreator")
+  interviewParticipation InterviewParticipant[]    @relation("InterviewParticipantMember")
 
   @@unique([companyId, userId])
   @@unique([companyId, id])
@@ -615,10 +659,6 @@ model Job {
   description         String         @db.Text
   employmentType      EmploymentType
   workplaceType       WorkplaceType
-  countryCode         String?        @db.VarChar(2)
-  provinceId          String?        @db.Uuid
-  wardId              String?        @db.Uuid
-  addressLine         String?        @db.VarChar(255)
   experienceMinMonths Int?
   experienceMaxMonths Int?
   salaryMin           Decimal?       @db.Decimal(19, 2)
@@ -626,36 +666,58 @@ model Job {
   currency            String         @default("VND") @db.VarChar(3)
   salaryPeriod        SalaryPeriod   @default(MONTH)
   salaryNegotiable    Boolean        @default(false)
+  showSalary          Boolean        @default(false)
   status              JobStatus      @default(DRAFT)
   publishedAt         DateTime?      @db.Timestamptz(6)
+  applicationDeadline DateTime?      @db.Timestamptz(6)
   expiresAt           DateTime?      @db.Timestamptz(6)
   version             Int            @default(1)
   createdAt           DateTime       @default(now()) @db.Timestamptz(6)
   updatedAt           DateTime       @updatedAt @db.Timestamptz(6)
 
-  company          Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  createdByMember  CompanyMember       @relation("JobCreator", fields: [companyId, createdByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Job_creator_same_company_fkey")
-  category         JobCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  province         Province?           @relation(fields: [provinceId], references: [id], onDelete: Restrict)
-  ward             Ward?               @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "Job_ward_same_province_fkey")
-  skills           JobSkill[]
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdByMember    CompanyMember       @relation("JobCreator", fields: [companyId, createdByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Job_creator_same_company_fkey")
+  category           JobCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  locations          JobLocation[]
+  skills             JobSkill[]
   screeningQuestions ScreeningQuestion[]
-  applications     Application[]
+  applications       Application[]
 
   @@unique([companyId, id])
   @@index([companyId, status, publishedAt])
   @@index([categoryId, status, publishedAt])
-  @@index([provinceId, status, publishedAt])
   @@index([status, publishedAt])
+  @@index([status, applicationDeadline])
+  @@index([expiresAt])
+}
+
+model JobLocation {
+  id          String   @id @default(uuid()) @db.Uuid
+  jobId       String   @db.Uuid
+  countryCode String?  @db.VarChar(2)
+  provinceId  String?  @db.Uuid
+  wardId      String?  @db.Uuid
+  addressLine String?  @db.VarChar(255)
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  province Province? @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  ward     Ward?     @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "JobLocation_ward_same_province_fkey")
+
+  @@index([jobId])
+  @@index([provinceId])
+  @@index([wardId])
 }
 
 model JobSkill {
-  id              String      @id @default(uuid()) @db.Uuid
-  jobId           String      @db.Uuid
-  skillId         String?     @db.Uuid
-  customSkillName String?     @db.VarChar(160)
+  id               String      @id @default(uuid()) @db.Uuid
+  jobId            String      @db.Uuid
+  skillId          String?     @db.Uuid
+  customSkillName  String?     @db.VarChar(160)
   requirementLevel SkillLevel?
-  isRequired      Boolean     @default(false)
+  isRequired       Boolean     @default(false)
 
   job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
   skill Skill? @relation(fields: [skillId], references: [id], onDelete: Restrict)
@@ -704,11 +766,11 @@ model Application {
   createdAt               DateTime                  @default(now()) @db.Timestamptz(6)
   updatedAt               DateTime                  @updatedAt @db.Timestamptz(6)
 
-  candidateProfile CandidateProfile          @relation(fields: [candidateProfileId], references: [id], onDelete: Restrict)
-  company          Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  job              Job                       @relation(fields: [companyId, jobId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_job_same_company_fkey")
-  resume           Resume                    @relation(fields: [candidateProfileId, resumeId], references: [candidateProfileId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_resume_same_candidate_fkey")
-  resumeVersion    ResumeVersion             @relation(fields: [resumeId, resumeVersionId], references: [resumeId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_version_same_resume_fkey")
+  candidateProfile CandidateProfile           @relation(fields: [candidateProfileId], references: [id], onDelete: Restrict)
+  company          Company                    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  job              Job                        @relation(fields: [companyId, jobId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_job_same_company_fkey")
+  resume           Resume                     @relation(fields: [candidateProfileId, resumeId], references: [candidateProfileId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_resume_same_candidate_fkey")
+  resumeVersion    ResumeVersion              @relation(fields: [resumeId, resumeVersionId], references: [resumeId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_version_same_resume_fkey")
   answers          ApplicationAnswer[]
   statusHistory    ApplicationStatusHistory[]
   assignments      ApplicationAssignment[]
@@ -742,13 +804,13 @@ model ApplicationAnswer {
 }
 
 model ApplicationStatusHistory {
-  id              String            @id @default(uuid()) @db.Uuid
-  applicationId   String            @db.Uuid
+  id              String             @id @default(uuid()) @db.Uuid
+  applicationId   String             @db.Uuid
   fromStatus      ApplicationStatus?
   toStatus        ApplicationStatus
-  changedByUserId String?           @db.Uuid
-  note            String?           @db.Text
-  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
+  changedByUserId String?            @db.Uuid
+  note            String?            @db.Text
+  createdAt       DateTime           @default(now()) @db.Timestamptz(6)
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Restrict)
   changedBy   User?       @relation("ApplicationStatusActor", fields: [changedByUserId], references: [id], onDelete: SetNull)
@@ -791,9 +853,9 @@ model Interview {
   createdAt         DateTime        @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime        @updatedAt @db.Timestamptz(6)
 
-  application     Application          @relation(fields: [companyId, applicationId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Interview_application_same_company_fkey")
-  company         Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  createdByMember CompanyMember        @relation("InterviewCreator", fields: [companyId, createdByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Interview_creator_same_company_fkey")
+  application     Application            @relation(fields: [companyId, applicationId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Interview_application_same_company_fkey")
+  company         Company                @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdByMember CompanyMember          @relation("InterviewCreator", fields: [companyId, createdByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Interview_creator_same_company_fkey")
   participants    InterviewParticipant[]
 
   @@unique([companyId, id])
@@ -802,13 +864,13 @@ model Interview {
 }
 
 model InterviewParticipant {
-  id               String                   @id @default(uuid()) @db.Uuid
-  interviewId      String                   @db.Uuid
-  companyId        String                   @db.Uuid
-  companyMemberId  String                   @db.Uuid
-  participantRole  InterviewParticipantRole @default(INTERVIEWER)
-  addedAt          DateTime                 @default(now()) @db.Timestamptz(6)
-  removedAt        DateTime?                @db.Timestamptz(6)
+  id              String                   @id @default(uuid()) @db.Uuid
+  interviewId     String                   @db.Uuid
+  companyId       String                   @db.Uuid
+  companyMemberId String                   @db.Uuid
+  participantRole InterviewParticipantRole @default(INTERVIEWER)
+  addedAt         DateTime                 @default(now()) @db.Timestamptz(6)
+  removedAt       DateTime?                @db.Timestamptz(6)
 
   interview     Interview     @relation(fields: [companyId, interviewId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "InterviewParticipant_interview_same_company_fkey")
   companyMember CompanyMember @relation("InterviewParticipantMember", fields: [companyId, companyMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "InterviewParticipant_member_same_company_fkey")
@@ -848,10 +910,10 @@ model Role {
   createdAt      DateTime @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @db.Timestamptz(6)
 
-  company            Company?            @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  permissions        RolePermission[]
-  systemUsers        SystemUserRole[]
-  companyMembers     CompanyMemberRole[]
+  company        Company?            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  permissions    RolePermission[]
+  systemUsers    SystemUserRole[]
+  companyMembers CompanyMemberRole[]
 
   @@unique([companyId, normalizedName])
   @@unique([companyId, id])
@@ -877,8 +939,8 @@ model SystemUserRole {
   assignedByUserId String?  @db.Uuid
   createdAt        DateTime @default(now()) @db.Timestamptz(6)
 
-  user       User @relation("SystemRoleAssignee", fields: [userId], references: [id], onDelete: Restrict)
-  role       Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  user       User  @relation("SystemRoleAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  role       Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
   assignedBy User? @relation("SystemRoleAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
 
   @@id([userId, roleId])
@@ -886,11 +948,11 @@ model SystemUserRole {
 }
 
 model CompanyMemberRole {
-  companyId       String   @db.Uuid
-  companyMemberId String   @db.Uuid
-  roleId          String   @db.Uuid
-  assignedByUserId String  @db.Uuid
-  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  companyId        String   @db.Uuid
+  companyMemberId  String   @db.Uuid
+  roleId           String   @db.Uuid
+  assignedByUserId String   @db.Uuid
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
 
   company       Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   companyMember CompanyMember @relation(fields: [companyId, companyMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "CompanyMemberRole_member_same_company_fkey")
@@ -1021,7 +1083,7 @@ model Skill {
   createdAt  DateTime @default(now()) @db.Timestamptz(6)
   updatedAt  DateTime @updatedAt @db.Timestamptz(6)
 
-  category         SkillCategory             @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category         SkillCategory              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   candidateSkills  CandidateSkill[]
   experienceSkills CandidateExperienceSkill[]
   jobSkills        JobSkill[]
@@ -1072,11 +1134,11 @@ model Province {
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @db.Timestamptz(6)
 
-  wards                  Ward[]
-  candidateProfiles      CandidateProfile[]
-  companies              Company[]
-  jobs                   Job[]
-  candidatePreferences   CandidatePreferredLocation[]
+  wards                Ward[]
+  candidateProfiles    CandidateProfile[]
+  companyLocations     CompanyLocation[]
+  jobLocations         JobLocation[]
+  candidatePreferences CandidatePreferredLocation[]
 
   @@index([isActive, name])
 }
@@ -1094,8 +1156,8 @@ model Ward {
 
   province          Province           @relation(fields: [provinceId], references: [id], onDelete: Restrict)
   candidateProfiles CandidateProfile[]
-  companies         Company[]
-  jobs              Job[]
+  companyLocations  CompanyLocation[]
+  jobLocations      JobLocation[]
 
   @@unique([provinceId, id])
   @@index([provinceId, isActive, name])
