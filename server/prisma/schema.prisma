@@ -1,0 +1,1102 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  INTERNSHIP
+  CONTRACT
+  FREELANCE
+  TEMPORARY
+  VOLUNTEER
+}
+
+enum WorkplaceType {
+  ONSITE
+  HYBRID
+  REMOTE
+}
+
+enum CareerLevel {
+  INTERN
+  FRESHER
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+  MANAGER
+}
+
+enum LocationPreferenceMode {
+  SELECTED
+  NATIONWIDE
+}
+
+enum SalaryExpectationType {
+  RANGE
+  NEGOTIABLE
+  NOT_IMPORTANT
+}
+
+enum AvailabilityType {
+  IMMEDIATELY
+  SPECIFIC_DATE
+}
+
+enum LanguageProficiency {
+  BASIC
+  CONVERSATIONAL
+  PROFESSIONAL
+  FLUENT
+  NATIVE
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  PROFICIENT
+  EXPERT
+}
+
+enum ResumeSourceType {
+  UPLOADED
+  BUILDER
+}
+
+enum ResumeStatus {
+  READY
+  UPLOADING
+  FAILED
+}
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum CompanyMemberStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
+}
+
+enum CompanyInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum JobStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  CLOSED
+  ARCHIVED
+}
+
+enum SalaryPeriod {
+  HOUR
+  DAY
+  WEEK
+  MONTH
+  YEAR
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWING
+  SHORTLISTED
+  INTERVIEW
+  OFFERED
+  REJECTED
+  WITHDRAWN
+}
+
+enum ApplicationAvailability {
+  IMMEDIATELY
+  WITHIN_1_WEEK
+  WITHIN_2_WEEKS
+  WITHIN_1_MONTH
+  NEGOTIABLE
+}
+
+enum ApplicationContactMethod {
+  EMAIL
+  PHONE
+}
+
+enum ScreeningQuestionType {
+  TEXT
+  TEXTAREA
+  YES_NO
+  SELECT
+}
+
+enum InterviewType {
+  ONSITE
+  PHONE
+  VIDEO
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum InterviewParticipantRole {
+  INTERVIEWER
+  HIRING_MANAGER
+  OBSERVER
+}
+
+enum RoleKind {
+  SYSTEM
+  COMPANY
+}
+
+enum PermissionEffect {
+  ALLOW
+  DENY
+}
+
+enum DataScope {
+  OWN
+  ASSIGNED
+  COMPANY
+  SYSTEM
+}
+
+enum AssignmentType {
+  PRIMARY_RECRUITER
+  REVIEWER
+  INTERVIEWER
+}
+
+model User {
+  id                String     @id @default(uuid()) @db.Uuid
+  email             String     @db.VarChar(320)
+  emailNormalized   String     @unique @db.VarChar(320)
+  passwordHash      String     @db.VarChar(255)
+  status            UserStatus @default(ACTIVE)
+  emailVerifiedAt   DateTime?  @db.Timestamptz(6)
+  createdAt         DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime   @updatedAt @db.Timestamptz(6)
+
+  candidateProfile       CandidateProfile?
+  companyMemberships     CompanyMember[]
+  authSessions           AuthSession[]
+  systemRoleAssignments  SystemUserRole[]       @relation("SystemRoleAssignee")
+  systemRolesAssigned    SystemUserRole[]       @relation("SystemRoleAssigner")
+  systemPermissionGrants SystemUserPermission[] @relation("SystemPermissionAssignee")
+  systemPermissionsGiven SystemUserPermission[] @relation("SystemPermissionAssigner")
+  companyRolesAssigned   CompanyMemberRole[]     @relation("CompanyRoleAssigner")
+  companyPermissionsGiven CompanyMemberPermission[] @relation("CompanyPermissionAssigner")
+  applicationStatusEdits ApplicationStatusHistory[] @relation("ApplicationStatusActor")
+  auditLogs              AuditLog[]             @relation("AuditActor")
+
+  @@index([status])
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  refreshTokenHash String    @unique @db.VarChar(255)
+  expiresAt        DateTime  @db.Timestamptz(6)
+  revokedAt        DateTime? @db.Timestamptz(6)
+  lastUsedAt       DateTime? @db.Timestamptz(6)
+  userAgent        String?   @db.Text
+  ipAddress        String?   @db.VarChar(64)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+model CandidateProfile {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @db.Uuid
+  fullName       String   @db.VarChar(160)
+  phone          String?  @db.VarChar(32)
+  dateOfBirth    DateTime? @db.Date
+  gender         Gender?
+  countryCode    String?  @db.VarChar(2)
+  provinceId     String?  @db.Uuid
+  wardId         String?  @db.Uuid
+  addressLine    String?  @db.VarChar(255)
+  bio            String?  @db.Text
+  avatarAssetKey String?  @db.VarChar(512)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  user              User                         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  province          Province?                    @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  ward              Ward?                        @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "CandidateProfile_ward_same_province_fkey")
+  education         CandidateEducation[]
+  experience        CandidateExperience[]
+  skills            CandidateSkill[]
+  languages         CandidateLanguage[]
+  careerPreference  CandidateCareerPreference?
+  privacySetting    CandidatePrivacySetting?
+  resumes           Resume[]
+  applications      Application[]
+
+  @@index([provinceId])
+  @@index([wardId])
+}
+
+model CandidateEducation {
+  id                 String   @id @default(uuid()) @db.Uuid
+  candidateProfileId String   @db.Uuid
+  school             String   @db.VarChar(255)
+  degree             String   @db.VarChar(160)
+  major              String   @db.VarChar(160)
+  location           String?  @db.VarChar(255)
+  startMonth         Int
+  startYear          Int
+  endMonth           Int?
+  endYear            Int?
+  isStudying         Boolean  @default(false)
+  gpa                Decimal? @db.Decimal(7, 3)
+  gpaScale           Decimal? @db.Decimal(7, 3)
+  achievements       String?  @db.Text
+  description        String?  @db.Text
+  createdAt          DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(6)
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  @@index([candidateProfileId])
+}
+
+model CandidateExperience {
+  id                 String         @id @default(uuid()) @db.Uuid
+  candidateProfileId String         @db.Uuid
+  companyName        String         @db.VarChar(255)
+  position           String         @db.VarChar(180)
+  employmentType     EmploymentType
+  workplaceType      WorkplaceType
+  location           String?        @db.VarChar(255)
+  startMonth         Int
+  startYear          Int
+  endMonth           Int?
+  endYear            Int?
+  isCurrent          Boolean        @default(false)
+  description        String?        @db.Text
+  achievements       String?        @db.Text
+  createdAt          DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime       @updatedAt @db.Timestamptz(6)
+
+  candidateProfile CandidateProfile          @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  skills           CandidateExperienceSkill[]
+
+  @@index([candidateProfileId])
+}
+
+model CandidateExperienceSkill {
+  id           String  @id @default(uuid()) @db.Uuid
+  experienceId String  @db.Uuid
+  skillId      String? @db.Uuid
+  skillName    String  @db.VarChar(160)
+
+  experience CandidateExperience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  skill      Skill?              @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@index([experienceId])
+  @@index([skillId])
+}
+
+model CandidateSkill {
+  id                 String     @id @default(uuid()) @db.Uuid
+  candidateProfileId String     @db.Uuid
+  skillId            String?    @db.Uuid
+  customSkillName    String?    @db.VarChar(160)
+  level              SkillLevel
+  yearsOfExperience  Decimal?   @db.Decimal(5, 2)
+  isHighlighted      Boolean    @default(false)
+  createdAt          DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime   @updatedAt @db.Timestamptz(6)
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  skill            Skill?           @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@index([candidateProfileId])
+  @@index([skillId])
+}
+
+model CandidateLanguage {
+  id                 String               @id @default(uuid()) @db.Uuid
+  candidateProfileId String               @db.Uuid
+  languageId         String?              @db.Uuid
+  customLanguageName String?              @db.VarChar(160)
+  overallLevel       LanguageProficiency
+  listeningLevel     LanguageProficiency
+  speakingLevel      LanguageProficiency
+  readingLevel       LanguageProficiency
+  writingLevel       LanguageProficiency
+  createdAt          DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(6)
+
+  candidateProfile CandidateProfile               @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  language         Language?                      @relation(fields: [languageId], references: [id], onDelete: Restrict)
+  certificates     CandidateLanguageCertificate[]
+
+  @@index([candidateProfileId])
+  @@index([languageId])
+}
+
+model CandidateLanguageCertificate {
+  id                    String   @id @default(uuid()) @db.Uuid
+  candidateLanguageId   String   @db.Uuid
+  certificateTypeId     String?  @db.Uuid
+  customCertificateName String?  @db.VarChar(180)
+  level                 String?  @db.VarChar(120)
+  overallScore          String?  @db.VarChar(80)
+  scores                Json?
+  issuedDate            DateTime? @db.Date
+  expiryDate            DateTime? @db.Date
+  issuer                String?  @db.VarChar(180)
+  credentialId          String?  @db.VarChar(180)
+  verificationUrl       String?  @db.VarChar(1000)
+  createdAt             DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(6)
+
+  candidateLanguage CandidateLanguage       @relation(fields: [candidateLanguageId], references: [id], onDelete: Cascade)
+  certificateType   LanguageCertificateType? @relation(fields: [certificateTypeId], references: [id], onDelete: Restrict)
+
+  @@index([candidateLanguageId])
+  @@index([certificateTypeId])
+}
+
+model CandidateCareerPreference {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  candidateProfileId String                   @unique @db.Uuid
+  locationMode       LocationPreferenceMode
+  salaryType         SalaryExpectationType
+  salaryMin          Decimal?                 @db.Decimal(19, 2)
+  salaryMax          Decimal?                 @db.Decimal(19, 2)
+  currency           String                   @default("VND") @db.VarChar(3)
+  salaryPeriod       SalaryPeriod             @default(MONTH)
+  desiredCareerLevel CareerLevel?
+  availabilityType   AvailabilityType?
+  availableFrom      DateTime?                @db.Date
+  willingToRelocate  Boolean                  @default(false)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(6)
+
+  candidateProfile        CandidateProfile                    @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  desiredPositions        CandidateDesiredPosition[]
+  preferredCategories     CandidatePreferredCategory[]
+  preferredLocations      CandidatePreferredLocation[]
+  preferredEmploymentTypes CandidatePreferredEmploymentType[]
+  preferredWorkplaceTypes CandidatePreferredWorkplaceType[]
+}
+
+model CandidateDesiredPosition {
+  id                 String @id @default(uuid()) @db.Uuid
+  careerPreferenceId String @db.Uuid
+  title              String @db.VarChar(180)
+  displayOrder       Int    @default(0)
+
+  careerPreference CandidateCareerPreference @relation(fields: [careerPreferenceId], references: [id], onDelete: Cascade)
+
+  @@index([careerPreferenceId, displayOrder])
+}
+
+model CandidatePreferredCategory {
+  careerPreferenceId String @db.Uuid
+  jobCategoryId      String @db.Uuid
+
+  careerPreference CandidateCareerPreference @relation(fields: [careerPreferenceId], references: [id], onDelete: Cascade)
+  jobCategory      JobCategory               @relation(fields: [jobCategoryId], references: [id], onDelete: Restrict)
+
+  @@id([careerPreferenceId, jobCategoryId])
+  @@index([jobCategoryId])
+}
+
+model CandidatePreferredLocation {
+  careerPreferenceId String @db.Uuid
+  provinceId         String @db.Uuid
+
+  careerPreference CandidateCareerPreference @relation(fields: [careerPreferenceId], references: [id], onDelete: Cascade)
+  province         Province                  @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+
+  @@id([careerPreferenceId, provinceId])
+  @@index([provinceId])
+}
+
+model CandidatePreferredEmploymentType {
+  careerPreferenceId String         @db.Uuid
+  employmentType     EmploymentType
+
+  careerPreference CandidateCareerPreference @relation(fields: [careerPreferenceId], references: [id], onDelete: Cascade)
+
+  @@id([careerPreferenceId, employmentType])
+}
+
+model CandidatePreferredWorkplaceType {
+  careerPreferenceId String        @db.Uuid
+  workplaceType      WorkplaceType
+
+  careerPreference CandidateCareerPreference @relation(fields: [careerPreferenceId], references: [id], onDelete: Cascade)
+
+  @@id([careerPreferenceId, workplaceType])
+}
+
+model CandidatePrivacySetting {
+  candidateProfileId  String   @id @db.Uuid
+  searchableProfile   Boolean  @default(true)
+  showEmail           Boolean  @default(false)
+  showPhone           Boolean  @default(false)
+  allowResumeDownload Boolean  @default(false)
+  allowJobMatching    Boolean  @default(true)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(6)
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+}
+
+model Resume {
+  id                 String           @id @default(uuid()) @db.Uuid
+  candidateProfileId String           @db.Uuid
+  name               String           @db.VarChar(180)
+  sourceType         ResumeSourceType
+  status             ResumeStatus     @default(READY)
+  isDefault          Boolean          @default(false)
+  createdAt          DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @db.Timestamptz(6)
+  deletedAt          DateTime?        @db.Timestamptz(6)
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Restrict)
+  versions         ResumeVersion[]
+  applications     Application[]
+
+  @@unique([candidateProfileId, id])
+  @@index([candidateProfileId, deletedAt])
+}
+
+model ResumeVersion {
+  id               String   @id @default(uuid()) @db.Uuid
+  resumeId         String   @db.Uuid
+  versionNumber    Int
+  fileOriginalName String?  @db.VarChar(255)
+  fileMimeType     String?  @db.VarChar(120)
+  fileSize         Int?
+  fileStorageKey   String?  @db.VarChar(512)
+  templateCode     String?  @db.VarChar(80)
+  builderContent   Json?
+  builderSettings  Json?
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+
+  resume       Resume        @relation(fields: [resumeId], references: [id], onDelete: Restrict)
+  applications Application[]
+
+  @@unique([resumeId, versionNumber])
+  @@unique([resumeId, id])
+  @@index([resumeId, createdAt])
+}
+
+model Company {
+  id                String        @id @default(uuid()) @db.Uuid
+  name              String        @db.VarChar(255)
+  industryId        String?       @db.Uuid
+  description       String?       @db.Text
+  website           String?       @db.VarChar(1000)
+  employeeSizeRange String?       @db.VarChar(120)
+  foundedYear       Int?
+  countryCode       String?       @db.VarChar(2)
+  provinceId        String?       @db.Uuid
+  wardId            String?       @db.Uuid
+  addressLine       String?       @db.VarChar(255)
+  logoAssetKey      String?       @db.VarChar(512)
+  coverAssetKey     String?       @db.VarChar(512)
+  status            CompanyStatus @default(ACTIVE)
+  createdAt         DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @db.Timestamptz(6)
+
+  industry     Industry?           @relation(fields: [industryId], references: [id], onDelete: Restrict)
+  province     Province?           @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  ward         Ward?               @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "Company_ward_same_province_fkey")
+  members      CompanyMember[]
+  invitations  CompanyInvitation[]
+  roles        Role[]
+  memberRoles  CompanyMemberRole[]
+  memberPermissionOverrides CompanyMemberPermission[]
+  jobs         Job[]
+  applications Application[]
+  assignments  ApplicationAssignment[]
+  interviews   Interview[]
+  auditLogs     AuditLog[]
+
+  @@index([industryId])
+  @@index([provinceId])
+  @@index([status])
+}
+
+model CompanyMember {
+  id        String              @id @default(uuid()) @db.Uuid
+  companyId String              @db.Uuid
+  userId    String              @db.Uuid
+  status    CompanyMemberStatus @default(ACTIVE)
+  isOwner   Boolean             @default(false)
+  joinedAt  DateTime            @default(now()) @db.Timestamptz(6)
+  removedAt DateTime?           @db.Timestamptz(6)
+  createdAt DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime            @updatedAt @db.Timestamptz(6)
+
+  company            Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user               User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  roles              CompanyMemberRole[]
+  permissionOverrides CompanyMemberPermission[]
+  createdJobs        Job[]                     @relation("JobCreator")
+  invitationsSent    CompanyInvitation[]       @relation("CompanyInviter")
+  assignedApplications ApplicationAssignment[] @relation("ApplicationAssignee")
+  assignmentsMade    ApplicationAssignment[]   @relation("ApplicationAssigner")
+  interviewsCreated  Interview[]               @relation("InterviewCreator")
+  interviewParticipation InterviewParticipant[] @relation("InterviewParticipantMember")
+
+  @@unique([companyId, userId])
+  @@unique([companyId, id])
+  @@index([userId, status])
+  @@index([companyId, status])
+}
+
+model CompanyInvitation {
+  id                String                  @id @default(uuid()) @db.Uuid
+  companyId         String                  @db.Uuid
+  emailNormalized   String                  @db.VarChar(320)
+  invitedByMemberId String                  @db.Uuid
+  tokenHash         String                  @unique @db.VarChar(255)
+  status            CompanyInvitationStatus @default(PENDING)
+  expiresAt         DateTime                @db.Timestamptz(6)
+  acceptedAt        DateTime?               @db.Timestamptz(6)
+  revokedAt         DateTime?               @db.Timestamptz(6)
+  createdAt         DateTime                @default(now()) @db.Timestamptz(6)
+
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invitedBy CompanyMember @relation("CompanyInviter", fields: [companyId, invitedByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "CompanyInvitation_inviter_same_company_fkey")
+
+  @@index([companyId, status])
+  @@index([emailNormalized, status])
+  @@index([expiresAt])
+}
+
+model Job {
+  id                  String         @id @default(uuid()) @db.Uuid
+  companyId           String         @db.Uuid
+  createdByMemberId   String         @db.Uuid
+  categoryId          String         @db.Uuid
+  title               String         @db.VarChar(220)
+  description         String         @db.Text
+  employmentType      EmploymentType
+  workplaceType       WorkplaceType
+  countryCode         String?        @db.VarChar(2)
+  provinceId          String?        @db.Uuid
+  wardId              String?        @db.Uuid
+  addressLine         String?        @db.VarChar(255)
+  experienceMinMonths Int?
+  experienceMaxMonths Int?
+  salaryMin           Decimal?       @db.Decimal(19, 2)
+  salaryMax           Decimal?       @db.Decimal(19, 2)
+  currency            String         @default("VND") @db.VarChar(3)
+  salaryPeriod        SalaryPeriod   @default(MONTH)
+  salaryNegotiable    Boolean        @default(false)
+  status              JobStatus      @default(DRAFT)
+  publishedAt         DateTime?      @db.Timestamptz(6)
+  expiresAt           DateTime?      @db.Timestamptz(6)
+  version             Int            @default(1)
+  createdAt           DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime       @updatedAt @db.Timestamptz(6)
+
+  company          Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdByMember  CompanyMember       @relation("JobCreator", fields: [companyId, createdByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Job_creator_same_company_fkey")
+  category         JobCategory         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  province         Province?           @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  ward             Ward?               @relation(fields: [provinceId, wardId], references: [provinceId, id], onDelete: Restrict, onUpdate: Cascade, map: "Job_ward_same_province_fkey")
+  skills           JobSkill[]
+  screeningQuestions ScreeningQuestion[]
+  applications     Application[]
+
+  @@unique([companyId, id])
+  @@index([companyId, status, publishedAt])
+  @@index([categoryId, status, publishedAt])
+  @@index([provinceId, status, publishedAt])
+  @@index([status, publishedAt])
+}
+
+model JobSkill {
+  id              String      @id @default(uuid()) @db.Uuid
+  jobId           String      @db.Uuid
+  skillId         String?     @db.Uuid
+  customSkillName String?     @db.VarChar(160)
+  requirementLevel SkillLevel?
+  isRequired      Boolean     @default(false)
+
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill Skill? @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@index([jobId])
+  @@index([skillId])
+}
+
+model ScreeningQuestion {
+  id           String                @id @default(uuid()) @db.Uuid
+  jobId        String                @db.Uuid
+  type         ScreeningQuestionType
+  label        String                @db.Text
+  isRequired   Boolean               @default(false)
+  displayOrder Int                   @default(0)
+  options      Json?
+  isActive     Boolean               @default(true)
+  createdAt    DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime              @updatedAt @db.Timestamptz(6)
+
+  job     Job                 @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  answers ApplicationAnswer[]
+
+  @@unique([jobId, id])
+  @@index([jobId, isActive, displayOrder])
+}
+
+model Application {
+  id                      String                    @id @default(uuid()) @db.Uuid
+  candidateProfileId      String                    @db.Uuid
+  companyId               String                    @db.Uuid
+  jobId                   String                    @db.Uuid
+  resumeId                String                    @db.Uuid
+  resumeVersionId         String                    @db.Uuid
+  status                  ApplicationStatus         @default(DRAFT)
+  version                 Int                       @default(1)
+  fullNameSnapshot        String?                   @db.VarChar(160)
+  emailSnapshot           String?                   @db.VarChar(320)
+  phoneSnapshot           String?                   @db.VarChar(32)
+  currentLocationSnapshot String?                   @db.VarChar(255)
+  availability            ApplicationAvailability?
+  preferredContactMethod  ApplicationContactMethod?
+  coverLetter             String?                   @db.Text
+  jobSnapshot             Json?
+  submittedAt             DateTime?                 @db.Timestamptz(6)
+  createdAt               DateTime                  @default(now()) @db.Timestamptz(6)
+  updatedAt               DateTime                  @updatedAt @db.Timestamptz(6)
+
+  candidateProfile CandidateProfile          @relation(fields: [candidateProfileId], references: [id], onDelete: Restrict)
+  company          Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  job              Job                       @relation(fields: [companyId, jobId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_job_same_company_fkey")
+  resume           Resume                    @relation(fields: [candidateProfileId, resumeId], references: [candidateProfileId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_resume_same_candidate_fkey")
+  resumeVersion    ResumeVersion             @relation(fields: [resumeId, resumeVersionId], references: [resumeId, id], onDelete: Restrict, onUpdate: Cascade, map: "Application_version_same_resume_fkey")
+  answers          ApplicationAnswer[]
+  statusHistory    ApplicationStatusHistory[]
+  assignments      ApplicationAssignment[]
+  interviews       Interview[]
+
+  @@unique([candidateProfileId, jobId])
+  @@unique([companyId, id])
+  @@unique([jobId, id])
+  @@index([companyId, status, createdAt])
+  @@index([candidateProfileId, status, updatedAt])
+  @@index([jobId, status, createdAt])
+  @@index([resumeVersionId])
+}
+
+model ApplicationAnswer {
+  id                  String   @id @default(uuid()) @db.Uuid
+  jobId               String   @db.Uuid
+  applicationId       String   @db.Uuid
+  screeningQuestionId String   @db.Uuid
+  questionSnapshot    Json
+  answerValue         Json
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(6)
+
+  application       Application       @relation(fields: [jobId, applicationId], references: [jobId, id], onDelete: Restrict, onUpdate: Cascade, map: "ApplicationAnswer_application_same_job_fkey")
+  screeningQuestion ScreeningQuestion @relation(fields: [jobId, screeningQuestionId], references: [jobId, id], onDelete: Restrict, onUpdate: Cascade, map: "ApplicationAnswer_question_same_job_fkey")
+
+  @@unique([applicationId, screeningQuestionId])
+  @@index([jobId])
+  @@index([screeningQuestionId])
+}
+
+model ApplicationStatusHistory {
+  id              String            @id @default(uuid()) @db.Uuid
+  applicationId   String            @db.Uuid
+  fromStatus      ApplicationStatus?
+  toStatus        ApplicationStatus
+  changedByUserId String?           @db.Uuid
+  note            String?           @db.Text
+  createdAt       DateTime          @default(now()) @db.Timestamptz(6)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  changedBy   User?       @relation("ApplicationStatusActor", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([applicationId, createdAt])
+  @@index([changedByUserId, createdAt])
+}
+
+model ApplicationAssignment {
+  id                 String         @id @default(uuid()) @db.Uuid
+  applicationId      String         @db.Uuid
+  companyId          String         @db.Uuid
+  companyMemberId    String         @db.Uuid
+  assignmentType     AssignmentType
+  assignedByMemberId String         @db.Uuid
+  assignedAt         DateTime       @default(now()) @db.Timestamptz(6)
+  removedAt          DateTime?      @db.Timestamptz(6)
+
+  application      Application   @relation(fields: [companyId, applicationId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "ApplicationAssignment_application_same_company_fkey")
+  company          Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  companyMember    CompanyMember @relation("ApplicationAssignee", fields: [companyId, companyMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "ApplicationAssignment_member_same_company_fkey")
+  assignedByMember CompanyMember @relation("ApplicationAssigner", fields: [companyId, assignedByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "ApplicationAssignment_assigner_same_company_fkey")
+
+  @@index([companyMemberId, removedAt])
+  @@index([applicationId, removedAt])
+  @@index([companyId, assignmentType])
+}
+
+model Interview {
+  id                String          @id @default(uuid()) @db.Uuid
+  applicationId     String          @db.Uuid
+  companyId         String          @db.Uuid
+  scheduledAt       DateTime        @db.Timestamptz(6)
+  durationMinutes   Int
+  type              InterviewType
+  location          String?         @db.VarChar(255)
+  meetingUrl        String?         @db.VarChar(1000)
+  status            InterviewStatus @default(SCHEDULED)
+  createdByMemberId String          @db.Uuid
+  createdAt         DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(6)
+
+  application     Application          @relation(fields: [companyId, applicationId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Interview_application_same_company_fkey")
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdByMember CompanyMember        @relation("InterviewCreator", fields: [companyId, createdByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Interview_creator_same_company_fkey")
+  participants    InterviewParticipant[]
+
+  @@unique([companyId, id])
+  @@index([companyId, status, scheduledAt])
+  @@index([applicationId, scheduledAt])
+}
+
+model InterviewParticipant {
+  id               String                   @id @default(uuid()) @db.Uuid
+  interviewId      String                   @db.Uuid
+  companyId        String                   @db.Uuid
+  companyMemberId  String                   @db.Uuid
+  participantRole  InterviewParticipantRole @default(INTERVIEWER)
+  addedAt          DateTime                 @default(now()) @db.Timestamptz(6)
+  removedAt        DateTime?                @db.Timestamptz(6)
+
+  interview     Interview     @relation(fields: [companyId, interviewId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "InterviewParticipant_interview_same_company_fkey")
+  companyMember CompanyMember @relation("InterviewParticipantMember", fields: [companyId, companyMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "InterviewParticipant_member_same_company_fkey")
+
+  @@index([interviewId, removedAt])
+  @@index([companyMemberId, removedAt])
+  @@index([companyId])
+}
+
+model Permission {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String   @unique @db.VarChar(160)
+  resource     String   @db.VarChar(80)
+  action       String   @db.VarChar(80)
+  description  String?  @db.Text
+  isProtected  Boolean  @default(false)
+  isDeprecated Boolean  @default(false)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  rolePermissions          RolePermission[]
+  systemUserPermissions    SystemUserPermission[]
+  companyMemberPermissions CompanyMemberPermission[]
+
+  @@index([resource, action])
+}
+
+model Role {
+  id             String   @id @default(uuid()) @db.Uuid
+  kind           RoleKind
+  companyId      String?  @db.Uuid
+  systemCode     String?  @unique @db.VarChar(100)
+  name           String   @db.VarChar(160)
+  normalizedName String   @db.VarChar(160)
+  isProtected    Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  company            Company?            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  permissions        RolePermission[]
+  systemUsers        SystemUserRole[]
+  companyMembers     CompanyMemberRole[]
+
+  @@unique([companyId, normalizedName])
+  @@unique([companyId, id])
+  @@index([kind, isActive])
+}
+
+model RolePermission {
+  roleId       String    @db.Uuid
+  permissionId String    @db.Uuid
+  dataScope    DataScope
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model SystemUserRole {
+  userId           String   @db.Uuid
+  roleId           String   @db.Uuid
+  assignedByUserId String   @db.Uuid
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+
+  user       User @relation("SystemRoleAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  role       Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  assignedBy User @relation("SystemRoleAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model CompanyMemberRole {
+  companyId       String   @db.Uuid
+  companyMemberId String   @db.Uuid
+  roleId          String   @db.Uuid
+  assignedByUserId String  @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  companyMember CompanyMember @relation(fields: [companyId, companyMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "CompanyMemberRole_member_same_company_fkey")
+  role          Role          @relation(fields: [companyId, roleId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "CompanyMemberRole_role_same_company_fkey")
+  assignedBy    User          @relation("CompanyRoleAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([companyMemberId, roleId])
+  @@index([companyId])
+  @@index([roleId])
+  @@index([assignedByUserId])
+}
+
+model SystemUserPermission {
+  userId           String           @db.Uuid
+  permissionId     String           @db.Uuid
+  effect           PermissionEffect
+  dataScope        DataScope?
+  assignedByUserId String           @db.Uuid
+  expiresAt        DateTime?        @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(6)
+
+  user       User       @relation("SystemPermissionAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+  assignedBy User       @relation("SystemPermissionAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([userId, permissionId])
+  @@index([permissionId])
+  @@index([expiresAt])
+}
+
+model CompanyMemberPermission {
+  companyId        String           @db.Uuid
+  companyMemberId  String           @db.Uuid
+  permissionId     String           @db.Uuid
+  effect           PermissionEffect
+  dataScope        DataScope?
+  assignedByUserId String           @db.Uuid
+  expiresAt        DateTime?        @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(6)
+
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  companyMember CompanyMember @relation(fields: [companyId, companyMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "CompanyMemberPermission_member_same_company_fkey")
+  permission    Permission    @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+  assignedBy    User          @relation("CompanyPermissionAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([companyMemberId, permissionId])
+  @@index([companyId])
+  @@index([permissionId])
+  @@index([assignedByUserId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @db.Uuid
+  companyId   String?  @db.Uuid
+  action      String   @db.VarChar(180)
+  targetType  String   @db.VarChar(120)
+  targetId    String?  @db.VarChar(120)
+  beforeData  Json?
+  afterData   Json?
+  metadata    Json?
+  ipAddress   String?  @db.VarChar(64)
+  userAgent   String?  @db.Text
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  actor   User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([action, createdAt])
+}
+
+model Industry {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(120)
+  name      String   @db.VarChar(180)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  companies Company[]
+}
+
+model JobCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(120)
+  name      String   @db.VarChar(180)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  jobs                 Job[]
+  candidatePreferences CandidatePreferredCategory[]
+}
+
+model SkillCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(120)
+  name      String   @db.VarChar(180)
+  parentId  String?  @db.Uuid
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  parent   SkillCategory?  @relation("SkillCategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children SkillCategory[] @relation("SkillCategoryHierarchy")
+  skills   Skill[]
+
+  @@index([parentId])
+}
+
+model Skill {
+  id         String   @id @default(uuid()) @db.Uuid
+  code       String   @unique @db.VarChar(120)
+  name       String   @db.VarChar(180)
+  categoryId String   @db.Uuid
+  aliases    String[] @default([])
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  category         SkillCategory             @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  candidateSkills  CandidateSkill[]
+  experienceSkills CandidateExperienceSkill[]
+  jobSkills        JobSkill[]
+
+  @@index([categoryId, isActive])
+}
+
+model Language {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String   @unique @db.VarChar(20)
+  label        String   @db.VarChar(120)
+  englishLabel String   @db.VarChar(120)
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  candidateLanguages CandidateLanguage[]
+  certificateTypes   LanguageCertificateType[]
+}
+
+model LanguageCertificateType {
+  id                   String   @id @default(uuid()) @db.Uuid
+  code                 String   @unique @db.VarChar(120)
+  languageId           String   @db.Uuid
+  label                String   @db.VarChar(180)
+  supportsOverallScore Boolean  @default(false)
+  supportsLevel        Boolean  @default(false)
+  levelOptions         String[] @default([])
+  scoreFields          Json
+  isActive             Boolean  @default(true)
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(6)
+
+  language              Language                       @relation(fields: [languageId], references: [id], onDelete: Restrict)
+  candidateCertificates CandidateLanguageCertificate[]
+
+  @@index([languageId, isActive])
+}
+
+model Province {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String   @unique @db.VarChar(10)
+  name         String   @db.VarChar(180)
+  divisionType String   @db.VarChar(80)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  wards                  Ward[]
+  candidateProfiles      CandidateProfile[]
+  companies              Company[]
+  jobs                   Job[]
+  candidatePreferences   CandidatePreferredLocation[]
+
+  @@index([isActive, name])
+}
+
+model Ward {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String   @unique @db.VarChar(10)
+  provinceId   String   @db.Uuid
+  name         String   @db.VarChar(180)
+  divisionType String   @db.VarChar(80)
+  codename     String   @db.VarChar(180)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  province          Province           @relation(fields: [provinceId], references: [id], onDelete: Restrict)
+  candidateProfiles CandidateProfile[]
+  companies         Company[]
+  jobs              Job[]
+
+  @@unique([provinceId, id])
+  @@index([provinceId, isActive, name])
+}
