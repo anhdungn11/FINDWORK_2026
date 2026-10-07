@@ -44,7 +44,7 @@ function getCookie(
 
   if (!cookie) {
     throw new Error(
-      "Refresh cookie header is malformed.",
+      "Expected refresh cookie value but none was parsed.",
     );
   }
 
@@ -74,6 +74,7 @@ describe("Auth integration", () => {
   let passwordService: PasswordService;
 
   let passwordHash: string;
+  let candidateRoleId: string;
 
   beforeAll(async () => {
     const moduleRef =
@@ -133,15 +134,46 @@ describe("Auth integration", () => {
       await passwordService.hash(
         TEST_PASSWORD,
       );
+
+    const candidateRole =
+      await prisma.role.upsert({
+        where: {
+          systemCode: "CANDIDATE",
+        },
+        update: {
+          kind: "SYSTEM",
+          companyId: null,
+          name: "Candidate",
+          normalizedName: "candidate",
+          isProtected: true,
+          isActive: true,
+        },
+        create: {
+          kind: "SYSTEM",
+          companyId: null,
+          systemCode: "CANDIDATE",
+          name: "Candidate",
+          normalizedName: "candidate",
+          isProtected: true,
+          isActive: true,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    candidateRoleId = candidateRole.id;
   });
 
   beforeEach(async () => {
     await prisma.authSession.deleteMany();
+    await prisma.systemUserRole.deleteMany();
     await prisma.user.deleteMany();
   });
 
   afterAll(async () => {
     await prisma.authSession.deleteMany();
+    await prisma.systemUserRole.deleteMany();
     await prisma.user.deleteMany();
 
     await app.close();
@@ -164,7 +196,7 @@ describe("Auth integration", () => {
     });
   }
 
-  it("registers a user, hashes the password, creates a session and sets HttpOnly refresh cookie", async () => {
+  it("registers a user, assigns CANDIDATE, hashes the password, creates a session and sets HttpOnly refresh cookie", async () => {
     const email =
       "Phase2.Integration@Findwork.Local";
 
@@ -232,6 +264,22 @@ describe("Auth integration", () => {
       ),
     ).toBe(true);
 
+    const candidateAssignment =
+      await prisma.systemUserRole.findUnique({
+        where: {
+          userId_roleId: {
+            userId: user.id,
+            roleId: candidateRoleId,
+          },
+        },
+      });
+
+    expect(candidateAssignment).not.toBeNull();
+
+    expect(
+      candidateAssignment?.assignedByUserId,
+    ).toBeNull();
+
     const sessions =
       await prisma.authSession.findMany({
         where: {
@@ -241,14 +289,6 @@ describe("Auth integration", () => {
 
     expect(sessions).toHaveLength(1);
 
-    const [session] = sessions;
-
-    if (!session) {
-      throw new Error(
-        "Expected exactly one authentication session.",
-      );
-    }
-
     const cookie =
       getCookie(response);
 
@@ -257,12 +297,14 @@ describe("Auth integration", () => {
         "findwork_refresh=".length,
       );
 
-    const [, secret] =
-      rawRefreshToken.split(".");
+    const secret =
+      rawRefreshToken.split(".")[1];
 
-    if (!secret) {
+    const session = sessions[0];
+
+    if (!session) {
       throw new Error(
-        "Refresh token is malformed.",
+        "Expected exactly one auth session.",
       );
     }
 

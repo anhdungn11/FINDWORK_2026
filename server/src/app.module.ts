@@ -10,6 +10,7 @@ import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { validateEnvironment } from "./config/env.validation";
 import { PrismaModule } from "./infrastructure/prisma/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { AuthorizationModule } from "./modules/authorization/authorization.module";
 import { HealthModule } from "./modules/health/health.module";
 
 @Module({
@@ -30,6 +31,7 @@ import { HealthModule } from "./modules/health/health.module";
     PrismaModule,
     HealthModule,
     AuthModule,
+    AuthorizationModule,
   ],
 })
 export class AppModule implements NestModule {

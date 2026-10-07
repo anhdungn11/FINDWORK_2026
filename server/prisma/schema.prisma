@@ -874,12 +874,12 @@ model RolePermission {
 model SystemUserRole {
   userId           String   @db.Uuid
   roleId           String   @db.Uuid
-  assignedByUserId String   @db.Uuid
+  assignedByUserId String?  @db.Uuid
   createdAt        DateTime @default(now()) @db.Timestamptz(6)
 
   user       User @relation("SystemRoleAssignee", fields: [userId], references: [id], onDelete: Restrict)
   role       Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  assignedBy User @relation("SystemRoleAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+  assignedBy User? @relation("SystemRoleAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
 
   @@id([userId, roleId])
   @@index([roleId])

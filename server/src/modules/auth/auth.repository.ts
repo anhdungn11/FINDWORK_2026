@@ -44,6 +44,27 @@ export class AuthRepository {
     input: CreateRegisteredUserInput,
   ) {
     return this.prisma.$transaction(async (tx) => {
+      const candidateRole = await tx.role.findUnique({
+        where: {
+          systemCode: "CANDIDATE",
+        },
+        select: {
+          id: true,
+          kind: true,
+          isActive: true,
+        },
+      });
+
+      if (
+        !candidateRole ||
+        candidateRole.kind !== "SYSTEM" ||
+        !candidateRole.isActive
+      ) {
+        throw new Error(
+          "CANDIDATE system role is not provisioned or active.",
+        );
+      }
+
       const user = await tx.user.create({
         data: {
           email: input.email,
@@ -55,6 +76,14 @@ export class AuthRepository {
           email: true,
           status: true,
           emailVerifiedAt: true,
+        },
+      });
+
+      await tx.systemUserRole.create({
+        data: {
+          userId: user.id,
+          roleId: candidateRole.id,
+          assignedByUserId: null,
         },
       });
 
