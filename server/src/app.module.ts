@@ -12,6 +12,7 @@ import { PrismaModule } from "./infrastructure/prisma/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { AuthorizationModule } from "./modules/authorization/authorization.module";
 import { CandidateModule } from "./modules/candidate/candidate.module";
+import { CompanyModule } from "./modules/company/company.module";
 import { HealthModule } from "./modules/health/health.module";
 
 @Module({
@@ -34,6 +35,7 @@ import { HealthModule } from "./modules/health/health.module";
     AuthModule,
     AuthorizationModule,
     CandidateModule,
+    CompanyModule,
   ],
 })
 export class AppModule implements NestModule {
