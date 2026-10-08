@@ -125,6 +125,19 @@ enum CompanyInvitationStatus {
   EXPIRED
 }
 
+enum EmailOutboxKind {
+  VERIFY_EMAIL
+  COMPANY_INVITATION
+}
+
+enum EmailOutboxStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
 enum JobStatus {
   DRAFT
   PUBLISHED
@@ -229,6 +242,7 @@ model User {
   companyMemberships      CompanyMember[]
   companiesCreated        Company[]                  @relation("CompanyCreator")
   authSessions            AuthSession[]
+  emailVerificationTokens EmailVerificationToken[]
   systemRoleAssignments   SystemUserRole[]           @relation("SystemRoleAssignee")
   systemRolesAssigned     SystemUserRole[]           @relation("SystemRoleAssigner")
   systemPermissionGrants  SystemUserPermission[]     @relation("SystemPermissionAssignee")
@@ -644,10 +658,67 @@ model CompanyInvitation {
 
   company   Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   invitedBy CompanyMember @relation("CompanyInviter", fields: [companyId, invitedByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "CompanyInvitation_inviter_same_company_fkey")
+  emailOutboxJobs EmailOutbox[]
 
   @@index([companyId, status])
   @@index([emailNormalized, status])
   @@index([expiresAt])
+}
+
+// Phase 4.3C.2A — durable, purpose-specific email-verification tokens.
+// Active tokens are additionally limited by a PostgreSQL partial unique index
+// in the hand-reviewed migration. Expired open tokens must be revoked first.
+model EmailVerificationToken {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @db.Uuid
+  emailNormalized String    @db.VarChar(320)
+  tokenHash       String    @unique @db.VarChar(64)
+  expiresAt       DateTime  @db.Timestamptz(6)
+  consumedAt      DateTime? @db.Timestamptz(6)
+  revokedAt       DateTime? @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailOutboxJobs EmailOutbox[]
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+// Phase 4.3C.2A — no plaintext recipient or one-time token in this table.
+// Encrypt both before enqueue with independently managed AES-256-GCM keys.
+// A SQL CHECK enforces ciphertext presence only in active job states and
+// requires clearing the ciphertext upon SENT/FAILED/CANCELLED.
+model EmailOutbox {
+  id                   String            @id @default(uuid()) @db.Uuid
+  kind                 EmailOutboxKind
+  verificationTokenId  String?           @db.Uuid
+  companyInvitationId  String?           @db.Uuid
+  idempotencyKey       String            @unique @db.VarChar(200)
+  payloadCiphertext    Bytes?            @db.ByteA
+  payloadNonce         Bytes?            @db.ByteA
+  payloadTag           Bytes?            @db.ByteA
+  encryptionKeyId      String?           @db.VarChar(80)
+  status               EmailOutboxStatus @default(QUEUED)
+  attemptCount         Int               @default(0)
+  maxAttempts          Int               @default(8)
+  nextAttemptAt        DateTime          @default(now()) @db.Timestamptz(6)
+  claimedBy            String?           @db.VarChar(128)
+  leaseUntil           DateTime?         @db.Timestamptz(6)
+  providerMessageId    String?           @db.VarChar(255)
+  lastErrorCode        String?           @db.VarChar(120)
+  sentAt               DateTime?         @db.Timestamptz(6)
+  cancelledAt          DateTime?         @db.Timestamptz(6)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+
+  verificationToken  EmailVerificationToken? @relation(fields: [verificationTokenId], references: [id], onDelete: Cascade)
+  companyInvitation  CompanyInvitation?      @relation(fields: [companyInvitationId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseUntil])
+  @@index([kind, verificationTokenId])
+  @@index([kind, companyInvitationId])
 }
 
 model Job {
