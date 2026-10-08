@@ -86,6 +86,7 @@ export class AuthorizationRepository {
         companyId,
         status: "ACTIVE",
         removedAt: null,
+        company: { status: "ACTIVE" },
       },
       select: {
         id: true,
