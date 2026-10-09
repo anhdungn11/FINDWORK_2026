@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
+import { EmailDeliveryModule } from "../../infrastructure/email/email-delivery.module";
 import { AuthController } from "./auth.controller";
 import { EmailVerificationController } from "./email-verification/email-verification.controller";
 import { EmailVerificationService } from "./email-verification/email-verification.service";
@@ -15,7 +16,7 @@ import { PasswordService } from "./services/password.service";
 import { TokenService } from "./services/token.service";
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), EmailDeliveryModule],
   controllers: [AuthController, EmailVerificationController],
   providers: [
     AuthRepository,
