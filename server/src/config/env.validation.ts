@@ -11,6 +11,13 @@ export interface ValidatedEnvironment {
   JWT_ACCESS_TTL_SECONDS: number;
   REFRESH_TOKEN_TTL_DAYS: number;
   REFRESH_TOKEN_PEPPER: string;
+  EMAIL_DELIVERY_MODE: "disabled" | "resend";
+  EMAIL_WORKER_ENABLED: string;
+  EMAIL_ACTIVE_KEY_ID: string;
+  EMAIL_KEYRING_JSON: string;
+  EMAIL_VERIFY_URL: string;
+  EMAIL_RESEND_API_KEY: string;
+  EMAIL_FROM: string;
 }
 
 const ALLOWED_NODE_ENVIRONMENTS = new Set<NodeEnvironment>([
@@ -135,6 +142,50 @@ function parseSecret(
   return secret;
 }
 
+function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment) {
+  const mode = String(raw.EMAIL_DELIVERY_MODE ?? "disabled");
+  if (mode !== "disabled" && mode !== "resend") throw new Error("EMAIL_DELIVERY_MODE invalid");
+  const workerEnabled = String(raw.EMAIL_WORKER_ENABLED ?? "false");
+  if (workerEnabled !== "true" && workerEnabled !== "false") throw new Error("EMAIL_WORKER_ENABLED invalid");
+  if (workerEnabled === "true" && mode !== "resend") throw new Error("EMAIL_WORKER_ENABLED requires resend mode");
+  const activeKeyId = String(raw.EMAIL_ACTIVE_KEY_ID ?? "");
+  const ringJson = String(raw.EMAIL_KEYRING_JSON ?? "");
+  const verifyUrl = String(raw.EMAIL_VERIFY_URL ?? "");
+  const apiKey = String(raw.EMAIL_RESEND_API_KEY ?? "");
+  const sender = String(raw.EMAIL_FROM ?? "");
+  if (mode === "resend") {
+    if (!/^[A-Za-z0-9_.-]{1,80}$/.test(activeKeyId)) throw new Error("EMAIL_ACTIVE_KEY_ID invalid");
+    let ring: unknown;
+    try { ring = JSON.parse(ringJson); } catch { throw new Error("EMAIL_KEYRING_JSON invalid"); }
+    const encoded = ring && typeof ring === "object" && !Array.isArray(ring)
+      ? (ring as Record<string, unknown>)[activeKeyId] : null;
+    if (typeof encoded !== "string" || !/^[A-Za-z0-9+/]{43}=$/.test(encoded) ||
+      Buffer.from(encoded, "base64").length !== 32 ||
+      Buffer.from(encoded, "base64").toString("base64") !== encoded) {
+      throw new Error("EMAIL_KEYRING_JSON missing valid active key");
+    }
+    let url: URL;
+    try { url = new URL(verifyUrl); } catch { throw new Error("EMAIL_VERIFY_URL invalid"); }
+    if ((url.protocol !== "https:" && !(env !== "production" && url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) ||
+      url.username || url.password || url.hash || url.searchParams.has("token")) {
+      throw new Error("EMAIL_VERIFY_URL must use HTTPS and contain no token");
+    }
+    if (!apiKey || apiKey.length < 16 || /\s/.test(apiKey)) throw new Error("EMAIL_RESEND_API_KEY invalid");
+    if (!/^[^\r\n<>]+<[^\s<>@]+@[^\s<>@]+>$|^[^\s<>@]+@[^\s<>@]+$/.test(sender)) {
+      throw new Error("EMAIL_FROM invalid");
+    }
+  }
+  return {
+    EMAIL_DELIVERY_MODE: mode as "disabled" | "resend",
+    EMAIL_WORKER_ENABLED: workerEnabled,
+    EMAIL_ACTIVE_KEY_ID: activeKeyId,
+    EMAIL_KEYRING_JSON: ringJson,
+    EMAIL_VERIFY_URL: verifyUrl,
+    EMAIL_RESEND_API_KEY: apiKey,
+    EMAIL_FROM: sender,
+  };
+}
+
 export function validateEnvironment(
   raw: Record<string, unknown>,
 ): ValidatedEnvironment & Record<string, unknown> {
@@ -188,5 +239,6 @@ export function validateEnvironment(
       90,
     ),
     REFRESH_TOKEN_PEPPER: refreshTokenPepper,
+    ...emailDeliveryConfig(raw, nodeEnv),
   };
 }
