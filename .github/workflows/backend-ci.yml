@@ -1,0 +1,109 @@
+# FINDWORK backend CI — proposed for PR A, based on master @ 83edc8f.
+# CI-only PostgreSQL service; no production credentials or email delivery.
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Prisma, build, and Jest integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: server
+        shell: bash
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: findwork_test
+          POSTGRES_USER: findwork_ci
+          POSTGRES_PASSWORD: ci_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U findwork_ci -d findwork_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://findwork_ci:ci_only_password@127.0.0.1:5432/findwork_test?schema=public
+      API_PREFIX: api/v1
+      PORT: '3000'
+      CORS_ORIGINS: http://localhost:5173
+      JWT_ACCESS_SECRET: ci-only-jwt-secret-never-use-this-outside-github-actions-001
+      REFRESH_TOKEN_PEPPER: ci-only-refresh-pepper-never-use-this-outside-github-actions-002
+      EMAIL_DELIVERY_MODE: disabled
+      EMAIL_WORKER_ENABLED: 'false'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install locked backend dependencies
+        run: npm ci
+
+      - name: Verify CI test database target and write ignored Jest env file
+        run: |
+          node - <<'NODE'
+          const url = new URL(process.env.DATABASE_URL);
+          if (url.hostname !== '127.0.0.1' || url.pathname !== '/findwork_test' ||
+              url.searchParams.get('schema') !== 'public' || process.env.NODE_ENV !== 'test') {
+            throw new Error('Unsafe CI database configuration; refusing migration, seed or test');
+          }
+          NODE
+          cat > .env.test <<'EOF'
+          NODE_ENV=test
+          DATABASE_URL=postgresql://findwork_ci:ci_only_password@127.0.0.1:5432/findwork_test?schema=public
+          PORT=3000
+          API_PREFIX=api/v1
+          CORS_ORIGINS=http://localhost:5173
+          JWT_ACCESS_SECRET=ci-only-jwt-secret-never-use-this-outside-github-actions-001
+          REFRESH_TOKEN_PEPPER=ci-only-refresh-pepper-never-use-this-outside-github-actions-002
+          EMAIL_DELIVERY_MODE=disabled
+          EMAIL_WORKER_ENABLED=false
+          EOF
+          chmod 600 .env.test
+
+      # The tracked file is named prisma7.config.ts, not prisma.config.ts.
+      - name: Generate Prisma Client
+        run: npx prisma generate --config ./prisma7.config.ts
+
+      - name: Validate Prisma schema
+        run: npx prisma validate --config ./prisma7.config.ts
+
+      - name: Apply checked-in migrations to ephemeral CI database
+        run: npx prisma migrate deploy --config ./prisma7.config.ts
+
+      - name: Check migration status
+        run: npx prisma migrate status --config ./prisma7.config.ts
+
+      - name: Seed ephemeral CI database
+        run: npx prisma db seed --config ./prisma7.config.ts
+
+      - name: Build NestJS backend
+        run: npm run build
+
+      - name: Run full backend Jest suite serially
+        run: npm test -- --runInBand
