@@ -18,6 +18,7 @@ export const ROUTES = {
     FORGOT_PASSWORD: "forgot-password",
     RESET_PASSWORD: "reset-password",
     VERIFY_EMAIL: "verify-email",
+    COMPANY_INVITATION_ACCEPT: "company-invitations/accept",
     // CANDIDATE
     CANDIDATE: "candidate",
     CANDIDATE_ONBOARDING: "onboarding",

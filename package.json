@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "tsx --test src/services/company/__tests__/*.test.ts src/store/__tests__/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -31,7 +32,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
-    "typescript": "^7.0.2",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
     "vite": "^8.2.0"
   }
 }

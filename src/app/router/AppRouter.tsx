@@ -16,6 +16,7 @@ import LoginPage from "@/pages/auth/LoginPage/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage/RegisterPage";
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage/ResetPasswordPage";
 import VerifyEmailPage from "@/pages/auth/VerifyEmailPage/VerifyEmailPage";
+import CompanyInvitationAcceptPage from "@/pages/company/CompanyInvitationAcceptPage";
 
 import CandidateDashboardPage from "@/pages/candidate/CandidateDashboardPage";
 import CandidateOnboardingPage from "@/pages/candidate/CandidateOnboardingPage";
@@ -124,6 +125,11 @@ const AppRouter = () => {
           <Route
             path="verify-email"
             element={<VerifyEmailPage />}
+          />
+
+          <Route
+            path="company-invitations/accept"
+            element={<CompanyInvitationAcceptPage />}
           />
 
           <Route
