@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { ConfigService } from "@nestjs/config";
 import { EmailCryptoService } from "../src/infrastructure/email/email-crypto.service";
 import { EmailDeliverySettings } from "../src/infrastructure/email/email-delivery-settings.service";
 import { validateEnvironment } from "../src/config/env.validation";
@@ -16,6 +17,61 @@ describe("Email delivery fail-closed crypto/config", () => {
   it("keeps delivery disabled by default", () => {
     expect(validateEnvironment(base).EMAIL_DELIVERY_MODE).toBe("disabled");
     expect(validateEnvironment(base).EMAIL_WORKER_ENABLED).toBe("false");
+    expect(validateEnvironment(base).EMAIL_INVITATION_DELIVERY_ENABLED).toBe("false");
+  });
+  it("validates invitation URL and flag independently of verification URL", () => {
+    const shared = {
+      ...base, EMAIL_DELIVERY_MODE: "resend", EMAIL_ACTIVE_KEY_ID: "k1",
+      EMAIL_KEYRING_JSON: JSON.stringify({ k1: key }),
+      EMAIL_RESEND_API_KEY: "fake-only-1234567890", EMAIL_FROM: "no-reply@example.com",
+    };
+    expect(() => validateEnvironment({ ...shared })).toThrow("EMAIL_VERIFY_URL");
+    const withVerify = { ...shared, EMAIL_VERIFY_URL: "https://example.invalid/verify" };
+    const disabled = validateEnvironment({ ...withVerify,
+      EMAIL_INVITATION_URL: "not-a-url" });
+    expect(disabled.EMAIL_INVITATION_DELIVERY_ENABLED).toBe("false");
+    const settings = new EmailDeliverySettings({
+      get: (name: string, fallback?: unknown) => disabled[name] ?? fallback,
+    } as unknown as ConfigService);
+    expect(() => settings.assertCanQueue()).not.toThrow();
+    expect(() => settings.assertCanQueueInvitation()).toThrow("EMAIL_INVITATION_DELIVERY_DISABLED");
+    expect(() => validateEnvironment({ ...withVerify, EMAIL_INVITATION_DELIVERY_ENABLED: "true" })).toThrow();
+    expect(() => validateEnvironment({ ...withVerify, EMAIL_INVITATION_DELIVERY_ENABLED: "true",
+      EMAIL_INVITATION_URL: "http://example.com/invite" })).toThrow();
+    expect(() => validateEnvironment({ ...withVerify, EMAIL_INVITATION_DELIVERY_ENABLED: "true",
+      EMAIL_INVITATION_URL: "https://example.invalid/invite?token=secret" })).toThrow();
+    const enabled = validateEnvironment({ ...withVerify, EMAIL_INVITATION_DELIVERY_ENABLED: "true",
+      EMAIL_INVITATION_URL: "http://localhost:5173/company-invitations/accept" });
+    expect(enabled.EMAIL_VERIFY_URL).toBe(withVerify.EMAIL_VERIFY_URL);
+    const enabledSettings = new EmailDeliverySettings({
+      get: (name: string, fallback?: unknown) => enabled[name] ?? fallback,
+    } as unknown as ConfigService);
+    expect(() => enabledSettings.assertCanQueue()).not.toThrow();
+    expect(() => enabledSettings.assertCanQueueInvitation()).not.toThrow();
+    const inviteOnly = validateEnvironment({ ...shared,
+      EMAIL_INVITATION_DELIVERY_ENABLED: "true",
+      EMAIL_INVITATION_URL: "http://localhost:5173/company-invitations/accept" });
+    const inviteOnlySettings = new EmailDeliverySettings({
+      get: (name: string, fallback?: unknown) => inviteOnly[name] ?? fallback,
+    } as unknown as ConfigService);
+    expect(() => inviteOnlySettings.assertInvitationWorkerReady()).not.toThrow();
+    expect(() => inviteOnlySettings.assertWorkerReady()).toThrow();
+    expect(() => validateEnvironment({ ...withVerify, NODE_ENV: "production",
+      EMAIL_INVITATION_DELIVERY_ENABLED: "true",
+      EMAIL_INVITATION_URL: "https://example.invalid/invite" })).toThrow();
+  });
+  it("keeps verification worker startup dependent on a valid verification URL", () => {
+    const valid = validateEnvironment({ ...base, EMAIL_DELIVERY_MODE: "resend",
+      EMAIL_ACTIVE_KEY_ID: "k1", EMAIL_KEYRING_JSON: JSON.stringify({ k1: key }),
+      EMAIL_VERIFY_URL: "https://example.invalid/verify", EMAIL_RESEND_API_KEY: "fake-only-1234567890",
+      EMAIL_FROM: "no-reply@example.com", EMAIL_WORKER_ENABLED: "true",
+      EMAIL_INVITATION_URL: "invalid-unused-url" });
+    const settings = new EmailDeliverySettings({
+      get: (name: string, fallback?: unknown) => valid[name] ?? fallback,
+    } as unknown as ConfigService);
+    expect(() => settings.assertWorkerReady()).not.toThrow();
+    expect(() => validateEnvironment({ ...valid, EMAIL_VERIFY_URL: "" })).toThrow("EMAIL_VERIFY_URL");
+    expect(() => validateEnvironment({ ...valid, EMAIL_VERIFY_URL: "http://outside.example/verify" })).toThrow();
   });
   it("rejects enabling worker without real delivery", () => {
     expect(() => validateEnvironment({ ...base, EMAIL_WORKER_ENABLED: "true" })).toThrow();

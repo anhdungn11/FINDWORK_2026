@@ -1,18 +1,8 @@
 import "reflect-metadata";
-import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
-import { validateEnvironment } from "../config/env.validation";
-import { PrismaModule } from "../infrastructure/prisma/prisma.module";
-import { EmailDeliveryModule } from "../infrastructure/email/email-delivery.module";
 import { EmailDeliverySettings } from "../infrastructure/email/email-delivery-settings.service";
 import { EmailDeliveryWorker } from "../infrastructure/email/email-delivery.worker";
-
-@Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnvironment }),
-    PrismaModule, EmailDeliveryModule],
-})
-class EmailWorkerModule {}
+import { EmailWorkerModule } from "./email-worker.module";
 
 async function start(): Promise<void> {
   const app = await NestFactory.createApplicationContext(EmailWorkerModule, { logger: ["error", "warn"] });

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
 export interface ClaimedEmailJob {
@@ -21,6 +22,21 @@ const SCRUB = {
 @Injectable()
 export class EmailOutboxRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Call only after locking Company, then CompanyInvitation in the same transaction. */
+  async cancelInvitationJobs(tx: Prisma.TransactionClient, invitationId: string, reason: string): Promise<number> {
+    const result = await tx.emailOutbox.updateMany({
+      where: {
+        kind: "COMPANY_INVITATION", companyInvitationId: invitationId,
+        status: { in: ["QUEUED", "PROCESSING"] },
+      },
+      data: {
+        status: "CANCELLED", ...SCRUB, cancelledAt: new Date(),
+        claimedBy: null, leaseUntil: null, lastErrorCode: reason,
+      },
+    });
+    return result.count;
+  }
 
   async pendingKeyIds(): Promise<string[]> {
     // Protect queued ciphertext across rotations: never claim with missing historical keys.

@@ -39,7 +39,7 @@ export class CompanyInvitationsController {
   }
 
   @Post()
-  @ApiOperation({ summary: "Create invitation; delivery is unavailable in 4.3C.1 by default" })
+  @ApiOperation({ summary: "Create invitation and queue encrypted delivery when enabled" })
   @RequireCompanyPermissions("company.member.invite")
   create(
     @Param("companyId", ParseUUIDPipe) companyId: string,

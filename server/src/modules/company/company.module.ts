@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { AuthorizationModule } from "../authorization/authorization.module";
 import { PrismaModule } from "../../infrastructure/prisma/prisma.module";
+import { EmailDeliveryModule } from "../../infrastructure/email/email-delivery.module";
 import { CompanyController } from "./company.controller";
 import { CompanyRepository } from "./company.repository";
 import { CompanyService } from "./company.service";
@@ -14,7 +15,7 @@ import { CompanyInvitationsRepository } from "./company-invitations.repository";
 import { CompanyInvitationDeliveryService } from "./company-invitation-delivery.service";
 
 @Module({
-  imports: [AuthModule, AuthorizationModule, PrismaModule],
+  imports: [AuthModule, AuthorizationModule, PrismaModule, EmailDeliveryModule],
   controllers: [
     CompanyController, CompanyProfileLocationsController,
     CompanyInvitationsController, CompanyInvitationAcceptanceController,

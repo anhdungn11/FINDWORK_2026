@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
 import { CompanyInvitationDeliveryService } from "./company-invitation-delivery.service";
 import { CompanyInvitationsRepository } from "./company-invitations.repository";
@@ -19,7 +19,7 @@ export class CompanyInvitationsService {
   list(companyId: string) { return this.repo.list(companyId); }
 
   async create(companyId: string, actorUserId: string, dto: CreateCompanyInvitationDto) {
-    // Fail closed before any writes in this prototype. Never return raw token over HTTP.
+    // Fail closed before generating or persisting a token.
     this.delivery.assertAvailable();
     const token = randomBytes(32).toString("base64url");
     const email = dto.email.trim().toLowerCase();
@@ -27,19 +27,9 @@ export class CompanyInvitationsService {
       companyId,
       actorUserId,
       email,
-      tokenHash: hashToken(token),
-      expiresAt: new Date(Date.now() + INVITE_TTL_MILLISECONDS),
-    });
-    try {
-      await this.delivery.send(email, token);
-    } catch {
-      // If a test/future adapter fails, revoke rather than leave an undeliverable live token.
-      await this.repo.revokeAfterDeliveryFailure(companyId, invitation.id);
-      throw new ServiceUnavailableException({
-        code: "COMPANY_INVITATION_DELIVERY_FAILED",
-        message: "Invitation delivery failed.",
-      });
-    }
+      rawToken: token,
+      ttlMilliseconds: INVITE_TTL_MILLISECONDS,
+    }, (tx, input) => this.delivery.enqueue(tx, input));
     return invitation;
   }
 

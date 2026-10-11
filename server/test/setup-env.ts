@@ -23,12 +23,13 @@ if (!databaseUrl) {
   );
 }
 
-const databaseName = new URL(databaseUrl)
-  .pathname
-  .replace(/^\//, "");
+const parsedDatabaseUrl = new URL(databaseUrl);
+const databaseName = decodeURIComponent(parsedDatabaseUrl.pathname.replace(/^\//, ""));
 
-if (databaseName !== "findwork_test") {
+if (databaseName !== "findwork_test" ||
+    !["localhost", "127.0.0.1", "[::1]"].includes(parsedDatabaseUrl.hostname) ||
+    (parsedDatabaseUrl.searchParams.has("schema") && parsedDatabaseUrl.searchParams.get("schema") !== "public")) {
   throw new Error(
-    `Refusing to run tests against database: ${databaseName}`,
+    "Refusing to run tests outside local findwork_test.",
   );
 }
