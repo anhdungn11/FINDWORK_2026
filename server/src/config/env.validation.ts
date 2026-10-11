@@ -16,6 +16,8 @@ export interface ValidatedEnvironment {
   EMAIL_ACTIVE_KEY_ID: string;
   EMAIL_KEYRING_JSON: string;
   EMAIL_VERIFY_URL: string;
+  EMAIL_INVITATION_DELIVERY_ENABLED: string;
+  EMAIL_INVITATION_URL: string;
   EMAIL_RESEND_API_KEY: string;
   EMAIL_FROM: string;
 }
@@ -151,6 +153,14 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
   const activeKeyId = String(raw.EMAIL_ACTIVE_KEY_ID ?? "");
   const ringJson = String(raw.EMAIL_KEYRING_JSON ?? "");
   const verifyUrl = String(raw.EMAIL_VERIFY_URL ?? "");
+  const invitationEnabled = String(raw.EMAIL_INVITATION_DELIVERY_ENABLED ?? "false");
+  if (invitationEnabled !== "true" && invitationEnabled !== "false") {
+    throw new Error("EMAIL_INVITATION_DELIVERY_ENABLED invalid");
+  }
+  if (env === "production" && invitationEnabled === "true") {
+    throw new Error("EMAIL_INVITATION_DELIVERY_ENABLED is unavailable in production");
+  }
+  const invitationUrl = String(raw.EMAIL_INVITATION_URL ?? "");
   const apiKey = String(raw.EMAIL_RESEND_API_KEY ?? "");
   const sender = String(raw.EMAIL_FROM ?? "");
   if (mode === "resend") {
@@ -164,15 +174,32 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
       Buffer.from(encoded, "base64").toString("base64") !== encoded) {
       throw new Error("EMAIL_KEYRING_JSON missing valid active key");
     }
-    let url: URL;
-    try { url = new URL(verifyUrl); } catch { throw new Error("EMAIL_VERIFY_URL invalid"); }
-    if ((url.protocol !== "https:" && !(env !== "production" && url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) ||
-      url.username || url.password || url.hash || url.searchParams.has("token")) {
-      throw new Error("EMAIL_VERIFY_URL must use HTTPS and contain no token");
+    // An invitation-only process has no verification URL dependency. The
+    // verification worker still requires and validates its own destination.
+    if (verifyUrl || invitationEnabled !== "true" || workerEnabled === "true") {
+      let url: URL;
+      try { url = new URL(verifyUrl); } catch { throw new Error("EMAIL_VERIFY_URL invalid"); }
+      if ((url.protocol !== "https:" && !(env !== "production" && url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) ||
+        url.username || url.password || url.hash || url.searchParams.has("token")) {
+        throw new Error("EMAIL_VERIFY_URL must use HTTPS and contain no token");
+      }
     }
     if (!apiKey || apiKey.length < 16 || /\s/.test(apiKey)) throw new Error("EMAIL_RESEND_API_KEY invalid");
     if (!/^[^\r\n<>]+<[^\s<>@]+@[^\s<>@]+>$|^[^\s<>@]+@[^\s<>@]+$/.test(sender)) {
       throw new Error("EMAIL_FROM invalid");
+    }
+  }
+  if (invitationEnabled === "true" && mode !== "resend") {
+    throw new Error("EMAIL_INVITATION_DELIVERY_ENABLED requires resend mode");
+  }
+  // A disabled feature must not make verification or API startup depend on its unused URL.
+  if (invitationEnabled === "true") {
+    let url: URL;
+    try { url = new URL(invitationUrl); } catch { throw new Error("EMAIL_INVITATION_URL invalid"); }
+    if ((url.protocol !== "https:" && !(env !== "production" && url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) ||
+      url.username || url.password || url.search || url.hash) {
+      throw new Error("EMAIL_INVITATION_URL must be an HTTPS token-free URL");
     }
   }
   return {
@@ -181,6 +208,8 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
     EMAIL_ACTIVE_KEY_ID: activeKeyId,
     EMAIL_KEYRING_JSON: ringJson,
     EMAIL_VERIFY_URL: verifyUrl,
+    EMAIL_INVITATION_DELIVERY_ENABLED: invitationEnabled,
+    EMAIL_INVITATION_URL: invitationUrl,
     EMAIL_RESEND_API_KEY: apiKey,
     EMAIL_FROM: sender,
   };

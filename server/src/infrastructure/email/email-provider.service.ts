@@ -8,6 +8,12 @@ export type ProviderRequest = {
   verifyUrl: string;
   idempotencyKey: string;
 };
+export type InvitationProviderRequest = {
+  to: string;
+  from: string;
+  acceptUrl: string;
+  idempotencyKey: string;
+};
 export class EmailProviderError extends Error {
   constructor(public readonly errorCode: string, public readonly retryable: boolean) {
     super(errorCode);
@@ -25,6 +31,28 @@ export class EmailProviderService {
   constructor(private readonly settings: EmailDeliverySettings) {}
 
   async sendVerification(input: ProviderRequest): Promise<DeliveryResult> {
+    return this.send(input.idempotencyKey, {
+      from: input.from,
+      to: [input.to],
+      subject: "Verify your FINDWORK email",
+      text: `Open the following link to verify your email:\n${input.verifyUrl}\n\nIf you did not request this, ignore the email.`,
+      html: `<p>Verify your FINDWORK email:</p><p><a href="${escapeHtml(input.verifyUrl)}">Verify email</a></p><p>If you did not request this, ignore the email.</p>`,
+    });
+  }
+
+  /** Invitation template v1. Inputs come only from authenticated, versioned ciphertext. */
+  async sendInvitation(input: InvitationProviderRequest): Promise<DeliveryResult> {
+    this.settings.assertInvitationWorkerReady();
+    return this.send(input.idempotencyKey, {
+      from: input.from,
+      to: [input.to],
+      subject: "Invitation to join a company on FINDWORK",
+      text: `You have been invited to join a company on FINDWORK.\n\nOpen this link to review and accept the invitation:\n${input.acceptUrl}\n\nSign in with the invited email address. If you did not expect this invitation, you can ignore this message.`,
+      html: `<p>You have been invited to join a company on FINDWORK.</p><p><a href="${escapeHtml(input.acceptUrl)}">Review invitation</a></p><p>Sign in with the invited email address. If you did not expect this invitation, you can ignore this message.</p>`,
+    });
+  }
+
+  private async send(idempotencyKey: string, body: Record<string, unknown>): Promise<DeliveryResult> {
     if (this.settings.mode !== "resend") throw new EmailProviderError("PROVIDER_DISABLED", false);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
@@ -35,15 +63,9 @@ export class EmailProviderService {
         headers: {
           Authorization: `Bearer ${this.settings.resendApiKey}`,
           "Content-Type": "application/json",
-          "Idempotency-Key": input.idempotencyKey,
+          "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({
-          from: input.from,
-          to: [input.to],
-          subject: "Verify your FINDWORK email",
-          text: `Open the following link to verify your email:\n${input.verifyUrl}\n\nIf you did not request this, ignore the email.`,
-          html: `<p>Verify your FINDWORK email:</p><p><a href="${escapeHtml(input.verifyUrl)}">Verify email</a></p><p>If you did not request this, ignore the email.</p>`,
-        }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         let retryable = response.status === 408 || response.status === 429 || response.status >= 500;
@@ -60,11 +82,11 @@ export class EmailProviderService {
         throw new EmailProviderError(`HTTP_${response.status}`, retryable);
       }
       // Never include provider body in logs or exceptions; provider id alone may be stored.
-      const body = await response.json() as { id?: unknown };
-      if (typeof body.id !== "string" || !body.id || body.id.length > 255) {
+      const responseBody = await response.json() as { id?: unknown };
+      if (typeof responseBody.id !== "string" || !responseBody.id || responseBody.id.length > 255) {
         throw new EmailProviderError("PROVIDER_RESPONSE_UNCERTAIN", true);
       }
-      return { providerMessageId: body.id };
+      return { providerMessageId: responseBody.id };
     } catch (error) {
       if (error instanceof EmailProviderError) throw error;
       throw new EmailProviderError("PROVIDER_TRANSPORT_UNCERTAIN", true);

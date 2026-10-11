@@ -22,6 +22,12 @@ export class EmailDeliverySettings {
   get verifyUrl(): string {
     return this.config.get<string>("EMAIL_VERIFY_URL", "");
   }
+  get invitationEnabled(): boolean {
+    return this.config.get<string>("EMAIL_INVITATION_DELIVERY_ENABLED", "false") === "true";
+  }
+  get invitationUrl(): string {
+    return this.config.get<string>("EMAIL_INVITATION_URL", "");
+  }
   get resendApiKey(): string {
     return this.config.get<string>("EMAIL_RESEND_API_KEY", "");
   }
@@ -37,8 +43,27 @@ export class EmailDeliverySettings {
       throw new Error("EMAIL_DELIVERY_NOT_CONFIGURED");
     }
   }
+  assertCanQueueInvitation(): void {
+    if (!this.invitationEnabled || this.nodeEnv === "production") {
+      throw new Error("EMAIL_INVITATION_DELIVERY_DISABLED");
+    }
+    if (this.mode !== "resend" || !this.activeKeyId || !this.keyringJson ||
+        !this.invitationUrl || !this.resendApiKey || !this.sender) {
+      throw new Error("EMAIL_INVITATION_DELIVERY_NOT_CONFIGURED");
+    }
+    // Recheck URL even when ConfigService is overridden outside normal bootstrap.
+    const url = new URL(this.invitationUrl);
+    if ((url.protocol !== "https:" && !(this.nodeEnv !== "production" && url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) ||
+        url.username || url.password || url.search || url.hash) {
+      throw new Error("EMAIL_INVITATION_URL_INVALID");
+    }
+  }
   assertWorkerReady(): void {
     this.assertCanQueue();
     if (!this.workerEnabled) throw new Error("EMAIL_WORKER_DISABLED");
+  }
+  assertInvitationWorkerReady(): void {
+    this.assertCanQueueInvitation();
   }
 }
