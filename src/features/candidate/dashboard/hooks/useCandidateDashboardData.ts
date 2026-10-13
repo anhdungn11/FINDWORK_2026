@@ -64,7 +64,7 @@ export function useCandidateDashboardData(): UseCandidateDashboardResult {
   const profileQuery = useQuery<CandidateProfileState, Error>({
     queryKey: CANDIDATE_DASHBOARD_QUERY_KEYS.profile(userId),
     queryFn: async () => {
-      return await getCandidateProfile();
+      return await getCandidateProfile(userId ?? "");
     },
     enabled: isAuthed,
     staleTime: 1000 * 30,

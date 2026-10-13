@@ -82,7 +82,7 @@ export function isCandidateProfileRecord(value: unknown): value is CandidateProf
  * Supports both raw profile records and optional API response wrappers ({ data: profile }).
  * Classifies malformed payloads as error, never exists or not_created.
  */
-export function parseCandidateProfileResponse(payload: unknown): CandidateProfileState {
+export function parseCandidateProfileResponse(payload: unknown, expectedUserId: string): CandidateProfileState {
   let target = payload;
   if (
     typeof payload === "object" &&
@@ -96,6 +96,13 @@ export function parseCandidateProfileResponse(payload: unknown): CandidateProfil
   }
 
   if (isCandidateProfileRecord(target)) {
+    if (target.userId !== expectedUserId) {
+      return {
+        status: "error",
+        profile: null,
+        errorMessage: "Profile does not belong to the current account.",
+      };
+    }
     return {
       status: "exists",
       profile: target,
@@ -166,10 +173,17 @@ export function parseCandidateProfileError(error: unknown): CandidateProfileStat
  * Fetches current candidate profile from GET /api/v1/candidate/profile.
  * Returns deterministic CandidateProfileState without throwing unhandled exceptions.
  */
-export async function getCandidateProfile(): Promise<CandidateProfileState> {
+export async function getCandidateProfile(expectedUserId: string): Promise<CandidateProfileState> {
+  if (!expectedUserId) {
+    return {
+      status: "error",
+      profile: null,
+      errorMessage: "Current account is unavailable.",
+    };
+  }
   try {
     const response = await apiClient.get<unknown>("/candidate/profile");
-    return parseCandidateProfileResponse(response.data);
+    return parseCandidateProfileResponse(response.data, expectedUserId);
   } catch (error: unknown) {
     return parseCandidateProfileError(error);
   }

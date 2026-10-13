@@ -75,7 +75,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     apiClient.get = (async () => ({ data: mockValidProfile })) as any;
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "exists");
     assert.ok(result.profile !== null);
     assert.equal(result.profile?.id, "profile-uuid-001");
@@ -92,9 +92,19 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     apiClient.get = (async () => ({ data: { data: mockValidProfile } })) as any;
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "exists");
     assert.equal(result.profile?.fullName, "Nguyễn Văn Chuyên Nghiệp");
+  });
+
+  it("rejects a valid profile belonging to another account through getCandidateProfile()", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    apiClient.get = (async () => ({ data: mockValidProfile })) as any;
+
+    const result = await getCandidateProfile("different-user-id");
+    assert.equal(result.status, "error");
+    assert.equal(result.profile, null);
+    assert.ok(result.errorMessage?.includes("current account"));
   });
 
   // 2. 200 + null → error
@@ -102,7 +112,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     apiClient.get = (async () => ({ data: null })) as any;
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "error");
     assert.equal(result.profile, null);
     assert.notEqual(result.status, "not_created");
@@ -119,7 +129,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     apiClient.get = (async () => ({ data: incompleteObject })) as any;
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "error");
     assert.equal(result.profile, null);
     assert.notEqual(result.status, "not_created");
@@ -135,7 +145,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     apiClient.get = (async () => ({ data: wrongTypeObject })) as any;
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "error");
     assert.equal(result.profile, null);
     assert.notEqual(result.status, "not_created");
@@ -152,7 +162,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
       throw error404Valid;
     }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "not_created");
     assert.equal(result.profile, null);
   });
@@ -167,7 +177,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
       throw error404Other;
     }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "error");
     assert.equal(result.profile, null);
     assert.notEqual(result.status, "not_created");
@@ -183,7 +193,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
       throw error404NoCode;
     }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "error");
     assert.equal(result.profile, null);
     assert.notEqual(result.status, "not_created");
@@ -200,7 +210,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
       throw error403;
     }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "forbidden");
     assert.equal(result.profile, null);
     assert.notEqual(result.status, "not_created");
@@ -217,7 +227,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
       throw error500;
     }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "error");
     assert.equal(result.profile, null);
     assert.notEqual(result.status, "not_created");
@@ -230,7 +240,7 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
       throw networkError;
     }) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    const result = await getCandidateProfile();
+    const result = await getCandidateProfile("user-uuid-123");
     assert.equal(result.status, "error");
     assert.equal(result.profile, null);
     assert.notEqual(result.status, "not_created");
@@ -251,10 +261,10 @@ describe("Candidate Profile Backend Contract & Response Validation", () => {
 
   // Unit tests for parseCandidateProfileResponse & parseCandidateProfileError
   it("standalone parser functions handle custom inputs predictably", () => {
-    const validState = parseCandidateProfileResponse(mockValidProfile);
+    const validState = parseCandidateProfileResponse(mockValidProfile, "user-uuid-123");
     assert.equal(validState.status, "exists");
 
-    const invalidState = parseCandidateProfileResponse({ randomKey: true });
+    const invalidState = parseCandidateProfileResponse({ randomKey: true }, "user-uuid-123");
     assert.equal(invalidState.status, "error");
 
     const clientErrorState = parseCandidateProfileError(new Error("Local exception"));
