@@ -238,6 +238,7 @@ model User {
   createdAt       DateTime   @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime   @updatedAt @db.Timestamptz(6)
 
+  candidateOnboardingDraft CandidateOnboardingDraft?
   candidateProfile        CandidateProfile?
   companyMemberships      CompanyMember[]
   companiesCreated        Company[]                  @relation("CompanyCreator")
@@ -270,6 +271,18 @@ model AuthSession {
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
+}
+
+// Account-scoped resumable WIP. This is NOT a published candidate profile.
+model CandidateOnboardingDraft {
+  userId    String   @id @db.Uuid
+  content   Json     @db.JsonB
+  stepIndex Int      @default(0)
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model CandidateProfile {

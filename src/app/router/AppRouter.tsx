@@ -6,6 +6,7 @@ import {
 
 
 import AdminLayout from "@/layouts/AdminLayout";
+import CandidateRoute from "@/app/guards/CandidateRoute";
 import AuthLayout from "@/layouts/AuthLayout";
 import CandidateLayout from "@/layouts/CandidateLayout";
 import EmployerLayout from "@/layouts/EmployerLayout";
@@ -16,6 +17,7 @@ import LoginPage from "@/pages/auth/LoginPage/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage/RegisterPage";
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage/ResetPasswordPage";
 import VerifyEmailPage from "@/pages/auth/VerifyEmailPage/VerifyEmailPage";
+import CompanyInvitationAcceptPage from "@/pages/company/CompanyInvitationAcceptPage";
 
 import CandidateDashboardPage from "@/pages/candidate/CandidateDashboardPage";
 import CandidateOnboardingPage from "@/pages/candidate/CandidateOnboardingPage";
@@ -127,6 +129,11 @@ const AppRouter = () => {
           />
 
           <Route
+            path="company-invitations/accept"
+            element={<CompanyInvitationAcceptPage />}
+          />
+
+          <Route
             path="employer/login"
             element={<h1>Employer Login Page</h1>}
           />
@@ -138,6 +145,7 @@ const AppRouter = () => {
         </Route>
 
         {/* CANDIDATE */}
+        <Route element={<CandidateRoute />}>
         <Route
           path="candidate"
           element={<CandidateLayout />}
@@ -156,6 +164,7 @@ const AppRouter = () => {
             path="onboarding"
             element={<CandidateOnboardingPage />}
           />
+        </Route>
         </Route>
 
         {/* EMPLOYER */}

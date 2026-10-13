@@ -87,6 +87,11 @@ export const useCandidateOnboarding = () => {
     setCurrentStepIndex(index);
   };
 
+  const restore = (draft: CandidateOnboardingData, stepIndex: number) => {
+    setData(draft);
+    setCurrentStepIndex(Number.isInteger(stepIndex) && stepIndex >= 0 && stepIndex < ONBOARDING_STEPS.length ? stepIndex : 0);
+  };
+
   const reset = () => {
     setData(INITIAL_ONBOARDING_DATA);
     setCurrentStepIndex(0);
@@ -108,5 +113,6 @@ export const useCandidateOnboarding = () => {
     goPrevious,
     goToStep,
     reset,
+    restore,
   };
 };

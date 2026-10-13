@@ -1,12 +1,20 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path from "node:path";
+import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
+  // Same-origin dev proxy preserves the httpOnly refresh cookie and avoids CORS.
+  // Production must configure a reverse proxy for /api/v1 or VITE_API_BASE_URL.
+  server: {
+    proxy: {
+      "/api/v1": {
+        target: "http://127.0.0.1:3000",
+        changeOrigin: true,
+      },
     },
   },
 });

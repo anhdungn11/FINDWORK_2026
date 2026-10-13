@@ -1,79 +1,53 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-
-import AuthCheckbox from "@/features/auth/components/AuthCheckbox/AuthCheckbox";
-import AuthDivider from "@/features/auth/components/AuthDivider/AuthDivider";
+import { useAuthStore } from "@/store/authStore";
 import AuthErrorMessage from "@/features/auth/components/AuthErrorMessage/AuthErrorMessage";
 import AuthField from "@/features/auth/components/AuthField/AuthField";
 import AuthFooterText from "@/features/auth/components/AuthFooterText/AuthFooterText";
 import AuthForm from "@/features/auth/components/AuthForm/AuthForm";
 import AuthPasswordField from "@/features/auth/components/AuthPasswordField/AuthPasswordField";
 import AuthShell from "@/features/auth/components/AuthShell/AuthShell";
-import AuthSocialButtons from "@/features/auth/components/AuthSocialButtons/AuthSocialButtons";
 import AuthSubmitButton from "@/features/auth/components/AuthSubmitButton/AuthSubmitButton";
 import { useLoginForm } from "@/features/auth/hooks/useLoginForm";
 
-import styles from "./LoginPageLinks.module.css";
-
 const LoginPage = () => {
-  const {
-    email, password, rememberMe, error,
-    setEmail, setPassword, setRememberMe,
-    handleSubmit,
-  } = useLoginForm();
-
+  const { email, password, error, isSubmitting, setEmail, setPassword, handleSubmit } = useLoginForm();
+  const logoutError = useAuthStore((state) => state.logoutError);
+  const logout = useAuthStore((state) => state.logout);
+  const [isRetryingLogout, setIsRetryingLogout] = useState(false);
+  const retryLogout = async () => {
+    setIsRetryingLogout(true);
+    try { await logout(); }
+    finally { setIsRetryingLogout(false); }
+  };
   return (
     <AuthShell
       eyebrow="TÀI KHOẢN ỨNG VIÊN"
       title="Đăng nhập FINDWORK"
       description="Tiếp tục quản lý hồ sơ, CV và những cơ hội nghề nghiệp của bạn."
-      footer={
-        <AuthFooterText>
-          Chưa có tài khoản?{" "}
-          <Link to="/register">Đăng ký ngay</Link>
-        </AuthFooterText>
-      }
+      footer={<AuthFooterText>Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link></AuthFooterText>}
     >
-      <AuthSocialButtons />
-
-      <AuthDivider>hoặc đăng nhập bằng email</AuthDivider>
-
+      {logoutError && <div role="alert">
+        <p>{logoutError}</p>
+        <button type="button" onClick={retryLogout} disabled={isRetryingLogout}>
+          {isRetryingLogout ? "Đang thử lại..." : "Thử đăng xuất lại"}
+        </button>
+      </div>}
       <AuthForm onSubmit={handleSubmit}>
         <AuthField
-          id="email"
-          type="email"
-          label="Email"
-          value={email}
-          placeholder="you@gmail.com"
-          autoComplete="email"
-          required
-          onChange={setEmail}
+          id="email" type="email" label="Email" value={email}
+          placeholder="you@gmail.com" autoComplete="email" required onChange={setEmail}
         />
-
         <AuthPasswordField
-          id="password"
-          label="Mật khẩu"
-          value={password}
-          placeholder="Nhập mật khẩu"
-          autoComplete="current-password"
-          required
-          onChange={setPassword}
-          labelAction={
-            <Link to="/forgot-password" className={styles.forgotLink}>
-              Quên mật khẩu?
-            </Link>
-          }
+          id="password" label="Mật khẩu" value={password}
+          placeholder="Nhập mật khẩu" autoComplete="current-password" required onChange={setPassword}
         />
-
-        <AuthCheckbox checked={rememberMe} onChange={setRememberMe}>
-          Ghi nhớ thông tin đăng nhập trên thiết bị này
-        </AuthCheckbox>
-
         <AuthErrorMessage message={error} />
-
-        <AuthSubmitButton>Đăng nhập</AuthSubmitButton>
+        <AuthSubmitButton disabled={isSubmitting}>
+          {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
+        </AuthSubmitButton>
       </AuthForm>
     </AuthShell>
   );
 };
-
 export default LoginPage;
