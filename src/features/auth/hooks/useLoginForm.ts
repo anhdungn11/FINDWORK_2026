@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../store/authStore";
+import { getReturnDestination } from "../../../app/router/returnDestination";
 
 export const useLoginForm = () => {
   const navigate = useNavigate();
@@ -32,8 +33,7 @@ export const useLoginForm = () => {
     try {
       await login({ email: normalizedEmail, password });
       const requestedPath = (location.state as { from?: unknown } | null)?.from;
-      const destination = typeof requestedPath === "string" &&
-        /^\/candidate(?:\/|\?|$)/.test(requestedPath) ? requestedPath : "/candidate";
+      const destination = getReturnDestination(requestedPath);
       navigate(destination, { replace: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Đăng nhập thất bại. Vui lòng thử lại.");

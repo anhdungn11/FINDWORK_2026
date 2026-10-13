@@ -6,19 +6,21 @@ import type {
   Resume,
   ResumeVersion,
   UpdateBuilderResumeInput,
-} from "@/features/resume/types/resume.types";
+} from "../types/resume.types";
 import {
   MAX_RESUME_COUNT,
   validateResumeFile,
-} from "@/features/resume/utils/resume.utils";
+} from "../utils/resume.utils";
+import { useAuthStore } from "../../../store/authStore";
 
 const STORAGE_KEY = "findwork.mock.builder-resumes.v7";
+const storageKeyFor = (userId: string) => `${STORAGE_KEY}.${userId}`;
 
-const readStoredBuilderResumes = (): Resume[] => {
-  if (typeof window === "undefined") return [];
+const readStoredBuilderResumes = (userId: string | null): Resume[] => {
+  if (typeof window === "undefined" || !userId) return [];
 
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(storageKeyFor(userId));
     if (!raw) return [];
 
     const parsed = JSON.parse(raw) as Resume[];
@@ -30,16 +32,36 @@ const readStoredBuilderResumes = (): Resume[] => {
   }
 };
 
-let resumeStore: Resume[] = readStoredBuilderResumes();
+let ownerId = useAuthStore.getState().user?.id ?? null;
+let resumeStore: Resume[] = readStoredBuilderResumes(ownerId);
+
+// The old iframe can still be mounted until React commits the next view.
+const revokePreviewLater = (previewUrl: string | undefined) => {
+  if (previewUrl) {
+    setTimeout(() => URL.revokeObjectURL(previewUrl), 0);
+  }
+};
+
+// Drop the previous account's in-memory records as soon as auth changes.
+useAuthStore.subscribe((state) => {
+  const nextOwnerId = state.user?.id ?? null;
+  if (nextOwnerId !== ownerId) {
+    for (const resume of resumeStore) {
+      revokePreviewLater(resume.currentVersion?.file?.previewUrl);
+    }
+    ownerId = nextOwnerId;
+    resumeStore = readStoredBuilderResumes(ownerId);
+  }
+});
 
 const persistBuilderResumes = () => {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !ownerId) return;
 
   try {
     const builderResumes = resumeStore.filter(
       (resume) => resume.sourceType === "builder",
     );
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(builderResumes));
+    window.sessionStorage.setItem(storageKeyFor(ownerId), JSON.stringify(builderResumes));
   } catch {
     // Mock persistence is best-effort only. Real persistence belongs to backend.
   }
@@ -213,9 +235,7 @@ const replaceUploadedResume = async ({
       : resume,
   );
 
-  if (previousPreviewUrl) {
-    URL.revokeObjectURL(previousPreviewUrl);
-  }
+  revokePreviewLater(previousPreviewUrl);
 
   return cloneResumes();
 };
@@ -295,9 +315,7 @@ const deleteResume = async (resumeId: string): Promise<Resume[]> => {
     }));
   }
 
-  if (previewUrl) {
-    URL.revokeObjectURL(previewUrl);
-  }
+  revokePreviewLater(previewUrl);
 
   persistBuilderResumes();
   return cloneResumes();
