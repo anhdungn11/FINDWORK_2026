@@ -6,6 +6,7 @@ import {
 
 
 import AdminLayout from "@/layouts/AdminLayout";
+import CandidateRoute from "@/app/guards/CandidateRoute";
 import AuthLayout from "@/layouts/AuthLayout";
 import CandidateLayout from "@/layouts/CandidateLayout";
 import EmployerLayout from "@/layouts/EmployerLayout";
@@ -144,6 +145,7 @@ const AppRouter = () => {
         </Route>
 
         {/* CANDIDATE */}
+        <Route element={<CandidateRoute />}>
         <Route
           path="candidate"
           element={<CandidateLayout />}
@@ -162,6 +164,7 @@ const AppRouter = () => {
             path="onboarding"
             element={<CandidateOnboardingPage />}
           />
+        </Route>
         </Route>
 
         {/* EMPLOYER */}

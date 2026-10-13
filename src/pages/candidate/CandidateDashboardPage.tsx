@@ -1,17 +1,12 @@
-import Button from "@/components/common/Button";
+import { Link } from "react-router-dom";
 
 const CandidateDashboardPage = () => {
-  const handleApply = () => {
-    alert("Applied!");
-  };
-
   return (
     <div>
       <h1>Candidate Dashboard</h1>
 
-      <Button onClick={handleApply}>
-        Apply Now
-      </Button>
+      <p>Chức năng ứng tuyển chưa sẵn sàng.</p>
+      <Link to="/jobs">Xem việc làm</Link>
     </div>
   );
 };

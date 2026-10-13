@@ -6,6 +6,7 @@ export const API_ENDPOINTS = {
     LOGOUT: "/auth/logout",
     ME: "/auth/me",
   },
+  CANDIDATE: { ONBOARDING_DRAFT: "/candidate/onboarding-draft" },
   COMPANY_INVITATIONS: {
     ACCEPT: "/company-invitations/accept",
     LIST: (companyId: string) => `/companies/${companyId}/invitations`,

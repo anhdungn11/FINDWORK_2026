@@ -21,6 +21,8 @@ import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
 import { PermissionGuard } from "../authorization/guards/permission.guard";
 import { CandidateService } from "./candidate.service";
+import { CandidateOnboardingDraftService } from "./candidate-onboarding-draft.service";
+import { SaveCandidateOnboardingDraftDto } from "./dto/onboarding-draft.dto";
 import { PutCandidateCareerPreferenceDto } from "./dto/career-preference.dto";
 import {
   CreateCandidateEducationDto,
@@ -53,7 +55,25 @@ import {
 @Controller("candidate")
 @UseGuards(AccessTokenGuard)
 export class CandidateController {
-  constructor(private readonly candidateService: CandidateService) {}
+  constructor(
+    private readonly candidateService: CandidateService,
+    private readonly candidateDrafts: CandidateOnboardingDraftService,
+  ) {}
+
+  @Get("onboarding-draft")
+  @ApiOperation({ summary: "Load private 7-step onboarding draft for current account" })
+  loadOnboardingDraft(@CurrentAuth() auth: AuthenticatedPrincipal) {
+    return this.candidateDrafts.get(auth.userId);
+  }
+
+  @Put("onboarding-draft")
+  @ApiOperation({ summary: "Versioned save of current account onboarding draft" })
+  saveOnboardingDraft(
+    @CurrentAuth() auth: AuthenticatedPrincipal,
+    @Body() dto: SaveCandidateOnboardingDraftDto,
+  ) {
+    return this.candidateDrafts.put(auth.userId, dto);
+  }
 
   @Post("profile")
   @ApiOperation({
