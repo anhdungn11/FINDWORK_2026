@@ -1,14 +1,7 @@
-import { Link } from "react-router-dom";
+import { CandidateDashboard } from "@/features/candidate/dashboard";
 
 const CandidateDashboardPage = () => {
-  return (
-    <div>
-      <h1>Candidate Dashboard</h1>
-
-      <p>Chức năng ứng tuyển chưa sẵn sàng.</p>
-      <Link to="/jobs">Xem việc làm</Link>
-    </div>
-  );
+  return <CandidateDashboard />;
 };
 
 export default CandidateDashboardPage;
