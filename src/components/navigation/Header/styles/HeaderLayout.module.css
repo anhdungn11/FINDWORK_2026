@@ -36,6 +36,27 @@
   letter-spacing: -0.7px;
 }
 
+.logoutNotice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 16px;
+  color: #9f2b22;
+  background: #fff3f1;
+  font-size: 12px;
+}
+
+.logoutNotice button {
+  padding: 4px 8px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
 @media (max-width: 1180px) {
   .inner {
     gap: 18px;

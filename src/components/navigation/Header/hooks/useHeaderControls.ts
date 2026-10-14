@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import type {
   HeaderLanguage,
@@ -19,6 +19,7 @@ const useHeaderControls = () => {
     isMobileOpen,
     setIsMobileOpen,
   ] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
 
   const [
     language,
@@ -26,10 +27,19 @@ const useHeaderControls = () => {
   ] =
     useState<HeaderLanguage>("VI");
 
-  const closeMenus = () => {
+  const closeMenus = useCallback(() => {
     setIsLanguageOpen(false);
     setIsEmployerOpen(false);
     setIsMobileOpen(false);
+    setIsAccountOpen(false);
+  }, []);
+
+  const closeAccount = useCallback(() => setIsAccountOpen(false), []);
+
+  const toggleAccount = () => {
+    setIsAccountOpen((current) => !current);
+    setIsLanguageOpen(false);
+    setIsEmployerOpen(false);
   };
 
   const changeLanguage = (
@@ -45,6 +55,7 @@ const useHeaderControls = () => {
     );
 
     setIsEmployerOpen(false);
+    setIsAccountOpen(false);
   };
 
   const toggleEmployer = () => {
@@ -53,6 +64,7 @@ const useHeaderControls = () => {
     );
 
     setIsLanguageOpen(false);
+    setIsAccountOpen(false);
   };
 
   const toggleMobile = () => {
@@ -62,18 +74,22 @@ const useHeaderControls = () => {
 
     setIsLanguageOpen(false);
     setIsEmployerOpen(false);
+    setIsAccountOpen(false);
   };
 
   return {
     isLanguageOpen,
     isEmployerOpen,
     isMobileOpen,
+    isAccountOpen,
     language,
     closeMenus,
+    closeAccount,
     changeLanguage,
     toggleLanguage,
     toggleEmployer,
     toggleMobile,
+    toggleAccount,
   };
 };
 
