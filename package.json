@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "tsx --test src/services/company/__tests__/*.test.ts src/services/http/__tests__/*.test.ts src/store/__tests__/*.test.ts src/features/candidate/services/__tests__/*.test.ts src/features/candidate/dashboard/tests/*.test.ts",
+    "test": "tsx --test src/services/company/__tests__/*.test.ts src/services/http/__tests__/*.test.ts src/store/__tests__/*.test.ts src/features/candidate/services/__tests__/*.test.ts src/features/candidate/dashboard/tests/*.test.ts src/features/candidate/workspace/tests/*.test.ts src/components/navigation/Header/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
