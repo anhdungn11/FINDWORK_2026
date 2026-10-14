@@ -1,0 +1,126 @@
+/* ==========================================================================
+   Candidate Profile Layout - UI/UX Pro Max Architecture
+   Responsive Breakpoints: 360px / 393px (Mobile) / 768px (Tablet) / 1024px (Laptop) / 1440px (Desktop)
+   ========================================================================== */
+
+.pageContainer {
+  width: 100%;
+  max-width: var(--container-width, 1200px);
+  margin: 0 auto;
+  padding: var(--space-4, 1rem) var(--space-4, 1rem) var(--space-12, 3rem);
+  box-sizing: border-box;
+}
+
+/* Header khu vực trang */
+.pageHeader {
+  margin-bottom: var(--space-6, 1.5rem);
+}
+
+.pageEyebrow {
+  display: inline-block;
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-primary, #4f6ef7);
+  margin-bottom: var(--space-1, 0.25rem);
+}
+
+.pageTitle {
+  font-size: var(--font-size-2xl, 1.5rem);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-text-primary, #1e293b);
+  margin: 0 0 var(--space-1, 0.25rem) 0;
+  letter-spacing: -0.02em;
+}
+
+.pageSubtitle {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #64748b);
+  margin: 0;
+  max-width: 680px;
+  line-height: 1.5;
+}
+
+/* Lưới hiển thị chính 2 cột */
+.workspaceGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6, 1.5rem);
+}
+
+.mainColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6, 1.5rem);
+  min-width: 0;
+  flex: 1;
+}
+
+.rightRail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6, 1.5rem);
+  width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Breakpoints: 768px (Tablet)
+   -------------------------------------------------------------------------- */
+@media (min-width: 768px) {
+  .pageContainer {
+    padding: var(--space-6, 1.5rem) var(--space-6, 1.5rem) var(--space-12, 3rem);
+  }
+
+  .pageTitle {
+    font-size: var(--font-size-3xl, 1.875rem);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Breakpoints: 1024px (Laptop)
+   -------------------------------------------------------------------------- */
+@media (min-width: 1024px) {
+  .workspaceGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+    gap: var(--space-6, 1.5rem);
+  }
+
+  .rightRail {
+    position: sticky;
+    top: 80px;
+    width: 300px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    padding-bottom: var(--space-4, 1rem);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Breakpoints: 1440px (Desktop Màn rộng)
+   -------------------------------------------------------------------------- */
+@media (min-width: 1440px) {
+  .workspaceGrid {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--space-8, 2rem);
+  }
+
+  .rightRail {
+    width: 340px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Accessibility: Prefers-reduced-motion
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .pageContainer,
+  .workspaceGrid,
+  .mainColumn,
+  .rightRail {
+    transition: none !important;
+    animation: none !important;
+  }
+}
