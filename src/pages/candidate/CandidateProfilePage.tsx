@@ -18,7 +18,7 @@ import { Info } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import {
   CandidateProfileView,
-  type CandidateProfilePresentationState,
+  resolveCandidateProfilePageState,
   type FullCandidateProfileRecord,
 } from "@/features/candidate/profile";
 import {
@@ -28,70 +28,59 @@ import {
 } from "@/features/candidate/profile/fixtures/mockProfileData";
 
 const CandidateProfilePage = () => {
+  const isDev = Boolean(import.meta.env?.DEV);
   const [searchParams, setSearchParams] = useSearchParams();
-  const previewParam = searchParams.get("preview");
+  const rawPreview = searchParams.get("preview");
+  const previewParam = isDev ? rawPreview : null;
   const user = useAuthStore((state) => state.user);
   const accountEmail = user?.email || "candidate@findwork.vn";
 
-  // Quản lý dữ liệu giả định chỉ trong bộ nhớ khi bật chế độ Preview
+  // Quản lý dữ liệu giả định chỉ trong bộ nhớ khi bật chế độ Preview trong Development
   const [demoProfile, setDemoProfile] = useState<FullCandidateProfileRecord>(
     previewParam === "fresher" ? MOCK_FIXTURE_FRESHER_PROFILE : MOCK_FIXTURE_FULL_PROFILE
   );
 
-  // Xác định trạng thái hiển thị dựa trên URL param hoặc mặc định chưa tích hợp
-  let presentationState: CandidateProfilePresentationState = "eligibility_unknown";
-  let activeProfile: FullCandidateProfileRecord | null = null;
-  let activeDraft = null;
-
-  if (previewParam === "full") {
-    presentationState = "existing_profile";
-    activeProfile = demoProfile;
-  } else if (previewParam === "fresher") {
-    presentationState = "existing_profile";
-    activeProfile = demoProfile;
-  } else if (previewParam === "draft") {
-    presentationState = "not_created_with_draft";
-    activeDraft = MOCK_FIXTURE_DRAFT_SUMMARY;
-  } else if (previewParam === "loading") {
-    presentationState = "loading";
-  } else if (previewParam === "forbidden") {
-    presentationState = "forbidden";
-  } else if (previewParam === "nodraft") {
-    presentationState = "not_created_no_draft";
-  } else if (previewParam === "error") {
-    presentationState = "network_error";
-  } else {
-    // Mặc định Production Route: Phản ánh trung thực trạng thái chờ API Integration từ CP8C
-    presentationState = "eligibility_unknown";
-  }
+  // P0 Boundary: Production builds strictly lock out fixtures and ?preview= queries
+  const {
+    presentationState,
+    activeProfile,
+    activeDraft,
+    showDevBanner,
+  } = resolveCandidateProfilePageState({
+    isDev,
+    previewParam,
+    demoProfile,
+    draftFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
+  });
 
   return (
     <div>
-      {/* Banner hướng dẫn kiểm thử giao diện (Development Preview Switcher) */}
-      <aside
-        style={{
-          background: "var(--color-surface-soft, #f1f5f9)",
-          borderBottom: "1px solid var(--color-border, #e2e8f0)",
-          padding: "0.5rem 1rem",
-          fontSize: "0.75rem",
-          color: "var(--color-text-secondary, #64748b)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "0.5rem",
-        }}
-        aria-label="Thanh điều khiển chế độ xem trước CP8B"
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Info size={14} color="var(--color-primary, #4f6ef7)" aria-hidden="true" />
-          <span>
-            <strong>CP8B Presentation Mode:</strong>{" "}
-            {previewParam
-              ? `Đang xem kịch bản mẫu (?preview=${previewParam}) — Dữ liệu Mock Fixture.`
-              : "Trạng thái sẵn sàng giao diện. Kết nối dữ liệu máy chủ thực tế sẽ được bàn giao tại CP8C."}
-          </span>
-        </div>
+      {/* Banner hướng dẫn kiểm thử giao diện (Chỉ hiển thị trong Development) */}
+      {showDevBanner && (
+        <aside
+          style={{
+            background: "var(--color-surface-soft, #f1f5f9)",
+            borderBottom: "1px solid var(--color-border, #e2e8f0)",
+            padding: "0.5rem 1rem",
+            fontSize: "0.75rem",
+            color: "var(--color-text-secondary, #64748b)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "0.5rem",
+          }}
+          aria-label="Thanh điều khiển chế độ xem trước CP8B"
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Info size={14} color="var(--color-primary, #4f6ef7)" aria-hidden="true" />
+            <span>
+              <strong>CP8B Development Preview:</strong>{" "}
+              {previewParam
+                ? `Đang xem kịch bản mẫu (?preview=${previewParam}) — Dữ liệu Mock Fixture.`
+                : "Trạng thái sẵn sàng giao diện. Kết nối dữ liệu máy chủ thực tế sẽ được bàn giao tại CP8C."}
+            </span>
+          </div>
 
         {/* Nút chuyển đổi nhanh các kịch bản preview phục vụ Review */}
         <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
@@ -189,6 +178,7 @@ const CandidateProfilePage = () => {
           )}
         </div>
       </aside>
+      )}
 
       {/* Presentation Master Container */}
       <CandidateProfileView
@@ -200,12 +190,11 @@ const CandidateProfilePage = () => {
         onRetry={() => {
           // Handled in CP8C
         }}
-        onConfirmImport={async (payload) => {
-          // Mô phỏng tương tác thành công trong chế độ preview
-          window.alert(
-            `[CP8B Presentation Preview]: Xác nhận Import Onboarding hợp lệ với payload: version=${payload.version}, confirmPrivacy=${payload.confirmPrivacy}. Trong CP8C, mutation POST /candidate/profile/import-onboarding sẽ được thực thi.`
-          );
-          setSearchParams({ preview: "full" });
+        onConfirmImport={async () => {
+          // In development preview mode, transition to full profile view
+          if (isDev) {
+            setSearchParams({ preview: "full" });
+          }
         }}
         onSaveOverview={async (data) => {
           setDemoProfile((prev) => ({

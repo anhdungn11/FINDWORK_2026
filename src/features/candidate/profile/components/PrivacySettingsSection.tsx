@@ -9,7 +9,7 @@
  *   hay tải CV công khai đã hoạt động thực tế.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Info, ShieldCheck } from "lucide-react";
 import {
   DEFAULT_PRIVACY_SETTINGS,
@@ -34,12 +34,43 @@ export const PrivacySettingsSection = ({
 
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Sync state if privacySetting prop changes (e.g. initial fetch or profile update)
+  useEffect(() => {
+    if (privacySetting) {
+      setSettings({
+        searchableProfile: privacySetting.searchableProfile ?? false,
+        showEmail: privacySetting.showEmail ?? false,
+        showPhone: privacySetting.showPhone ?? false,
+        allowResumeDownload: privacySetting.allowResumeDownload ?? false,
+        allowJobMatching: privacySetting.allowJobMatching ?? true,
+      });
+      setHasChanges(false);
+    }
+  }, [privacySetting]);
+
   const toggleField = (field: keyof CandidatePrivacySettingRecord) => {
     setSettings((prev) => {
       const updated = { ...prev, [field]: !prev[field] };
-      setHasChanges(true);
+      const isDirty =
+        updated.searchableProfile !== (privacySetting?.searchableProfile ?? false) ||
+        updated.showEmail !== (privacySetting?.showEmail ?? false) ||
+        updated.showPhone !== (privacySetting?.showPhone ?? false) ||
+        updated.allowResumeDownload !== (privacySetting?.allowResumeDownload ?? false) ||
+        updated.allowJobMatching !== (privacySetting?.allowJobMatching ?? true);
+      setHasChanges(isDirty);
       return updated;
     });
+  };
+
+  const handleCancel = () => {
+    setSettings({
+      searchableProfile: privacySetting?.searchableProfile ?? false,
+      showEmail: privacySetting?.showEmail ?? false,
+      showPhone: privacySetting?.showPhone ?? false,
+      allowResumeDownload: privacySetting?.allowResumeDownload ?? false,
+      allowJobMatching: privacySetting?.allowJobMatching ?? true,
+    });
+    setHasChanges(false);
   };
 
   const handleSave = async () => {
@@ -71,15 +102,26 @@ export const PrivacySettingsSection = ({
         </div>
 
         {hasChanges && (
-          <button
-            type="button"
-            className={formStyles.btnPrimary}
-            onClick={handleSave}
-            disabled={isSaving}
-            aria-label="Lưu cài đặt quyền riêng tư"
-          >
-            {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <button
+              type="button"
+              className={formStyles.btnSecondary}
+              onClick={handleCancel}
+              disabled={isSaving}
+              aria-label="Hủy các thay đổi quyền riêng tư"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className={formStyles.btnPrimary}
+              onClick={handleSave}
+              disabled={isSaving}
+              aria-label="Lưu cài đặt quyền riêng tư"
+            >
+              {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
         )}
       </div>
 

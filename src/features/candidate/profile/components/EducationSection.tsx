@@ -5,11 +5,12 @@
  * chuyên ngành, điểm GPA và thành tích đào tạo.
  */
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { AlertCircle, GraduationCap, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { CandidateEducationRecord } from "../types/candidateProfile.types";
 import type { EducationSectionProps } from "../types/uiProfileProps.types";
 import { formatMonthYear } from "../utils/profileFormatters";
+import { useModalAccessibility } from "../utils/useModalAccessibility";
 import formStyles from "../styles/ProfileForms.module.css";
 import sectionStyles from "../styles/ProfileSections.module.css";
 
@@ -39,7 +40,26 @@ export const EducationSection = ({
   const [description, setDescription] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const formDialogRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const deleteCancelBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Focus trap, Escape, initial focus, focus restoration, and scroll lock for add/edit form modal
+  useModalAccessibility({
+    isOpen: modalMode !== null,
+    onClose: () => setModalMode(null),
+    containerRef: formDialogRef,
+    initialFocusRef: firstInputRef,
+  });
+
+  // Focus trap, Escape, initial focus, focus restoration, and scroll lock for delete confirm modal
+  useModalAccessibility({
+    isOpen: deleteTargetId !== null,
+    onClose: () => setDeleteTargetId(null),
+    containerRef: deleteDialogRef,
+    initialFocusRef: deleteCancelBtnRef,
+  });
 
   const openAddModal = () => {
     setModalMode("add");
@@ -76,12 +96,6 @@ export const EducationSection = ({
     setDescription(item.description || "");
     setErrorMsg(null);
   };
-
-  useEffect(() => {
-    if (modalMode) {
-      firstInputRef.current?.focus();
-    }
-  }, [modalMode]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -241,6 +255,7 @@ export const EducationSection = ({
           role="presentation"
         >
           <div
+            ref={formDialogRef}
             className={formStyles.modalDialog}
             role="dialog"
             aria-modal="true"
@@ -264,7 +279,7 @@ export const EducationSection = ({
             <form onSubmit={handleSubmit} style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {errorMsg && (
-                  <div className={formStyles.errorSummary} role="alert" tabIndex={-1}>
+                  <div id="education-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>
                     <div className={formStyles.errorSummaryTitle}>
                       <AlertCircle size={14} aria-hidden="true" />
                       <span>Thông tin chưa hợp lệ:</span>
@@ -281,11 +296,17 @@ export const EducationSection = ({
                     ref={firstInputRef}
                     id="edu-school"
                     type="text"
-                    className={formStyles.inputField}
+                    className={`${formStyles.inputField} ${errorMsg && !school.trim() ? formStyles.inputFieldInvalid : ""}`}
                     placeholder="Ví dụ: Đại học Bách Khoa Hà Nội"
                     value={school}
-                    onChange={(e) => setSchool(e.target.value)}
+                    onChange={(e) => {
+                      setSchool(e.target.value);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
                     required
+                    aria-required="true"
+                    aria-invalid={Boolean(errorMsg && !school.trim())}
+                    aria-describedby={errorMsg ? "education-error-summary" : undefined}
                   />
                 </div>
 
@@ -297,11 +318,17 @@ export const EducationSection = ({
                     <input
                       id="edu-degree"
                       type="text"
-                      className={formStyles.inputField}
+                      className={`${formStyles.inputField} ${errorMsg && !degree.trim() ? formStyles.inputFieldInvalid : ""}`}
                       placeholder="Cử nhân, Kỹ sư, Thạc sĩ..."
                       value={degree}
-                      onChange={(e) => setDegree(e.target.value)}
+                      onChange={(e) => {
+                        setDegree(e.target.value);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
                       required
+                      aria-required="true"
+                      aria-invalid={Boolean(errorMsg && !degree.trim())}
+                      aria-describedby={errorMsg ? "education-error-summary" : undefined}
                     />
                   </div>
 
@@ -312,11 +339,17 @@ export const EducationSection = ({
                     <input
                       id="edu-major"
                       type="text"
-                      className={formStyles.inputField}
+                      className={`${formStyles.inputField} ${errorMsg && !major.trim() ? formStyles.inputFieldInvalid : ""}`}
                       placeholder="Công nghệ Thông tin, Kinh tế..."
                       value={major}
-                      onChange={(e) => setMajor(e.target.value)}
+                      onChange={(e) => {
+                        setMajor(e.target.value);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
                       required
+                      aria-required="true"
+                      aria-invalid={Boolean(errorMsg && !major.trim())}
+                      aria-describedby={errorMsg ? "education-error-summary" : undefined}
                     />
                   </div>
                 </div>
@@ -460,9 +493,11 @@ export const EducationSection = ({
           role="presentation"
         >
           <div
+            ref={deleteDialogRef}
             className={formStyles.modalDialog}
             style={{ maxWidth: 420 }}
             role="alertdialog"
+            aria-modal="true"
             aria-labelledby="delete-edu-title"
             tabIndex={-1}
           >
@@ -478,6 +513,7 @@ export const EducationSection = ({
             </div>
             <footer className={formStyles.modalFooter}>
               <button
+                ref={deleteCancelBtnRef}
                 type="button"
                 className={formStyles.btnSecondary}
                 onClick={() => setDeleteTargetId(null)}

@@ -16,6 +16,7 @@ import {
   formatGenderLabel,
   formatMonthYear,
   getAvatarInitials,
+  resolveCandidateProfilePageState,
 } from "../utils/profileFormatters";
 import {
   MOCK_FIXTURE_DRAFT_SUMMARY,
@@ -177,5 +178,117 @@ describe("Candidate Profile Onboarding Import Contract", () => {
     assert.equal(MOCK_FIXTURE_DRAFT_SUMMARY.hasLocalResumeFile, true);
     assert.ok(MOCK_FIXTURE_DRAFT_SUMMARY.educationCount >= 1);
     assert.ok(MOCK_FIXTURE_DRAFT_SUMMARY.version >= 1);
+  });
+});
+
+describe("Candidate Profile Production Preview Security (P0)", () => {
+  const previewParams = ["full", "fresher", "draft", "loading", "forbidden", "nodraft", "error", "unknown", ""];
+
+  it("strictly bars mock fixtures in production mode (isDev: false) regardless of ?preview= query", () => {
+    for (const previewParam of previewParams) {
+      const result = resolveCandidateProfilePageState({
+        isDev: false,
+        previewParam,
+        demoProfile: MOCK_FIXTURE_FULL_PROFILE,
+        draftFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
+      });
+
+      assert.equal(
+        result.presentationState,
+        "eligibility_unknown",
+        `Production must enforce eligibility_unknown state for ?preview=${previewParam}`
+      );
+      assert.equal(
+        result.activeProfile,
+        null,
+        `Production must never leak activeProfile for ?preview=${previewParam}`
+      );
+      assert.equal(
+        result.activeDraft,
+        null,
+        `Production must never leak activeDraft for ?preview=${previewParam}`
+      );
+      assert.equal(
+        result.showDevBanner,
+        false,
+        `Production must never show dev preview switcher banner for ?preview=${previewParam}`
+      );
+    }
+  });
+
+  it("allows mock fixtures and dev preview banner strictly when isDev: true", () => {
+    // 1. Full preview
+    const fullResult = resolveCandidateProfilePageState({
+      isDev: true,
+      previewParam: "full",
+      demoProfile: MOCK_FIXTURE_FULL_PROFILE,
+      draftFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
+    });
+    assert.equal(fullResult.presentationState, "existing_profile");
+    assert.equal(fullResult.activeProfile, MOCK_FIXTURE_FULL_PROFILE);
+    assert.equal(fullResult.showDevBanner, true);
+
+    // 2. Fresher preview
+    const fresherResult = resolveCandidateProfilePageState({
+      isDev: true,
+      previewParam: "fresher",
+      demoProfile: MOCK_FIXTURE_FRESHER_PROFILE,
+      draftFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
+    });
+    assert.equal(fresherResult.presentationState, "existing_profile");
+    assert.equal(fresherResult.activeProfile, MOCK_FIXTURE_FRESHER_PROFILE);
+    assert.equal(fresherResult.showDevBanner, true);
+
+    // 3. Draft preview
+    const draftResult = resolveCandidateProfilePageState({
+      isDev: true,
+      previewParam: "draft",
+      demoProfile: MOCK_FIXTURE_FULL_PROFILE,
+      draftFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
+    });
+    assert.equal(draftResult.presentationState, "not_created_with_draft");
+    assert.equal(draftResult.activeDraft, MOCK_FIXTURE_DRAFT_SUMMARY);
+    assert.equal(draftResult.activeProfile, null);
+    assert.equal(draftResult.showDevBanner, true);
+
+    // 4. Loading preview
+    const loadingResult = resolveCandidateProfilePageState({
+      isDev: true,
+      previewParam: "loading",
+    });
+    assert.equal(loadingResult.presentationState, "loading");
+    assert.equal(loadingResult.showDevBanner, true);
+
+    // 5. Forbidden preview
+    const forbiddenResult = resolveCandidateProfilePageState({
+      isDev: true,
+      previewParam: "forbidden",
+    });
+    assert.equal(forbiddenResult.presentationState, "forbidden");
+    assert.equal(forbiddenResult.showDevBanner, true);
+
+    // 6. Nodraft preview
+    const noDraftResult = resolveCandidateProfilePageState({
+      isDev: true,
+      previewParam: "nodraft",
+    });
+    assert.equal(noDraftResult.presentationState, "not_created_no_draft");
+    assert.equal(noDraftResult.showDevBanner, true);
+
+    // 7. Network error preview
+    const errorResult = resolveCandidateProfilePageState({
+      isDev: true,
+      previewParam: "error",
+    });
+    assert.equal(errorResult.presentationState, "network_error");
+    assert.equal(errorResult.showDevBanner, true);
+
+    // 8. No preview param in dev
+    const defaultDevResult = resolveCandidateProfilePageState({
+      isDev: true,
+      previewParam: null,
+    });
+    assert.equal(defaultDevResult.presentationState, "eligibility_unknown");
+    assert.equal(defaultDevResult.showDevBanner, true);
   });
 });

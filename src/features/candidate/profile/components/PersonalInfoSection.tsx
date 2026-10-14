@@ -10,6 +10,7 @@ import { AlertCircle, Pencil, User, X } from "lucide-react";
 import type { Gender } from "../types/candidateProfile.types";
 import type { PersonalInfoSectionProps } from "../types/uiProfileProps.types";
 import { formatDateOfBirth, formatGenderLabel } from "../utils/profileFormatters";
+import { useModalAccessibility } from "../utils/useModalAccessibility";
 import formStyles from "../styles/ProfileForms.module.css";
 import sectionStyles from "../styles/ProfileSections.module.css";
 
@@ -28,7 +29,16 @@ export const PersonalInfoSection = ({
   const [addressLine, setAddressLine] = useState(profile.addressLine || "");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+
+  // Accessible focus trap, Escape key, initial focus, focus restoration, and scroll lock
+  useModalAccessibility({
+    isOpen: isEditOpen,
+    onClose: () => setIsEditOpen(false),
+    containerRef: dialogRef,
+    initialFocusRef: firstInputRef,
+  });
 
   useEffect(() => {
     if (isEditOpen) {
@@ -37,7 +47,6 @@ export const PersonalInfoSection = ({
       setGender(profile.gender || "");
       setAddressLine(profile.addressLine || "");
       setErrorMsg(null);
-      firstInputRef.current?.focus();
     }
   }, [isEditOpen, profile]);
 
@@ -153,6 +162,7 @@ export const PersonalInfoSection = ({
           role="presentation"
         >
           <div
+            ref={dialogRef}
             className={formStyles.modalDialog}
             role="dialog"
             aria-modal="true"

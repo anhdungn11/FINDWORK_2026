@@ -14,7 +14,7 @@ import styles from "../styles/ProfileGuidance.module.css";
 
 export const CvCenterReferenceCard = () => {
   return (
-    <aside className={styles.cvReferenceCard} aria-labelledby="cv-reference-title">
+    <section className={styles.cvReferenceCard} aria-labelledby="cv-reference-title">
       <h4 id="cv-reference-title" className={styles.cvReferenceTitle}>
         <FileText size={16} aria-hidden="true" />
         <span>Quản lý CV ứng tuyển</span>
@@ -30,6 +30,6 @@ export const CvCenterReferenceCard = () => {
         <span>Mở CV Center</span>
         <ArrowUpRight size={14} aria-hidden="true" />
       </Link>
-    </aside>
+    </section>
   );
 };

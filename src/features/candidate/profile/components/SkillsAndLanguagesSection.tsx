@@ -5,13 +5,14 @@
  * ĐẢM BẢO RÀNG BUỘC: Linh hoạt theo ngành nghề, không áp đặt số lượng cố định.
  */
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Award, Globe, Plus, Sparkles, Trash2, X } from "lucide-react";
 import type {
   LanguageProficiency,
   SkillLevel,
 } from "../types/candidateProfile.types";
 import type { SkillsAndLanguagesSectionProps } from "../types/uiProfileProps.types";
+import { useModalAccessibility } from "../utils/useModalAccessibility";
 import formStyles from "../styles/ProfileForms.module.css";
 import sectionStyles from "../styles/ProfileSections.module.css";
 
@@ -55,6 +56,41 @@ export const SkillsAndLanguagesSection = ({
   const [certName, setCertName] = useState("");
   const [certScore, setCertScore] = useState("");
   const [langError, setLangError] = useState<string | null>(null);
+
+  // Confirm delete target
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: "skill" | "language";
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const skillDialogRef = useRef<HTMLDivElement>(null);
+  const skillInputRef = useRef<HTMLInputElement>(null);
+  const langDialogRef = useRef<HTMLDivElement>(null);
+  const langInputRef = useRef<HTMLInputElement>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const deleteCancelBtnRef = useRef<HTMLButtonElement>(null);
+
+  useModalAccessibility({
+    isOpen: isSkillModalOpen,
+    onClose: () => setIsSkillModalOpen(false),
+    containerRef: skillDialogRef,
+    initialFocusRef: skillInputRef,
+  });
+
+  useModalAccessibility({
+    isOpen: isLangModalOpen,
+    onClose: () => setIsLangModalOpen(false),
+    containerRef: langDialogRef,
+    initialFocusRef: langInputRef,
+  });
+
+  useModalAccessibility({
+    isOpen: deleteTarget !== null,
+    onClose: () => setDeleteTarget(null),
+    containerRef: deleteDialogRef,
+    initialFocusRef: deleteCancelBtnRef,
+  });
 
   const handleSkillSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -163,7 +199,7 @@ export const SkillsAndLanguagesSection = ({
                 {onDeleteSkill && (
                   <button
                     type="button"
-                    onClick={() => onDeleteSkill(s.id)}
+                    onClick={() => setDeleteTarget({ type: "skill", id: s.id, name: s.skillName })}
                     style={{
                       background: "none",
                       border: "none",
@@ -281,7 +317,7 @@ export const SkillsAndLanguagesSection = ({
                     <button
                       type="button"
                       className={`${sectionStyles.iconActionButton} ${sectionStyles.iconActionButtonDanger}`}
-                      onClick={() => onDeleteLanguage(lang.id)}
+                      onClick={() => setDeleteTarget({ type: "language", id: lang.id, name: lang.languageName })}
                       aria-label={`Xóa ngoại ngữ ${lang.languageName}`}
                     >
                       <Trash2 size={13} aria-hidden="true" />
@@ -304,6 +340,7 @@ export const SkillsAndLanguagesSection = ({
           role="presentation"
         >
           <div
+            ref={skillDialogRef}
             className={formStyles.modalDialog}
             role="dialog"
             aria-modal="true"
@@ -327,7 +364,7 @@ export const SkillsAndLanguagesSection = ({
             <form onSubmit={handleSkillSubmit} style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {skillError && (
-                  <div className={formStyles.errorSummary} role="alert" tabIndex={-1}>
+                  <div id="skill-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>
                     <span>{skillError}</span>
                   </div>
                 )}
@@ -337,13 +374,20 @@ export const SkillsAndLanguagesSection = ({
                     Tên kỹ năng
                   </label>
                   <input
+                    ref={skillInputRef}
                     id="skill-name"
                     type="text"
-                    className={formStyles.inputField}
+                    className={`${formStyles.inputField} ${skillError ? formStyles.inputFieldInvalid : ""}`}
                     placeholder="Ví dụ: React, Phân tích tài chính, SEO..."
                     value={skillName}
-                    onChange={(e) => setSkillName(e.target.value)}
+                    onChange={(e) => {
+                      setSkillName(e.target.value);
+                      if (skillError) setSkillError(null);
+                    }}
                     required
+                    aria-required="true"
+                    aria-invalid={Boolean(skillError)}
+                    aria-describedby={skillError ? "skill-error-summary" : undefined}
                   />
                 </div>
 
@@ -426,6 +470,7 @@ export const SkillsAndLanguagesSection = ({
           role="presentation"
         >
           <div
+            ref={langDialogRef}
             className={formStyles.modalDialog}
             role="dialog"
             aria-modal="true"
@@ -449,7 +494,7 @@ export const SkillsAndLanguagesSection = ({
             <form onSubmit={handleLangSubmit} style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {langError && (
-                  <div className={formStyles.errorSummary} role="alert" tabIndex={-1}>
+                  <div id="lang-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>
                     <span>{langError}</span>
                   </div>
                 )}
@@ -459,13 +504,20 @@ export const SkillsAndLanguagesSection = ({
                     Ngôn ngữ
                   </label>
                   <input
+                    ref={langInputRef}
                     id="lang-name"
                     type="text"
-                    className={formStyles.inputField}
+                    className={`${formStyles.inputField} ${langError ? formStyles.inputFieldInvalid : ""}`}
                     placeholder="Ví dụ: Tiếng Anh, Tiếng Nhật, Tiếng Trung..."
                     value={langName}
-                    onChange={(e) => setLangName(e.target.value)}
+                    onChange={(e) => {
+                      setLangName(e.target.value);
+                      if (langError) setLangError(null);
+                    }}
                     required
+                    aria-required="true"
+                    aria-invalid={Boolean(langError)}
+                    aria-describedby={langError ? "lang-error-summary" : undefined}
                   />
                 </div>
 
@@ -532,6 +584,65 @@ export const SkillsAndLanguagesSection = ({
                 </button>
               </footer>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xác Nhận Xóa Kỹ Năng / Ngoại Ngữ */}
+      {deleteTarget && (
+        <div
+          className={formStyles.modalBackdrop}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDeleteTarget(null);
+          }}
+          role="presentation"
+        >
+          <div
+            ref={deleteDialogRef}
+            className={formStyles.modalDialog}
+            style={{ maxWidth: 420 }}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-skill-lang-title"
+            tabIndex={-1}
+          >
+            <header className={formStyles.modalHeader}>
+              <h3 id="delete-skill-lang-title" className={formStyles.modalTitle}>
+                Xác nhận xóa {deleteTarget.type === "skill" ? "kỹ năng" : "ngoại ngữ"}
+              </h3>
+            </header>
+            <div className={formStyles.modalBody}>
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--color-text-secondary)" }}>
+                Bạn có chắc chắn muốn xóa {deleteTarget.type === "skill" ? "kỹ năng" : "ngoại ngữ"}{" "}
+                <strong>{deleteTarget.name}</strong> khỏi hồ sơ không?
+              </p>
+            </div>
+            <footer className={formStyles.modalFooter}>
+              <button
+                ref={deleteCancelBtnRef}
+                type="button"
+                className={formStyles.btnSecondary}
+                onClick={() => setDeleteTarget(null)}
+                disabled={isSaving}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className={formStyles.btnDanger}
+                onClick={async () => {
+                  if (deleteTarget.type === "skill" && onDeleteSkill) {
+                    await onDeleteSkill(deleteTarget.id);
+                  } else if (deleteTarget.type === "language" && onDeleteLanguage) {
+                    await onDeleteLanguage(deleteTarget.id);
+                  }
+                  setDeleteTarget(null);
+                }}
+                disabled={isSaving}
+              >
+                {isSaving ? "Đang xóa..." : "Xác nhận xóa"}
+              </button>
+            </footer>
           </div>
         </div>
       )}

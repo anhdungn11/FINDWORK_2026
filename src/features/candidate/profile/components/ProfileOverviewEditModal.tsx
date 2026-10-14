@@ -5,9 +5,10 @@
  * Trạng thái tìm việc và đoạn Bio giới thiệu.
  */
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { AlertCircle, X } from "lucide-react";
 import type { CandidateCareerStatus } from "../types/candidateProfile.types";
+import { useModalAccessibility } from "../utils/useModalAccessibility";
 import styles from "../styles/ProfileForms.module.css";
 
 interface Props {
@@ -46,19 +47,13 @@ export const ProfileOverviewEditModal = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus trap & Escape key listener
-  useEffect(() => {
-    if (!isOpen) return;
-    firstInputRef.current?.focus();
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  // Accessible focus trap, Escape key, initial focus, focus restoration, and scroll lock
+  useModalAccessibility({
+    isOpen,
+    onClose,
+    containerRef: dialogRef,
+    initialFocusRef: firstInputRef,
+  });
 
   if (!isOpen) return null;
 
@@ -111,7 +106,7 @@ export const ProfileOverviewEditModal = ({
         <form onSubmit={handleSubmit} style={{ display: "contents" }}>
           <div className={styles.modalBody}>
             {errorMsg && (
-              <div className={styles.errorSummary} role="alert" tabIndex={-1}>
+              <div id="overview-error" className={styles.errorSummary} role="alert" tabIndex={-1}>
                 <div className={styles.errorSummaryTitle}>
                   <AlertCircle size={14} aria-hidden="true" />
                   <span>Có lỗi cần khắc phục:</span>
@@ -136,6 +131,9 @@ export const ProfileOverviewEditModal = ({
                 }}
                 maxLength={160}
                 required
+                aria-required="true"
+                aria-invalid={!!errorMsg}
+                aria-describedby={errorMsg ? "overview-error" : undefined}
               />
             </div>
 

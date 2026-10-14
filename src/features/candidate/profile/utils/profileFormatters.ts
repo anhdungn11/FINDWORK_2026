@@ -7,10 +7,14 @@
 
 import type {
   CandidateCareerStatus,
+  CandidateProfilePresentationState,
   FullCandidateProfileRecord,
   Gender,
+  OnboardingDraftSummary,
 } from "../types/candidateProfile.types";
-import type { GuidanceChecklistItem } from "../types/uiProfileProps.types";
+import type {
+  GuidanceChecklistItem,
+} from "../types/uiProfileProps.types";
 
 /**
  * Trích xuất ký tự viết tắt cho Avatar (Initials)
@@ -193,4 +197,72 @@ export function buildGuidanceChecklist(profile?: FullCandidateProfileRecord | nu
       anchorId: "section-privacy",
     },
   ];
+}
+
+export interface CandidateProfilePageResolutionParams {
+  isDev: boolean;
+  previewParam: string | null;
+  demoProfile?: FullCandidateProfileRecord | null;
+  draftFixture?: OnboardingDraftSummary | null;
+}
+
+export interface CandidateProfilePageResolutionResult {
+  presentationState: CandidateProfilePresentationState;
+  activeProfile: FullCandidateProfileRecord | null;
+  activeDraft: OnboardingDraftSummary | null;
+  showDevBanner: boolean;
+}
+
+/**
+ * P0 PRODUCTION SECURITY RESOLVER:
+ * Ensures mock fixtures are strictly barred from production builds.
+ * In production (isDev=false), all ?preview= queries are completely ignored
+ * and the presentation state safely defaults to 'eligibility_unknown' with null profile and null draft.
+ */
+export function resolveCandidateProfilePageState({
+  isDev,
+  previewParam,
+  demoProfile = null,
+  draftFixture = null,
+}: CandidateProfilePageResolutionParams): CandidateProfilePageResolutionResult {
+  if (!isDev) {
+    return {
+      presentationState: "eligibility_unknown",
+      activeProfile: null,
+      activeDraft: null,
+      showDevBanner: false,
+    };
+  }
+
+  let presentationState: CandidateProfilePresentationState = "eligibility_unknown";
+  let activeProfile: FullCandidateProfileRecord | null = null;
+  let activeDraft: OnboardingDraftSummary | null = null;
+
+  if (previewParam === "full") {
+    presentationState = "existing_profile";
+    activeProfile = demoProfile;
+  } else if (previewParam === "fresher") {
+    presentationState = "existing_profile";
+    activeProfile = demoProfile;
+  } else if (previewParam === "draft") {
+    presentationState = "not_created_with_draft";
+    activeDraft = draftFixture;
+  } else if (previewParam === "loading") {
+    presentationState = "loading";
+  } else if (previewParam === "forbidden") {
+    presentationState = "forbidden";
+  } else if (previewParam === "nodraft") {
+    presentationState = "not_created_no_draft";
+  } else if (previewParam === "error") {
+    presentationState = "network_error";
+  } else {
+    presentationState = "eligibility_unknown";
+  }
+
+  return {
+    presentationState,
+    activeProfile,
+    activeDraft,
+    showDevBanner: true,
+  };
 }

@@ -78,9 +78,12 @@
 }
 
 /* --------------------------------------------------------------------------
-   Breakpoints: 1024px (Laptop)
+   Breakpoints: 1200px (Desktop accounting for 260px CandidateLayout Sidebar)
+   At 1024px viewport with 260px sidebar, content width is only 716px.
+   Two-column grid activates at 1200px (content width ~892px+) to prevent
+   main column from being crushed to mobile width.
    -------------------------------------------------------------------------- */
-@media (min-width: 1024px) {
+@media (min-width: 1200px) {
   .workspaceGrid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 300px;

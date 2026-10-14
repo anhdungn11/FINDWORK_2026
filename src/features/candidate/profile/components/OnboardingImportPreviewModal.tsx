@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, CheckCircle2, X } from "lucide-react";
 import type { OnboardingImportPreviewModalProps } from "../types/uiProfileProps.types";
+import { useModalAccessibility } from "../utils/useModalAccessibility";
 import formStyles from "../styles/ProfileForms.module.css";
 
 export const OnboardingImportPreviewModal = ({
@@ -30,11 +31,18 @@ export const OnboardingImportPreviewModal = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
 
+  // Accessible focus trap, Escape key, initial focus, focus restoration, and scroll lock
+  useModalAccessibility({
+    isOpen,
+    onClose,
+    containerRef: dialogRef,
+    initialFocusRef: confirmBtnRef,
+  });
+
   useEffect(() => {
     if (isOpen) {
       setConfirmPrivacy(true);
       setClientError(null);
-      confirmBtnRef.current?.focus();
     }
   }, [isOpen]);
 
@@ -86,7 +94,7 @@ export const OnboardingImportPreviewModal = ({
         <div className={formStyles.modalBody}>
           {/* Lỗi server hoặc client */}
           {(importError || clientError) && (
-            <div className={formStyles.errorSummary} role="alert" tabIndex={-1}>
+            <div id="import-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>
               <div className={formStyles.errorSummaryTitle}>
                 <AlertCircle size={15} aria-hidden="true" />
                 <span>Không thể hoàn tất khởi tạo hồ sơ:</span>
@@ -201,7 +209,12 @@ export const OnboardingImportPreviewModal = ({
                 type="checkbox"
                 className={formStyles.checkboxInput}
                 checked={confirmPrivacy}
-                onChange={(e) => setConfirmPrivacy(e.target.checked)}
+                onChange={(e) => {
+                  setConfirmPrivacy(e.target.checked);
+                  if (clientError) setClientError(null);
+                }}
+                aria-invalid={!confirmPrivacy && Boolean(clientError)}
+                aria-describedby={clientError ? "import-error-summary" : undefined}
               />
               <span style={{ fontWeight: 600 }}>
                 Áp dụng thiết lập quyền riêng tư mặc định (Khuyên dùng)

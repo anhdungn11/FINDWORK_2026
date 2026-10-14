@@ -156,7 +156,7 @@ export const CandidateProfileView = ({
 
       <div className={layoutStyles.workspaceGrid}>
         {/* CỘT CHÍNH (70% trên Desktop) */}
-        <main className={layoutStyles.mainColumn}>
+        <div className={layoutStyles.mainColumn}>
           {/* Section 1: Overview */}
           <ProfileOverviewCard
             fullName={profile.fullName}
@@ -229,7 +229,7 @@ export const CandidateProfileView = ({
             isSaving={isSaving}
             onSavePrivacy={onSavePrivacy}
           />
-        </main>
+        </div>
 
         {/* CỘT PHỤ RIGHT RAIL (30% trên Desktop) */}
         <aside className={layoutStyles.rightRail}>

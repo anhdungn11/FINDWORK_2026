@@ -7,6 +7,7 @@
 export * from "./types/candidateProfile.types";
 export * from "./types/uiProfileProps.types";
 export * from "./utils/profileFormatters";
+export { useModalAccessibility } from "./utils/useModalAccessibility";
 
 export { CandidateProfileView } from "./components/CandidateProfileView";
 export { ProfileOverviewCard } from "./components/ProfileOverviewCard";

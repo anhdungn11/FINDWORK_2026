@@ -31,7 +31,7 @@ export const ProfileGuidanceChecklist = ({
   };
 
   return (
-    <aside
+    <section
       className={styles.checklistCard}
       aria-labelledby="guidance-checklist-title"
     >
@@ -81,6 +81,6 @@ export const ProfileGuidanceChecklist = ({
           </li>
         ))}
       </ul>
-    </aside>
+    </section>
   );
 };

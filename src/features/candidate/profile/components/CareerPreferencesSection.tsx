@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Compass, DollarSign, MapPin, Pencil, X } from "lucide-react";
+import { AlertCircle, Compass, DollarSign, MapPin, Pencil, X } from "lucide-react";
 import type {
   CareerLevel,
   LocationPreferenceMode,
@@ -14,6 +14,7 @@ import type {
 } from "../types/candidateProfile.types";
 import type { CareerPreferencesSectionProps } from "../types/uiProfileProps.types";
 import { formatCurrencyVND } from "../utils/profileFormatters";
+import { useModalAccessibility } from "../utils/useModalAccessibility";
 import formStyles from "../styles/ProfileForms.module.css";
 import sectionStyles from "../styles/ProfileSections.module.css";
 
@@ -42,24 +43,53 @@ export const CareerPreferencesSection = ({
   const [salaryMax, setSalaryMax] = useState("");
   const [desiredLevel, setDesiredLevel] = useState<CareerLevel | "">("");
   const [willingToRelocate, setWillingToRelocate] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const prefDialogRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
+  useModalAccessibility({
+    isOpen: isEditOpen,
+    onClose: () => setIsEditOpen(false),
+    containerRef: prefDialogRef,
+    initialFocusRef: firstInputRef,
+  });
+
   useEffect(() => {
-    if (isEditOpen && careerPreference) {
-      setDesiredPositions(careerPreference.desiredPositions?.join(", ") || "");
-      setLocationMode(careerPreference.locationMode || "SELECTED");
-      setSalaryType(careerPreference.salaryType || "RANGE");
-      setSalaryMin(careerPreference.salaryMin ? String(careerPreference.salaryMin) : "");
-      setSalaryMax(careerPreference.salaryMax ? String(careerPreference.salaryMax) : "");
-      setDesiredLevel(careerPreference.desiredCareerLevel || "");
-      setWillingToRelocate(careerPreference.willingToRelocate || false);
-      firstInputRef.current?.focus();
+    if (isEditOpen) {
+      if (careerPreference) {
+        setDesiredPositions(careerPreference.desiredPositions?.join(", ") || "");
+        setLocationMode(careerPreference.locationMode || "SELECTED");
+        setSalaryType(careerPreference.salaryType || "RANGE");
+        setSalaryMin(careerPreference.salaryMin ? String(careerPreference.salaryMin) : "");
+        setSalaryMax(careerPreference.salaryMax ? String(careerPreference.salaryMax) : "");
+        setDesiredLevel(careerPreference.desiredCareerLevel || "");
+        setWillingToRelocate(careerPreference.willingToRelocate || false);
+      } else {
+        setDesiredPositions("");
+        setLocationMode("SELECTED");
+        setSalaryType("RANGE");
+        setSalaryMin("");
+        setSalaryMax("");
+        setDesiredLevel("");
+        setWillingToRelocate(false);
+      }
+      setErrorMsg(null);
     }
   }, [isEditOpen, careerPreference]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (salaryType === "RANGE" && salaryMin && salaryMax) {
+      const min = parseFloat(salaryMin);
+      const max = parseFloat(salaryMax);
+      if (!isNaN(min) && !isNaN(max) && min > max) {
+        setErrorMsg("Mức lương tối thiểu không được lớn hơn mức lương tối đa.");
+        return;
+      }
+    }
+    setErrorMsg(null);
+
     if (onSaveCareerPreference) {
       const positions = desiredPositions
         .split(",")
@@ -215,6 +245,7 @@ export const CareerPreferencesSection = ({
           role="presentation"
         >
           <div
+            ref={prefDialogRef}
             className={formStyles.modalDialog}
             role="dialog"
             aria-modal="true"
@@ -237,6 +268,16 @@ export const CareerPreferencesSection = ({
 
             <form onSubmit={handleSubmit} style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
+                {errorMsg && (
+                  <div id="pref-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>
+                    <div className={formStyles.errorSummaryTitle}>
+                      <AlertCircle size={14} aria-hidden="true" />
+                      <span>Thông tin chưa hợp lệ:</span>
+                    </div>
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
                 <div className={formStyles.formGroup}>
                   <label htmlFor="pref-positions" className={formStyles.formLabel}>
                     Vị trí mong muốn (phân cách bằng dấu phẩy)
@@ -278,10 +319,15 @@ export const CareerPreferencesSection = ({
                         id="pref-salary-min"
                         type="number"
                         step="1000000"
-                        className={formStyles.inputField}
+                        className={`${formStyles.inputField} ${errorMsg ? formStyles.inputFieldInvalid : ""}`}
                         placeholder="Ví dụ: 15000000"
                         value={salaryMin}
-                        onChange={(e) => setSalaryMin(e.target.value)}
+                        onChange={(e) => {
+                          setSalaryMin(e.target.value);
+                          if (errorMsg) setErrorMsg(null);
+                        }}
+                        aria-invalid={Boolean(errorMsg)}
+                        aria-describedby={errorMsg ? "pref-error-summary" : undefined}
                       />
                     </div>
                     <div className={formStyles.formGroup}>
@@ -292,10 +338,15 @@ export const CareerPreferencesSection = ({
                         id="pref-salary-max"
                         type="number"
                         step="1000000"
-                        className={formStyles.inputField}
+                        className={`${formStyles.inputField} ${errorMsg ? formStyles.inputFieldInvalid : ""}`}
                         placeholder="Ví dụ: 25000000"
                         value={salaryMax}
-                        onChange={(e) => setSalaryMax(e.target.value)}
+                        onChange={(e) => {
+                          setSalaryMax(e.target.value);
+                          if (errorMsg) setErrorMsg(null);
+                        }}
+                        aria-invalid={Boolean(errorMsg)}
+                        aria-describedby={errorMsg ? "pref-error-summary" : undefined}
                       />
                     </div>
                   </div>

@@ -6,7 +6,7 @@
  * (thân thiện với sinh viên mới ra trường và người chuyển ngành).
  */
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { AlertCircle, Briefcase, Pencil, Plus, Trash2, X } from "lucide-react";
 import type {
   CandidateExperienceRecord,
@@ -15,6 +15,7 @@ import type {
 } from "../types/candidateProfile.types";
 import type { ExperienceSectionProps } from "../types/uiProfileProps.types";
 import { formatMonthYear } from "../utils/profileFormatters";
+import { useModalAccessibility } from "../utils/useModalAccessibility";
 import formStyles from "../styles/ProfileForms.module.css";
 import sectionStyles from "../styles/ProfileSections.module.css";
 
@@ -45,7 +46,26 @@ export const ExperienceSection = ({
   const [skillTags, setSkillTags] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const formDialogRef = useRef<HTMLDivElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const deleteCancelBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Focus trap, Escape, initial focus, focus restoration, and scroll lock for add/edit form modal
+  useModalAccessibility({
+    isOpen: modalMode !== null,
+    onClose: () => setModalMode(null),
+    containerRef: formDialogRef,
+    initialFocusRef: firstInputRef,
+  });
+
+  // Focus trap, Escape, initial focus, focus restoration, and scroll lock for delete confirm modal
+  useModalAccessibility({
+    isOpen: deleteTargetId !== null,
+    onClose: () => setDeleteTargetId(null),
+    containerRef: deleteDialogRef,
+    initialFocusRef: deleteCancelBtnRef,
+  });
 
   const openAddModal = () => {
     setModalMode("add");
@@ -84,12 +104,6 @@ export const ExperienceSection = ({
     setSkillTags(item.skills.map((s) => s.skillName).join(", "));
     setErrorMsg(null);
   };
-
-  useEffect(() => {
-    if (modalMode) {
-      firstInputRef.current?.focus();
-    }
-  }, [modalMode]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -260,6 +274,7 @@ export const ExperienceSection = ({
           role="presentation"
         >
           <div
+            ref={formDialogRef}
             className={formStyles.modalDialog}
             role="dialog"
             aria-modal="true"
@@ -283,7 +298,7 @@ export const ExperienceSection = ({
             <form onSubmit={handleSubmit} style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {errorMsg && (
-                  <div className={formStyles.errorSummary} role="alert" tabIndex={-1}>
+                  <div id="experience-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>
                     <div className={formStyles.errorSummaryTitle}>
                       <AlertCircle size={14} aria-hidden="true" />
                       <span>Thông tin chưa hợp lệ:</span>
@@ -300,11 +315,17 @@ export const ExperienceSection = ({
                     ref={firstInputRef}
                     id="exp-company"
                     type="text"
-                    className={formStyles.inputField}
+                    className={`${formStyles.inputField} ${errorMsg && !companyName.trim() ? formStyles.inputFieldInvalid : ""}`}
                     placeholder="Ví dụ: Công ty Cổ phần TechVina"
                     value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
+                    onChange={(e) => {
+                      setCompanyName(e.target.value);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
                     required
+                    aria-required="true"
+                    aria-invalid={Boolean(errorMsg && !companyName.trim())}
+                    aria-describedby={errorMsg ? "experience-error-summary" : undefined}
                   />
                 </div>
 
@@ -315,11 +336,17 @@ export const ExperienceSection = ({
                   <input
                     id="exp-position"
                     type="text"
-                    className={formStyles.inputField}
+                    className={`${formStyles.inputField} ${errorMsg && !position.trim() ? formStyles.inputFieldInvalid : ""}`}
                     placeholder="Ví dụ: Frontend Developer"
                     value={position}
-                    onChange={(e) => setPosition(e.target.value)}
+                    onChange={(e) => {
+                      setPosition(e.target.value);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
                     required
+                    aria-required="true"
+                    aria-invalid={Boolean(errorMsg && !position.trim())}
+                    aria-describedby={errorMsg ? "experience-error-summary" : undefined}
                   />
                 </div>
 
@@ -493,9 +520,11 @@ export const ExperienceSection = ({
           role="presentation"
         >
           <div
+            ref={deleteDialogRef}
             className={formStyles.modalDialog}
             style={{ maxWidth: 420 }}
             role="alertdialog"
+            aria-modal="true"
             aria-labelledby="delete-exp-title"
             tabIndex={-1}
           >
@@ -511,6 +540,7 @@ export const ExperienceSection = ({
             </div>
             <footer className={formStyles.modalFooter}>
               <button
+                ref={deleteCancelBtnRef}
                 type="button"
                 className={formStyles.btnSecondary}
                 onClick={() => setDeleteTargetId(null)}
