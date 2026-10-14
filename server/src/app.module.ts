@@ -14,6 +14,7 @@ import { AuthorizationModule } from "./modules/authorization/authorization.modul
 import { CandidateModule } from "./modules/candidate/candidate.module";
 import { CompanyModule } from "./modules/company/company.module";
 import { HealthModule } from "./modules/health/health.module";
+import { ReferenceModule } from "./modules/reference/reference.module";
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { HealthModule } from "./modules/health/health.module";
 
     PrismaModule,
     HealthModule,
+    ReferenceModule,
     AuthModule,
     AuthorizationModule,
     CandidateModule,

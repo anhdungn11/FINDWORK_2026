@@ -20,7 +20,10 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "db:seed:reference": "tsx prisma/seed-reference-foundation.ts",
+    "test:unit": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.unit.config.cjs",
+    "typecheck:seed:reference": "tsc --noEmit -p tsconfig.seed.json"
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || ^24.0.0"
