@@ -46,6 +46,13 @@
   text-decoration: none;
 }
 
+.sessionStatus {
+  min-width: 130px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
 @media (max-width: 1024px) {
   .actions {
     display: none;

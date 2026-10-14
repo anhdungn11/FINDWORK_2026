@@ -1,0 +1,123 @@
+.account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspaceLink {
+  padding: 9px 10px;
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.workspaceLink:hover { text-decoration: underline; }
+
+.menuAnchor { position: relative; }
+
+.accountButton {
+  max-width: 180px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px 4px 4px;
+  color: var(--color-text-primary);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.accountButton:hover { border-color: var(--color-primary); }
+
+.accountButton:focus-visible,
+.workspaceLink:focus-visible,
+.menu a:focus-visible,
+.logoutButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--color-primary);
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.accountName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.menu {
+  min-width: 210px;
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 20px 45px rgb(15 23 42 / 0.13);
+}
+
+.menu a,
+.logoutButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  color: var(--color-text-primary);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.menu a:hover,
+.logoutButton:hover { background: #f7f9ff; }
+.menu small { color: var(--color-text-muted); font-size: 10px; white-space: nowrap; }
+.logoutButton { color: #b42318; }
+
+.mobile {
+  display: grid;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mobile .workspaceLink,
+.mobile .accountButton { width: 100%; min-height: 44px; }
+.mobile .accountButton { max-width: none; }
+.mobile .menu { position: static; margin-top: 8px; box-shadow: none; }

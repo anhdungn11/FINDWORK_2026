@@ -2,26 +2,41 @@ import {
   Link,
   NavLink,
 } from "react-router-dom";
+import type { AuthUser } from "@/store/authStore";
 
 import type {
   HeaderLanguage,
 } from "../types/header.types";
 
 import styles from "../styles/HeaderMobile.module.css";
+import AccountDropdown from "./AccountDropdown";
+import type { HeaderAuthView } from "../hooks/headerAuth";
 
 interface MobilePanelProps {
   isOpen: boolean;
+  isAccountOpen: boolean;
+  authView: HeaderAuthView;
+  user: AuthUser | null;
   language: HeaderLanguage;
   onLanguageChange:
     (value: HeaderLanguage) => void;
   onClose: () => void;
+  onAccountToggle: () => void;
+  onAccountClose: () => void;
+  onLogout: () => void;
 }
 
 const MobilePanel = ({
   isOpen,
+  isAccountOpen,
+  authView,
+  user,
   language,
   onLanguageChange,
   onClose,
+  onAccountToggle,
+  onAccountClose,
+  onLogout,
 }: MobilePanelProps) => {
   if (!isOpen) {
     return null;
@@ -130,22 +145,31 @@ const MobilePanel = ({
           </Link>
         </div>
 
-        <div className={styles.mobileAuth}>
-          <Link
-            to="/login"
-            className={styles.mobileLogin}
-            onClick={onClose}
-          >
-            Đăng nhập
-          </Link>
-
-          <Link
-            to="/register"
-            className={styles.mobileRegister}
-            onClick={onClose}
-          >
-            Đăng ký
-          </Link>
+        <div className={`${styles.mobileAuth} ${authView === "anonymous" ? "" : styles.mobileAuthSingle}`}>
+          {authView === "authenticated" && user ? (
+            <AccountDropdown
+              user={user}
+              variant="mobile"
+              isOpen={isAccountOpen}
+              onToggle={onAccountToggle}
+              onClose={onAccountClose}
+              onNavigate={onClose}
+              onLogout={onLogout}
+            />
+          ) : authView === "anonymous" ? (
+            <>
+              <Link to="/login" className={styles.mobileLogin} onClick={onClose}>
+                Đăng nhập
+              </Link>
+              <Link to="/register" className={styles.mobileRegister} onClick={onClose}>
+                Đăng ký
+              </Link>
+            </>
+          ) : (
+            <span className={styles.mobileSessionStatus} role="status">
+              {authView === "loggingOut" ? "Đang đăng xuất..." : "Đang kiểm tra phiên..."}
+            </span>
+          )}
         </div>
       </div>
     </div>
