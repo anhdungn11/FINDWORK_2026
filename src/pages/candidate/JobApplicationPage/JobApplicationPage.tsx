@@ -8,21 +8,17 @@ import ApplicationStepper from "@/features/applications/components/ApplicationSt
 import ResumeSelectionStep from "@/features/applications/components/ResumeSelectionStep";
 import { useApplicationFlow } from "@/features/applications/hooks/useApplicationFlow";
 import ApplicationDetailsStep from "@/features/applications/components/ApplicationDetailsStep/ApplicationDetailsStep";
+import { parseJobId } from "@/app/router/jobId";
 
 import styles from "./JobApplicationPage.module.css";
 
 const JobApplicationPage = () => {
     const { id } = useParams();
 
-    const jobId = Number(id);
-
-    const application = useApplicationFlow({
-        jobId,
-    });
+    const parsedJobId = parseJobId(id);
 
     if (
-        !Number.isInteger(jobId) ||
-        jobId <= 0
+        parsedJobId.kind === "invalid"
     ) {
         return (
             <section className={styles.statePage}>
@@ -36,6 +32,24 @@ const JobApplicationPage = () => {
             </section>
         );
     }
+
+    if (parsedJobId.kind === "backend") {
+        return (
+            <section className={styles.statePage}>
+                <div>
+                    <h1>Chưa hỗ trợ ứng tuyển việc làm này</h1>
+                    <p>Hệ thống chưa kết nối chức năng ứng tuyển với tin tuyển dụng thật. Chưa có đơn ứng tuyển nào được gửi.</p>
+                    <Link to={`/jobs/${parsedJobId.id}`}>Quay lại việc làm</Link>
+                </div>
+            </section>
+        );
+    }
+
+    return <MockJobApplicationPage key={parsedJobId.id} jobId={parsedJobId.id} />;
+};
+
+const MockJobApplicationPage = ({ jobId }: { jobId: number }) => {
+    const application = useApplicationFlow({ jobId });
 
     if (application.isLoading) {
         return (
@@ -100,6 +114,7 @@ const JobApplicationPage = () => {
                         {" • "}
                         {application.job.location}
                     </p>
+                    <p role="status">Đây là bản xem trước. Chức năng gửi đơn ứng tuyển chưa được kết nối; chưa có đơn nào được gửi.</p>
                 </header>
 
                 <ApplicationStepper
@@ -139,6 +154,13 @@ const JobApplicationPage = () => {
     }
   />
 )}
+                        {application.currentStep === "questions" && (
+                            <div role="status">
+                                <h2>Chưa hỗ trợ gửi đơn ứng tuyển</h2>
+                                <p>Hệ thống chưa có API ứng tuyển. Thông tin bạn vừa nhập chưa được gửi.</p>
+                                <button type="button" onClick={() => application.goToStep("details")}>Quay lại</button>
+                            </div>
+                        )}
 
                     </main>
 

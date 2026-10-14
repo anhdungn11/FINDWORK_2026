@@ -26,7 +26,7 @@ const CandidateRoute = () => {
     return <p role="status">{status === "loggingOut" ? "Đang đăng xuất..." : "Đang kiểm tra phiên đăng nhập..."}</p>;
   }
   if (routeState === "denied") {
-    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
   }
   return <Outlet />;
 };

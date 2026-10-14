@@ -1,7 +1,9 @@
 import {
+  Link,
   useParams,
 } from "react-router-dom";
 
+import { parseJobId } from "@/app/router/jobId";
 import {
   jobs,
 } from "@/data/mock/jobs.mock";
@@ -17,11 +19,23 @@ import styles from "./styles/JobDetailLayout.module.css";
 
 const JobDetailPage = () => {
   const { id } = useParams();
+  const parsedJobId = parseJobId(id);
 
-  const job = jobs.find(
-    (item) =>
-      item.id === Number(id),
-  );
+  if (parsedJobId.kind === "backend") {
+    return (
+      <main className={styles.page}>
+        <div className="container">
+          <h1>Chưa hỗ trợ hiển thị tin tuyển dụng này</h1>
+          <p>Tin tuyển dụng từ hệ thống chính chưa được kết nối với trang này.</p>
+          <Link to="/jobs">Quay lại danh sách việc làm</Link>
+        </div>
+      </main>
+    );
+  }
+
+  const job = parsedJobId.kind === "mock"
+    ? jobs.find((item) => item.id === parsedJobId.id)
+    : null;
 
   if (!job) {
     return <JobDetailNotFound />;

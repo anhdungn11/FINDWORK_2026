@@ -55,10 +55,6 @@ const AppRouter = () => {
             element={<JobsPage />}
           />
 
-          <Route
-            path="/jobs/:id/apply"
-            element={<JobApplicationPage />}
-          />
 
           <Route
             path="jobs/:id"
@@ -75,25 +71,13 @@ const AppRouter = () => {
             element={<CompanyDetailPage />}
           />
 
-          <Route
-            path="cv"
-            element={<CvCenterPage />}
-          />
-
-          <Route
-            path="cv/create"
-            element={<ResumeBuilderPage />}
-          />
-
-          <Route
-            path="cv/:resumeId/edit"
-            element={<ResumeBuilderPage />}
-          />
-
-          <Route
-            path="cv/:resumeId/preview"
-            element={<ResumePreviewPage />}
-          />
+          <Route element={<CandidateRoute />}>
+            <Route path="jobs/:id/apply" element={<JobApplicationPage />} />
+            <Route path="cv" element={<CvCenterPage />} />
+            <Route path="cv/create" element={<ResumeBuilderPage />} />
+            <Route path="cv/:resumeId/edit" element={<ResumeBuilderPage />} />
+            <Route path="cv/:resumeId/preview" element={<ResumePreviewPage />} />
+          </Route>
 
           <Route
             path="career"
