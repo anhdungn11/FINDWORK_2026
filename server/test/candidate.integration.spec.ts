@@ -13,9 +13,9 @@ import { ApiExceptionFilter } from "../src/common/exceptions/api-exception.filte
 import { PrismaService } from "../src/infrastructure/prisma/prisma.service";
 import { PasswordService } from "../src/modules/auth/services/password.service";
 import { TokenService } from "../src/modules/auth/services/token.service";
+import { assertSafeIntegrationDatabase } from "./integration-safety";
 
 const API = "/api/v1/candidate";
-const EMAIL_PREFIX = "phase4.1.candidate.";
 const TEST_PASSWORD = "CandidateIntegration123!";
 
 describe("Candidate integration", () => {
@@ -24,6 +24,8 @@ describe("Candidate integration", () => {
   let passwordService: PasswordService;
   let tokenService: TokenService;
   let passwordHash: string;
+  let fixturePrefix: string;
+  const ownedUserIds = new Set<string>();
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -32,15 +34,6 @@ describe("Candidate integration", () => {
 
     app = moduleRef.createNestApplication();
     const configService = app.get(ConfigService);
-    const databaseUrl = configService.getOrThrow<string>("DATABASE_URL");
-    const databaseName = new URL(databaseUrl).pathname.replace(/^\//, "");
-
-    if (databaseName !== "findwork_test") {
-      throw new Error(
-        `Refusing destructive integration tests against ${databaseName}`,
-      );
-    }
-
     app.use(cookieParser());
     app.setGlobalPrefix(configService.getOrThrow<string>("API_PREFIX"));
     app.useGlobalPipes(
@@ -54,6 +47,7 @@ describe("Candidate integration", () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    await assertSafeIntegrationDatabase(prisma, configService);
     passwordService = app.get(PasswordService);
     tokenService = app.get(TokenService);
     passwordHash = await passwordService.hash(TEST_PASSWORD);
@@ -61,14 +55,15 @@ describe("Candidate integration", () => {
     await assertCandidateAuthorizationSeed();
   });
 
-  beforeEach(async () => {
+  beforeEach(() => {
+    fixturePrefix = `phase4.1.candidate.${randomUUID()}.`;
+  });
+
+  afterEach(async () => {
     await cleanupTestUsers();
   });
 
-  afterAll(async () => {
-    await cleanupTestUsers();
-    await app.close();
-  });
+  afterAll(async () => app?.close());
 
   async function assertCandidateAuthorizationSeed(): Promise<void> {
     const role = await prisma.role.findUnique({
@@ -111,15 +106,12 @@ describe("Candidate integration", () => {
   }
 
   async function cleanupTestUsers(): Promise<void> {
-    const users = await prisma.user.findMany({
-      where: {
-        emailNormalized: { startsWith: EMAIL_PREFIX },
-      },
-      select: { id: true },
-    });
-    const userIds = users.map((user) => user.id);
+    const userIds = [...ownedUserIds];
     if (userIds.length === 0) return;
 
+    await prisma.candidateOnboardingDraft.deleteMany({
+      where: { userId: { in: userIds } },
+    });
     await prisma.candidateProfile.deleteMany({
       where: { userId: { in: userIds } },
     });
@@ -135,11 +127,12 @@ describe("Candidate integration", () => {
     await prisma.user.deleteMany({
       where: { id: { in: userIds } },
     });
+    ownedUserIds.clear();
   }
 
   async function seedAuthenticatedUser(label: string) {
     const normalizedLabel = `${label}.${randomUUID()}`;
-    const email = `${EMAIL_PREFIX}${normalizedLabel}@findwork.local`;
+    const email = `${fixturePrefix}${normalizedLabel}@findwork.local`;
     const user = await prisma.user.create({
       data: {
         email,
@@ -148,6 +141,7 @@ describe("Candidate integration", () => {
         status: "ACTIVE",
       },
     });
+    ownedUserIds.add(user.id);
 
     const sessionId = randomUUID();
     await prisma.authSession.create({
@@ -173,6 +167,107 @@ describe("Candidate integration", () => {
         countryCode: "vn",
       });
   }
+
+  function bootstrap(accessToken: string) {
+    return request(app.getHttpServer())
+      .get(`${API}/bootstrap`)
+      .set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  it("GET bootstrap reports a new account without creating Profile, Draft, or role assignment", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("bootstrap-new");
+    const before = await Promise.all([
+      prisma.candidateProfile.count({ where: { userId: user.id } }),
+      prisma.candidateOnboardingDraft.count({ where: { userId: user.id } }),
+      prisma.systemUserRole.count({ where: { userId: user.id } }),
+    ]);
+
+    const first = await bootstrap(accessToken).expect(200);
+    const second = await bootstrap(accessToken).expect(200);
+    expect(first.body).toEqual({
+      profile: { state: "not_created", canCreateProfile: true, canViewProfile: false },
+      draft: { state: "missing" },
+    });
+    expect(second.body).toEqual(first.body);
+    expect(await Promise.all([
+      prisma.candidateProfile.count({ where: { userId: user.id } }),
+      prisma.candidateOnboardingDraft.count({ where: { userId: user.id } }),
+      prisma.systemUserRole.count({ where: { userId: user.id } }),
+    ])).toEqual(before);
+  });
+
+  it("GET bootstrap reports an existing Profile with Candidate view authorization", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("bootstrap-profile");
+    await createProfile(accessToken).expect(201);
+    const response = await bootstrap(accessToken).expect(200);
+    expect(response.body).toEqual({
+      profile: { state: "exists", canCreateProfile: false, canViewProfile: true },
+      draft: { state: "missing" },
+    });
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(1);
+  });
+
+  it("GET bootstrap keeps Profile and Draft independent", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("bootstrap-draft");
+    await prisma.candidateOnboardingDraft.create({
+      data: { userId: user.id, content: {}, stepIndex: 2 },
+    });
+    expect((await bootstrap(accessToken).expect(200)).body).toEqual({
+      profile: { state: "not_created", canCreateProfile: true, canViewProfile: false },
+      draft: { state: "exists", version: 1 },
+    });
+
+    await createProfile(accessToken).expect(201);
+    expect((await bootstrap(accessToken).expect(200)).body).toEqual({
+      profile: { state: "exists", canCreateProfile: false, canViewProfile: true },
+      draft: { state: "exists", version: 1 },
+    });
+  });
+
+  it("GET bootstrap does not promise view access for a Profile without a grant", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("bootstrap-no-view");
+    await prisma.candidateProfile.create({ data: { userId: user.id, fullName: "Fixture Candidate" } });
+    expect((await bootstrap(accessToken).expect(200)).body).toEqual({
+      profile: { state: "exists", canCreateProfile: false, canViewProfile: false },
+      draft: { state: "missing" },
+    });
+  });
+
+  it("GET bootstrap rejects invalid tokens and expired fixture sessions", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("bootstrap-expired");
+    await request(app.getHttpServer()).get(`${API}/bootstrap`)
+      .set("Authorization", "Bearer invalid").expect(401);
+    await prisma.authSession.updateMany({
+      where: { userId: user.id }, data: { expiresAt: new Date(0) },
+    });
+    await bootstrap(accessToken).expect(401);
+  });
+
+  it("GET bootstrap never exposes another account's Profile or Draft", async () => {
+    const first = await seedAuthenticatedUser("bootstrap-owner");
+    const second = await seedAuthenticatedUser("bootstrap-other");
+    await createProfile(first.accessToken).expect(201);
+    await prisma.candidateOnboardingDraft.create({
+      data: { userId: first.user.id, content: { personal: { fullName: "Private Fixture" } }, stepIndex: 1 },
+    });
+
+    const other = await request(app.getHttpServer())
+      .get(`${API}/bootstrap?userId=${first.user.id}`)
+      .set("Authorization", `Bearer ${second.accessToken}`).expect(200);
+    expect(other.body).toEqual({
+      profile: { state: "not_created", canCreateProfile: true, canViewProfile: false },
+      draft: { state: "missing" },
+    });
+    expect(JSON.stringify(other.body)).not.toContain("Private Fixture");
+    expect((await bootstrap(first.accessToken).expect(200)).body).toEqual({
+      profile: { state: "exists", canCreateProfile: false, canViewProfile: true },
+      draft: { state: "exists", version: 1 },
+    });
+  });
+
+  // A real-DB test cannot hide or inactivate the shared CANDIDATE seed row safely.
+  it.skip("BLOCKED: GET bootstrap when the shared CANDIDATE role is inactive", () => {});
+  it.skip("BLOCKED: GET bootstrap when the shared CANDIDATE role is missing", () => {});
 
   it("requires authentication to start candidate context", async () => {
     await request(app.getHttpServer())

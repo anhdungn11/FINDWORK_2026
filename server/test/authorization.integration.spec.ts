@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
+import { randomUUID } from "node:crypto";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/infrastructure/prisma/prisma.service";
 import { AuthorizationRepository } from "../src/modules/authorization/authorization.repository";
@@ -17,10 +18,12 @@ import {
   PermissionGuard,
 } from "../src/modules/authorization/guards/permission.guard";
 import { PermissionResolverService } from "../src/modules/authorization/services/permission-resolver.service";
+import { assertSafeIntegrationDatabase } from "./integration-safety";
 
-const TEST_PERMISSION_CODE = "phase3.job.view";
-const TEST_USER_DOMAIN = "@authorization.test";
-const TEST_ROLE_PREFIX = "PHASE3_";
+const RUN_ID = randomUUID().replace(/-/g, "");
+const TEST_PERMISSION_CODE = `phase3.${RUN_ID}.job.view`;
+const TEST_USER_DOMAIN = `@${RUN_ID}.authorization.test`;
+const TEST_ROLE_PREFIX = `PHASE3_${RUN_ID}_`;
 
 class AuthorizationTestController {
   @RequirePermissions(TEST_PERMISSION_CODE)
@@ -46,6 +49,9 @@ describe("Authorization integration", () => {
   let prisma: PrismaService;
   let authorizationService: AuthorizationService;
   let permissionGuard: PermissionGuard;
+  const ownedUserIds = new Set<string>();
+  const ownedRoleIds = new Set<string>();
+  const ownedPermissionIds = new Set<string>();
 
   beforeAll(async () => {
     const moduleRef =
@@ -58,91 +64,30 @@ describe("Authorization integration", () => {
     const configService =
       app.get(ConfigService);
 
-    const databaseUrl =
-      configService.getOrThrow<string>(
-        "DATABASE_URL",
-      );
-
-    const databaseName =
-      new URL(databaseUrl)
-        .pathname
-        .replace(/^\//, "");
-
-    if (databaseName !== "findwork_test") {
-      throw new Error(
-        `Refusing destructive authorization tests against ${databaseName}`,
-      );
-    }
-
     await app.init();
 
     prisma = app.get(PrismaService);
+    await assertSafeIntegrationDatabase(prisma, configService);
     authorizationService =
       app.get(AuthorizationService);
     permissionGuard =
       app.get(PermissionGuard);
   });
 
-  beforeEach(async () => {
+  afterEach(async () => {
     await cleanupTestData();
   });
 
-  afterAll(async () => {
-    await cleanupTestData();
-    await app.close();
-  });
+  afterAll(async () => app?.close());
 
   async function cleanupTestData(): Promise<void> {
     if (!prisma) {
       return;
     }
 
-    const users = await prisma.user.findMany({
-      where: {
-        emailNormalized: {
-          endsWith: TEST_USER_DOMAIN,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    const roles = await prisma.role.findMany({
-      where: {
-        systemCode: {
-          startsWith: TEST_ROLE_PREFIX,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    const permissions =
-      await prisma.permission.findMany({
-        where: {
-          code: {
-            startsWith: "phase3.",
-          },
-        },
-        select: {
-          id: true,
-        },
-      });
-
-    const userIds = users.map(
-      (user) => user.id,
-    );
-
-    const roleIds = roles.map(
-      (role) => role.id,
-    );
-
-    const permissionIds =
-      permissions.map(
-        (permission) => permission.id,
-      );
+    const userIds = [...ownedUserIds];
+    const roleIds = [...ownedRoleIds];
+    const permissionIds = [...ownedPermissionIds];
 
     await prisma.authSession.deleteMany({
       where: {
@@ -154,62 +99,19 @@ describe("Authorization integration", () => {
 
     await prisma.systemUserPermission.deleteMany({
       where: {
-        OR: [
-          {
-            userId: {
-              in: userIds,
-            },
-          },
-          {
-            assignedByUserId: {
-              in: userIds,
-            },
-          },
-          {
-            permissionId: {
-              in: permissionIds,
-            },
-          },
-        ],
+        userId: { in: userIds },
       },
     });
 
     await prisma.systemUserRole.deleteMany({
       where: {
-        OR: [
-          {
-            userId: {
-              in: userIds,
-            },
-          },
-          {
-            assignedByUserId: {
-              in: userIds,
-            },
-          },
-          {
-            roleId: {
-              in: roleIds,
-            },
-          },
-        ],
+        userId: { in: userIds },
       },
     });
 
     await prisma.rolePermission.deleteMany({
       where: {
-        OR: [
-          {
-            roleId: {
-              in: roleIds,
-            },
-          },
-          {
-            permissionId: {
-              in: permissionIds,
-            },
-          },
-        ],
+        roleId: { in: roleIds },
       },
     });
 
@@ -236,6 +138,9 @@ describe("Authorization integration", () => {
         },
       },
     });
+    ownedUserIds.clear();
+    ownedRoleIds.clear();
+    ownedPermissionIds.clear();
   }
 
   async function createUser(
@@ -244,7 +149,7 @@ describe("Authorization integration", () => {
     const email =
       `${localPart}${TEST_USER_DOMAIN}`;
 
-    return prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         email,
         emailNormalized:
@@ -253,6 +158,8 @@ describe("Authorization integration", () => {
           "phase3-authorization-test-hash",
       },
     });
+    ownedUserIds.add(user.id);
+    return user;
   }
 
   async function createPermission(
@@ -265,7 +172,7 @@ describe("Authorization integration", () => {
       options?.code ??
       TEST_PERMISSION_CODE;
 
-    return prisma.permission.create({
+    const permission = await prisma.permission.create({
       data: {
         code,
         resource: "phase3_job",
@@ -277,13 +184,15 @@ describe("Authorization integration", () => {
           options?.isDeprecated ?? false,
       },
     });
+    ownedPermissionIds.add(permission.id);
+    return permission;
   }
 
   async function createRole(
     systemCode: string,
     isActive = true,
   ) {
-    return prisma.role.create({
+    const role = await prisma.role.create({
       data: {
         kind: "SYSTEM",
         companyId: null,
@@ -295,6 +204,8 @@ describe("Authorization integration", () => {
         isActive,
       },
     });
+    ownedRoleIds.add(role.id);
+    return role;
   }
 
   async function assignRole(

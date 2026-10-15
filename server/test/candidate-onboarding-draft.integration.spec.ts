@@ -10,9 +10,9 @@ import { ApiExceptionFilter } from "../src/common/exceptions/api-exception.filte
 import { PrismaService } from "../src/infrastructure/prisma/prisma.service";
 import { PasswordService } from "../src/modules/auth/services/password.service";
 import { TokenService } from "../src/modules/auth/services/token.service";
+import { assertSafeIntegrationDatabase } from "./integration-safety";
 
 const URL = "/api/v1/candidate/onboarding-draft";
-const PREFIX = "phase-onboarding-draft.";
 const draftData = () => ({
   personal: { fullName: "Tester", email: "test@findwork.local" },
   education: [], experience: [], skills: [], languages: [],
@@ -26,40 +26,43 @@ describe("candidate private onboarding draft", () => {
   let prisma: PrismaService;
   let tokens: TokenService;
   let passwords: PasswordService;
+  let fixturePrefix: string;
+  const ownedUserIds = new Set<string>();
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     const config = app.get(ConfigService);
-    const url = config.getOrThrow<string>("DATABASE_URL");
-    const db = new globalThis.URL(url).pathname.replace(/^\//, "");
-    if (db !== "findwork_test") throw new Error(`Refusing DB writes to ${db}`);
     app.use(cookieParser());
     app.setGlobalPrefix(config.getOrThrow<string>("API_PREFIX"));
     app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
     app.useGlobalFilters(new ApiExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    await assertSafeIntegrationDatabase(prisma, config);
     tokens = app.get(TokenService);
     passwords = app.get(PasswordService);
   });
 
   async function cleanup() {
-    const users = await prisma.user.findMany({ where: { emailNormalized: { startsWith: PREFIX } }, select: { id: true } });
-    const ids = users.map((user) => user.id);
+    const ids = [...ownedUserIds];
     if (ids.length) {
       await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
-      await prisma.user.deleteMany({ where: { id: { in: ids } } }); // ON DELETE CASCADE handles draft
+      await prisma.candidateOnboardingDraft.deleteMany({ where: { userId: { in: ids } } });
+      await prisma.user.deleteMany({ where: { id: { in: ids } } });
+      ownedUserIds.clear();
     }
   }
-  beforeEach(cleanup);
-  afterAll(async () => { await cleanup(); await app.close(); });
+  beforeEach(() => { fixturePrefix = `phase-onboarding-draft.${randomUUID()}.`; });
+  afterEach(cleanup);
+  afterAll(async () => app?.close());
 
   async function user() {
-    const email = `${PREFIX}${randomUUID()}@findwork.local`;
+    const email = `${fixturePrefix}${randomUUID()}@findwork.local`;
     const created = await prisma.user.create({
       data: { email, emailNormalized: email, passwordHash: await passwords.hash("TestStrongPassword123!"), status: "ACTIVE" },
     });
+    ownedUserIds.add(created.id);
     const sessionId = randomUUID();
     await prisma.authSession.create({
       data: { id: sessionId, userId: created.id, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now() + 3600_000) },
