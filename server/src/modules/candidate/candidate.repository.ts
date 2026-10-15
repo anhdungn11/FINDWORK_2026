@@ -161,6 +161,14 @@ export class CandidateRepository {
     });
   }
 
+  async getBootstrapState(userId: string) {
+    const [profile, draft] = await Promise.all([
+      this.prisma.candidateProfile.findUnique({ where: { userId }, select: { id: true } }),
+      this.prisma.candidateOnboardingDraft.findUnique({ where: { userId }, select: { version: true } }),
+    ]);
+    return { profileExists: profile !== null, draftVersion: draft?.version ?? null };
+  }
+
   async createProfileAndCandidateRole(
     userId: string,
     candidateRoleId: string,

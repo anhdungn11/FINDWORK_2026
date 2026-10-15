@@ -9,6 +9,7 @@ import {
   CandidateRepository,
   type CandidateProfileWriteInput,
 } from "./candidate.repository";
+import { AuthorizationService } from "../authorization/authorization.service";
 import type { PutCandidateCareerPreferenceDto } from "./dto/career-preference.dto";
 import type {
   CreateCandidateEducationDto,
@@ -40,7 +41,28 @@ import type { ExperienceSkillInput } from "./types/candidate.types";
 
 @Injectable()
 export class CandidateService {
-  constructor(private readonly candidateRepository: CandidateRepository) {}
+  constructor(
+    private readonly candidateRepository: CandidateRepository,
+    private readonly authorizationService: AuthorizationService,
+  ) {}
+
+  async getBootstrap(userId: string) {
+    const [state, role, viewPermission] = await Promise.all([
+      this.candidateRepository.getBootstrapState(userId),
+      this.candidateRepository.findCandidateRole(),
+      this.authorizationService.resolveRequiredSystemPermissions(userId, ["profile.view"]),
+    ]);
+    return {
+      profile: {
+        state: state.profileExists ? "exists" : "not_created",
+        canCreateProfile: !state.profileExists && this.isCandidateRoleConfigured(role),
+        canViewProfile: viewPermission.allowed && viewPermission.context !== null,
+      },
+      draft: state.draftVersion === null
+        ? { state: "missing" }
+        : { state: "exists", version: state.draftVersion },
+    };
+  }
 
   async createProfile(userId: string, dto: CreateCandidateProfileDto) {
     if (await this.candidateRepository.findProfileByUserId(userId)) {
@@ -51,20 +73,7 @@ export class CandidateService {
     }
 
     const role = await this.candidateRepository.findCandidateRole();
-    const roleScopes = new Map(
-      role?.permissions.map((grant) => [
-        grant.permission.code,
-        grant.dataScope,
-      ]) ?? [],
-    );
-
-    if (
-      !role ||
-      role.kind !== "SYSTEM" ||
-      !role.isActive ||
-      roleScopes.get("profile.view") !== "OWN" ||
-      roleScopes.get("profile.update") !== "OWN"
-    ) {
+    if (!this.isCandidateRoleConfigured(role)) {
       throw new InternalServerErrorException({
         code: "CANDIDATE_ROLE_NOT_CONFIGURED",
         message: "Candidate role is not configured correctly.",
@@ -104,6 +113,12 @@ export class CandidateService {
       }
       throw error;
     }
+  }
+
+  private isCandidateRoleConfigured(role: Awaited<ReturnType<CandidateRepository["findCandidateRole"]>>): role is NonNullable<typeof role> {
+    if (!role || role.kind !== "SYSTEM" || !role.isActive) return false;
+    const scopes = new Map(role.permissions.map((grant) => [grant.permission.code, grant.dataScope]));
+    return scopes.get("profile.view") === "OWN" && scopes.get("profile.update") === "OWN";
   }
 
   async getProfile(userId: string) {

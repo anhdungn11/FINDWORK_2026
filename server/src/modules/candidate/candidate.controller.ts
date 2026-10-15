@@ -60,6 +60,12 @@ export class CandidateController {
     private readonly candidateDrafts: CandidateOnboardingDraftService,
   ) {}
 
+  @Get("bootstrap")
+  @ApiOperation({ summary: "Get current account's candidate profile and draft availability" })
+  bootstrap(@CurrentAuth() auth: AuthenticatedPrincipal) {
+    return this.candidateService.getBootstrap(auth.userId);
+  }
+
   @Get("onboarding-draft")
   @ApiOperation({ summary: "Load private 7-step onboarding draft for current account" })
   loadOnboardingDraft(@CurrentAuth() auth: AuthenticatedPrincipal) {
