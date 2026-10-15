@@ -11,6 +11,8 @@ import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { ApiExceptionFilter } from "../src/common/exceptions/api-exception.filter";
 import { PrismaService } from "../src/infrastructure/prisma/prisma.service";
+import type { Prisma } from "../src/generated/prisma/client";
+import { CandidateOnboardingImportService } from "../src/modules/candidate/candidate-onboarding-import.service";
 import { PasswordService } from "../src/modules/auth/services/password.service";
 import { TokenService } from "../src/modules/auth/services/token.service";
 import { assertSafeIntegrationDatabase } from "./integration-safety";
@@ -26,6 +28,7 @@ describe("Candidate integration", () => {
   let passwordHash: string;
   let fixturePrefix: string;
   const ownedUserIds = new Set<string>();
+  const ownedJobCategoryIds = new Set<string>();
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -61,6 +64,10 @@ describe("Candidate integration", () => {
 
   afterEach(async () => {
     await cleanupTestUsers();
+    for (const id of ownedJobCategoryIds) {
+      await prisma.jobCategory.delete({ where: { id } });
+      ownedJobCategoryIds.delete(id);
+    }
   });
 
   afterAll(async () => app?.close());
@@ -524,6 +531,7 @@ describe("Candidate integration", () => {
     expect(response.body.code).toBe("CANDIDATE_LANGUAGE_HAS_CERTIFICATES");
   });
 
+  describe("Candidate import PostgreSQL", () => {
   function importDraftContent(email: string) {
     return {
       personal: { fullName: "Import Fixture", email, phone: "", dateOfBirth: "", gender: "", countryCode: "VN", provinceCode: "", wardCode: "", addressLine: "", bio: "", avatarUrl: "" },
@@ -542,13 +550,38 @@ describe("Candidate integration", () => {
 
   it("imports an owned draft atomically with private defaults and retains the draft", async () => {
     const { user, accessToken } = await seedAuthenticatedUser("import-success");
-    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content: importDraftContent(user.email), stepIndex: 0 } });
+    const content = importDraftContent(user.email);
+    content.education = [{ id: "education-local", school: "Test University", degree: "Bachelor", major: "Engineering", location: "", startMonth: "1", startYear: "2020", endMonth: "12", endYear: "2024", isStudying: false, gpa: "3.5", gpaScale: "4", achievements: "", description: "" }] as never;
+    content.experience = [{ id: "experience-local", company: "Test Company", position: "Engineer", employmentType: "full-time", workplaceType: "remote", location: "", startMonth: "1", startYear: "2025", endMonth: "", endYear: "", isCurrent: true, description: "", achievements: "", skillsUsed: ["Private Fixture Skill"] }] as never;
+    content.skills = [{ id: "skill-local", skillCode: "", customSkillName: "Private Fixture Skill", level: "advanced", yearsOfExperience: "1.5", isHighlighted: true }] as never;
+    content.languages = [{ id: "language-local", languageCode: "", customLanguageName: "Private Fixture Language", overallLevel: "basic", listeningLevel: "basic", speakingLevel: "basic", readingLevel: "basic", writingLevel: "basic", certificates: [{ id: "certificate-local", certificateTypeCode: "", customCertificateName: "Private Fixture Certificate", level: "", overallScore: "", scores: [], issuedDate: "", expiryDate: "", issuer: "", credentialId: "", verificationUrl: "" }] }] as never;
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 0 } });
     const result = await importDraft(accessToken).expect(201);
     expect(result.body).toMatchObject({ userId: user.id, fullName: "Import Fixture", privacySetting: { searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true } });
     expect(result.body.careerPreference.desiredPositions).toEqual(expect.arrayContaining([expect.objectContaining({ title: "Engineer" })]));
+    expect(result.body.education).toHaveLength(1);
+    expect(result.body.experience).toHaveLength(1);
+    expect(result.body.experience[0].skills).toHaveLength(1);
+    expect(result.body.skills).toHaveLength(1);
+    expect(result.body.languages).toHaveLength(1);
+    expect(result.body.languages[0].certificates).toHaveLength(1);
     expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id, version: 1 } })).toBe(1);
     expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(1);
+    const role = await prisma.role.findUniqueOrThrow({ where: { systemCode: "CANDIDATE" }, select: { id: true } });
+    expect(await prisma.systemUserRole.count({ where: { userId: user.id, roleId: role.id } })).toBe(1);
+    expect(await prisma.candidatePrivacySetting.count({ where: { candidateProfile: { userId: user.id } } })).toBe(1);
     await importDraft(accessToken).expect(409);
+    const childCounts = await Promise.all([
+      prisma.candidateEducation.count({ where: { candidateProfile: { userId: user.id } } }),
+      prisma.candidateExperience.count({ where: { candidateProfile: { userId: user.id } } }),
+      prisma.candidateExperienceSkill.count({ where: { experience: { candidateProfile: { userId: user.id } } } }),
+      prisma.candidateSkill.count({ where: { candidateProfile: { userId: user.id } } }),
+      prisma.candidateLanguage.count({ where: { candidateProfile: { userId: user.id } } }),
+      prisma.candidateLanguageCertificate.count({ where: { candidateLanguage: { candidateProfile: { userId: user.id } } } }),
+      prisma.candidateCareerPreference.count({ where: { candidateProfile: { userId: user.id } } }),
+      prisma.candidateDesiredPosition.count({ where: { careerPreference: { candidateProfile: { userId: user.id } } } }),
+    ]);
+    expect(childCounts).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
   });
 
   it("imports changed draft privacy but stores only backend defaults and retains draft choices", async () => {
@@ -591,6 +624,18 @@ describe("Candidate integration", () => {
     expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
   });
 
+  it("rejects invalid non-asset profile data even after asset omission consent", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("import-invalid-with-consent");
+    const content = importDraftContent(user.email);
+    content.personal.avatarUrl = "blob:sensitive-avatar";
+    content.personal.fullName = "";
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    const response = await importDraft(accessToken, 1, true).expect(400);
+    expect(response.body.code).toBe("CANDIDATE_ONBOARDING_INVALID");
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+    expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
+  });
+
   it("rejects missing, stale, foreign and invalid drafts without creating a profile", async () => {
     const owner = await seedAuthenticatedUser("import-owner");
     const other = await seedAuthenticatedUser("import-other");
@@ -602,6 +647,21 @@ describe("Candidate integration", () => {
       .set("Authorization", `Bearer ${other.accessToken}`).send({ version: 1, confirmPrivacy: true }).expect(404);
     await request(app.getHttpServer()).post(`${API}/profile/import-onboarding`)
       .set("Authorization", `Bearer ${owner.accessToken}`).send({ version: 1, confirmPrivacy: false }).expect(400);
+    expect(await prisma.candidateProfile.count({ where: { userId: { in: [owner.user.id, other.user.id] } } })).toBe(0);
+  });
+
+  it("requires a valid access token and never exposes another account's import draft", async () => {
+    const owner = await seedAuthenticatedUser("import-auth-owner");
+    const other = await seedAuthenticatedUser("import-auth-other");
+    const content = importDraftContent(owner.user.email);
+    content.personal.fullName = "Private Owner Fixture";
+    await prisma.candidateOnboardingDraft.create({ data: { userId: owner.user.id, content, stepIndex: 6 } });
+    await request(app.getHttpServer()).post(`${API}/profile/import-onboarding`).send({ version: 1, confirmPrivacy: true }).expect(401);
+    await request(app.getHttpServer()).post(`${API}/profile/import-onboarding`)
+      .set("Authorization", "Bearer invalid").send({ version: 1, confirmPrivacy: true }).expect(401);
+    const foreign = await request(app.getHttpServer()).post(`${API}/profile/import-onboarding?userId=${owner.user.id}`)
+      .set("Authorization", `Bearer ${other.accessToken}`).send({ version: 1, confirmPrivacy: true }).expect(404);
+    expect(JSON.stringify(foreign.body)).not.toMatch(/Private Owner Fixture|import-auth-owner/);
     expect(await prisma.candidateProfile.count({ where: { userId: { in: [owner.user.id, other.user.id] } } })).toBe(0);
   });
 
@@ -618,11 +678,88 @@ describe("Candidate integration", () => {
     expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id } })).toBe(1);
   });
 
+  it("imports an existing active job category code as its database UUID", async () => {
+    const active = await prisma.jobCategory.findFirst({ where: { isActive: true }, select: { id: true, code: true } });
+    if (!active) throw new Error("Candidate import requires one existing active JobCategory for reference verification.");
+    const { user, accessToken } = await seedAuthenticatedUser("import-active-reference");
+    const content = importDraftContent(user.email);
+    (content.preferences.preferredCategoryCodes as string[]) = [active.code];
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    const response = await importDraft(accessToken).expect(201);
+    expect(response.body.careerPreference.preferredCategories).toEqual(expect.arrayContaining([expect.objectContaining({ jobCategoryId: active.id })]));
+    expect(await prisma.candidatePreferredCategory.count({ where: { careerPreference: { candidateProfile: { userId: user.id } }, jobCategoryId: active.id } })).toBe(1);
+  });
+
+  it("rejects an unknown code in a populated catalog without a partial import", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("import-unknown-reference");
+    const content = importDraftContent(user.email);
+    (content.preferences.preferredCategoryCodes as string[]) = [`missing-${randomUUID()}`];
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    const response = await importDraft(accessToken).expect(400);
+    expect(response.body.code).toBe("CANDIDATE_REFERENCE_INVALID");
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id } })).toBe(1);
+  });
+
+  it("rejects a uniquely owned inactive category fixture and cleans it by ID", async () => {
+    const inactive = await prisma.jobCategory.create({ data: { code: `cp8a-inactive-${randomUUID()}`, name: "CP8A inactive test fixture", isActive: false } });
+    ownedJobCategoryIds.add(inactive.id);
+    const { user, accessToken } = await seedAuthenticatedUser("import-inactive-reference");
+    const content = importDraftContent(user.email);
+    (content.preferences.preferredCategoryCodes as string[]) = [inactive.code];
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    const response = await importDraft(accessToken).expect(400);
+    expect(response.body.code).toBe("CANDIDATE_REFERENCE_INVALID");
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+  });
+
+  it("rolls back actual profile, privacy, role and education writes after an injected transaction fault", async () => {
+    const { user } = await seedAuthenticatedUser("import-rollback");
+    const content = importDraftContent(user.email);
+    content.education = [{ id: "education-rollback", school: "Rollback Fixture School", degree: "Bachelor", major: "Engineering", location: "", startMonth: "1", startYear: "2020", endMonth: "", endYear: "", isStudying: true, gpa: "", gpaScale: "", achievements: "", description: "" }] as never;
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    const observed = { profile: 0, privacy: 0, role: 0, education: 0 };
+    const faultingPrisma = {
+      $transaction: (work: (tx: Prisma.TransactionClient) => Promise<unknown>, options: { isolationLevel: Prisma.TransactionIsolationLevel; timeout: number }) =>
+        prisma.$transaction(async (tx) => {
+          const faultingTx = new Proxy(tx, {
+            get(target, property, receiver) {
+              if (property === "candidateEducation") return {
+                create: async (args: Parameters<typeof target.candidateEducation.create>[0]) => {
+                  await target.candidateEducation.create(args);
+                  observed.profile = await target.candidateProfile.count({ where: { userId: user.id } });
+                  observed.privacy = await target.candidatePrivacySetting.count({ where: { candidateProfile: { userId: user.id } } });
+                  observed.role = await target.systemUserRole.count({ where: { userId: user.id } });
+                  observed.education = await target.candidateEducation.count({ where: { candidateProfile: { userId: user.id } } });
+                  throw new Error("CP8A_INJECTED_AFTER_DATABASE_WRITES");
+                },
+              };
+              return Reflect.get(target, property, receiver);
+            },
+          });
+          return work(faultingTx);
+        }, options),
+    };
+    await expect(new CandidateOnboardingImportService(faultingPrisma as never).import(user.id, { version: 1, confirmPrivacy: true }))
+      .rejects.toThrow("CP8A_INJECTED_AFTER_DATABASE_WRITES");
+    expect(observed).toEqual({ profile: 1, privacy: 1, role: 1, education: 1 });
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.candidatePrivacySetting.count({ where: { candidateProfile: { userId: user.id } } })).toBe(0);
+    expect(await prisma.systemUserRole.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.candidateEducation.count({ where: { candidateProfile: { userId: user.id } } })).toBe(0);
+    expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id } })).toBe(1);
+  });
+
   it("permits only one concurrent import for the same account", async () => {
     const { user, accessToken } = await seedAuthenticatedUser("import-race");
     await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content: importDraftContent(user.email), stepIndex: 6 } });
     const responses = await Promise.all([importDraft(accessToken), importDraft(accessToken)]);
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(1);
+    expect(await prisma.candidatePrivacySetting.count({ where: { candidateProfile: { userId: user.id } } })).toBe(1);
+    expect(await prisma.candidateCareerPreference.count({ where: { candidateProfile: { userId: user.id } } })).toBe(1);
+    expect(await prisma.systemUserRole.count({ where: { userId: user.id } })).toBe(1);
+    expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id } })).toBe(1);
+  });
   });
 });
