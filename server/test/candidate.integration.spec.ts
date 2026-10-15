@@ -553,8 +553,8 @@ describe("Candidate integration", () => {
     const content = importDraftContent(user.email);
     content.education = [{ id: "education-local", school: "Test University", degree: "Bachelor", major: "Engineering", location: "", startMonth: "1", startYear: "2020", endMonth: "12", endYear: "2024", isStudying: false, gpa: "3.5", gpaScale: "4", achievements: "", description: "" }] as never;
     content.experience = [{ id: "experience-local", company: "Test Company", position: "Engineer", employmentType: "full-time", workplaceType: "remote", location: "", startMonth: "1", startYear: "2025", endMonth: "", endYear: "", isCurrent: true, description: "", achievements: "", skillsUsed: ["Private Fixture Skill"] }] as never;
-    content.skills = [{ id: "skill-local", skillCode: "", customSkillName: "Private Fixture Skill", level: "advanced", yearsOfExperience: "1.5", isHighlighted: true }] as never;
-    content.languages = [{ id: "language-local", languageCode: "", customLanguageName: "Private Fixture Language", overallLevel: "basic", listeningLevel: "basic", speakingLevel: "basic", readingLevel: "basic", writingLevel: "basic", certificates: [{ id: "certificate-local", certificateTypeCode: "", customCertificateName: "Private Fixture Certificate", level: "", overallScore: "", scores: [], issuedDate: "", expiryDate: "", issuer: "", credentialId: "", verificationUrl: "" }] }] as never;
+    content.skills = [{ id: "skill-local", skillCode: "other", customSkillName: "Private Fixture Skill", level: "advanced", yearsOfExperience: "1.5", isHighlighted: true }] as never;
+    content.languages = [{ id: "language-local", languageCode: "other", customLanguageName: "Private Fixture Language", overallLevel: "basic", listeningLevel: "basic", speakingLevel: "basic", readingLevel: "basic", writingLevel: "basic", certificates: [{ id: "certificate-local", certificateTypeCode: "", customCertificateName: "Private Fixture Certificate", level: "", overallScore: "", scores: [], issuedDate: "", expiryDate: "", issuer: "", credentialId: "", verificationUrl: "" }] }] as never;
     await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 0 } });
     const result = await importDraft(accessToken).expect(201);
     expect(result.body).toMatchObject({ userId: user.id, fullName: "Import Fixture", privacySetting: { searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true } });
@@ -564,6 +564,8 @@ describe("Candidate integration", () => {
     expect(result.body.experience[0].skills).toHaveLength(1);
     expect(result.body.skills).toHaveLength(1);
     expect(result.body.languages).toHaveLength(1);
+    expect(result.body.skills[0]).toMatchObject({ skillId: null, customSkillName: "Private Fixture Skill" });
+    expect(result.body.languages[0]).toMatchObject({ languageId: null, customLanguageName: "Private Fixture Language" });
     expect(result.body.languages[0].certificates).toHaveLength(1);
     expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id, version: 1 } })).toBe(1);
     expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(1);

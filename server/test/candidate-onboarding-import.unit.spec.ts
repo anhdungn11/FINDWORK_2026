@@ -18,6 +18,22 @@ function draft() {
   };
 }
 
+function skill(skillCode: string, customSkillName = "", id = "s1") {
+  return { id, skillCode, customSkillName, level: "advanced", yearsOfExperience: "2", isHighlighted: false };
+}
+
+function language(languageCode: string, customLanguageName = "", id = "l1") {
+  return { id, languageCode, customLanguageName, overallLevel: "fluent", listeningLevel: "fluent", speakingLevel: "fluent", readingLevel: "fluent", writingLevel: "fluent", certificates: [] };
+}
+
+function errorCode(content: unknown): string | undefined {
+  try { parseCandidateOnboardingDraft(content); } catch (error) {
+    if (error instanceof BadRequestException) return (error.getResponse() as { code: string }).code;
+    throw error;
+  }
+  return undefined;
+}
+
 function harness(content: unknown = draft()) {
   const tx = {
     candidateProfile: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: "profile" }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: "profile", userId: "self" }) },
@@ -169,6 +185,57 @@ describe("Candidate onboarding import", () => {
     expect(tx.candidatePrivacySetting.create).toHaveBeenCalledWith({ data: { candidateProfileId: "profile", ...CANDIDATE_IMPORT_PRIVACY_DEFAULTS } });
     expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
     expect(tx.candidateCareerPreference.create).toHaveBeenCalledWith({ data: expect.objectContaining({ preferredCategories: { create: [{ jobCategoryId: "category" }] }, preferredLocations: { create: [{ provinceId: "province" }] } }) });
+  });
+
+  it("maps mixed catalog and custom skills and languages without looking up the other sentinel", async () => {
+    const content = draft();
+    content.skills = [skill("SKILL"), skill("other", "  Kỹ năng riêng  ", "s2")] as never;
+    content.languages = [language("en"), language("other", "  Ngoại ngữ riêng  ", "l2")] as never;
+    const { service, tx } = harness(content);
+    await service.import("self", { version: 3, confirmPrivacy: true });
+    expect(tx.skill.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.skill.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ code: "SKILL" }) }));
+    expect(tx.language.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.language.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ code: "en" }) }));
+    expect(tx.candidateSkill.create.mock.calls.map(([input]) => input.data)).toEqual([
+      expect.objectContaining({ skillId: "skill", customSkillName: null }),
+      expect.objectContaining({ skillId: null, customSkillName: "Kỹ năng riêng" }),
+    ]);
+    expect(tx.candidateLanguage.create.mock.calls.map(([input]) => input.data)).toEqual([
+      expect.objectContaining({ languageId: "language", customLanguageName: null }),
+      expect.objectContaining({ languageId: null, customLanguageName: "Ngoại ngữ riêng" }),
+    ]);
+    expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing skill name", [skill("other", "   ")], [], "CANDIDATE_SKILL_SOURCE_INVALID"],
+    ["catalog skill with custom name", [skill("SKILL", "Extra")], [], "CANDIDATE_SKILL_SOURCE_INVALID"],
+    ["missing language name", [], [language("other", "   ")], "CANDIDATE_LANGUAGE_SOURCE_INVALID"],
+    ["catalog language with custom name", [], [language("en", "Extra")], "CANDIDATE_LANGUAGE_SOURCE_INVALID"],
+    ["duplicate custom skill", [skill("other", " Craft "), skill("other", "craft", "s2")], [], "CANDIDATE_SKILL_DUPLICATE"],
+    ["duplicate catalog skill", [skill("SKILL"), skill("SKILL", "", "s2")], [], "CANDIDATE_SKILL_DUPLICATE"],
+    ["duplicate custom language", [], [language("other", " Tongue "), language("other", "tongue", "l2")], "CANDIDATE_LANGUAGE_DUPLICATE"],
+    ["duplicate catalog language", [], [language("en"), language("en", "", "l2")], "CANDIDATE_LANGUAGE_DUPLICATE"],
+  ])("rejects %s with a stable source code before writing", async (_label, skills, languages, code) => {
+    const content = draft();
+    content.skills = skills as never;
+    content.languages = languages as never;
+    expect(errorCode(content)).toBe(code);
+    const { service, tx } = harness(content);
+    await expect(service.import("self", { version: 3, confirmPrivacy: true })).rejects.toMatchObject({ response: { code } });
+    expect(tx.candidateProfile.create).not.toHaveBeenCalled();
+  });
+
+  it.each(["skill", "language"])("rejects an unknown %s reference code", async (kind) => {
+    const content = draft();
+    if (kind === "skill") content.skills = [skill("unknown")] as never;
+    else content.languages = [language("unknown")] as never;
+    const { service, tx } = harness(content);
+    if (kind === "skill") tx.skill.findFirst.mockResolvedValue(null as never);
+    else tx.language.findFirst.mockResolvedValue(null as never);
+    await expect(service.import("self", { version: 3, confirmPrivacy: true })).rejects.toMatchObject({ response: { code: "CANDIDATE_REFERENCE_INVALID", catalog: kind } });
+    expect(tx.candidateProfile.create).not.toHaveBeenCalled();
   });
 
   it("distinguishes an invalid reference from an unloaded catalog", async () => {

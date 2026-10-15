@@ -54,6 +54,12 @@ export interface ParsedCandidateDraft {
 function invalid(path: string): never {
   throw new BadRequestException({ code: "CANDIDATE_ONBOARDING_INVALID", message: `Invalid onboarding draft field: ${path}.` });
 }
+function invalidSource(kind: "SKILL" | "LANGUAGE", path: string): never {
+  throw new BadRequestException({ code: `CANDIDATE_${kind}_SOURCE_INVALID`, message: `Invalid onboarding draft source: ${path}.` });
+}
+function duplicateSource(kind: "SKILL" | "LANGUAGE", path: string): never {
+  throw new BadRequestException({ code: `CANDIDATE_${kind}_DUPLICATE`, message: `Duplicate onboarding draft entry: ${path}.` });
+}
 function obj(value: unknown, path: string, keys: readonly string[]): RecordValue {
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid(path);
   const record = value as RecordValue;
@@ -182,8 +188,8 @@ export function parseCandidateOnboardingDraft(value: unknown): ParsedCandidateDr
     const s = obj(entry, path, ["id", "skillCode", "customSkillName", "level", "yearsOfExperience", "isHighlighted"]); localId(s, path);
     const skillCode = str(s.skillCode, `${path}.skillCode`, 120);
     const customSkillName = str(s.customSkillName, `${path}.customSkillName`, 160);
-    if (!!skillCode === !!customSkillName) invalid(path);
-    return { skillCode, customSkillName, level: upper(s.level, `${path}.level`, skillLevels) as CandidateSkillLevel, yearsOfExperience: decimal(s.yearsOfExperience, `${path}.yearsOfExperience`, 999.99, 2), isHighlighted: bool(s.isHighlighted, `${path}.isHighlighted`) };
+    if (skillCode === "other" ? !customSkillName : (!!skillCode === !!customSkillName)) invalidSource("SKILL", path);
+    return { skillCode: skillCode === "other" ? null : skillCode, customSkillName, level: upper(s.level, `${path}.level`, skillLevels) as CandidateSkillLevel, yearsOfExperience: decimal(s.yearsOfExperience, `${path}.yearsOfExperience`, 999.99, 2), isHighlighted: bool(s.isHighlighted, `${path}.isHighlighted`) };
   });
   const proficiency = ["basic", "conversational", "professional", "fluent", "native"] as const;
   const languages = list(root.languages, "languages", 50).map((entry, index): Language => {
@@ -191,7 +197,7 @@ export function parseCandidateOnboardingDraft(value: unknown): ParsedCandidateDr
     const l = obj(entry, path, ["id", "languageCode", "customLanguageName", "overallLevel", "listeningLevel", "speakingLevel", "readingLevel", "writingLevel", "certificates"]); localId(l, path);
     const languageCode = str(l.languageCode, `${path}.languageCode`, 20);
     const customLanguageName = str(l.customLanguageName, `${path}.customLanguageName`, 160);
-    if (!!languageCode === !!customLanguageName) invalid(path);
+    if (languageCode === "other" ? !customLanguageName : (!!languageCode === !!customLanguageName)) invalidSource("LANGUAGE", path);
     const certificates = list(l.certificates, `${path}.certificates`, 50).map((entry, ci): Certificate => {
       const cp = `${path}.certificates[${ci}]`;
       const c = obj(entry, cp, ["id", "certificateTypeCode", "customCertificateName", "level", "overallScore", "scores", "issuedDate", "expiryDate", "issuer", "credentialId", "verificationUrl"]); localId(c, cp);
@@ -212,11 +218,12 @@ export function parseCandidateOnboardingDraft(value: unknown): ParsedCandidateDr
       if (verificationUrl && !/^https?:\/\//i.test(verificationUrl)) invalid(`${cp}.verificationUrl`);
       return { certificateTypeCode, customCertificateName, level: str(c.level, `${cp}.level`, 120), overallScore: str(c.overallScore, `${cp}.overallScore`, 80), scores: scores.length ? Object.fromEntries(scores) : null, issuedDate, expiryDate, issuer: str(c.issuer, `${cp}.issuer`, 180), credentialId: str(c.credentialId, `${cp}.credentialId`, 180), verificationUrl };
     });
-    return { languageCode, customLanguageName, overallLevel: upper(l.overallLevel, `${path}.overallLevel`, proficiency) as CandidateLanguageProficiency, listeningLevel: upper(l.listeningLevel, `${path}.listeningLevel`, proficiency) as CandidateLanguageProficiency, speakingLevel: upper(l.speakingLevel, `${path}.speakingLevel`, proficiency) as CandidateLanguageProficiency, readingLevel: upper(l.readingLevel, `${path}.readingLevel`, proficiency) as CandidateLanguageProficiency, writingLevel: upper(l.writingLevel, `${path}.writingLevel`, proficiency) as CandidateLanguageProficiency, certificates };
+    return { languageCode: languageCode === "other" ? null : languageCode, customLanguageName, overallLevel: upper(l.overallLevel, `${path}.overallLevel`, proficiency) as CandidateLanguageProficiency, listeningLevel: upper(l.listeningLevel, `${path}.listeningLevel`, proficiency) as CandidateLanguageProficiency, speakingLevel: upper(l.speakingLevel, `${path}.speakingLevel`, proficiency) as CandidateLanguageProficiency, readingLevel: upper(l.readingLevel, `${path}.readingLevel`, proficiency) as CandidateLanguageProficiency, writingLevel: upper(l.writingLevel, `${path}.writingLevel`, proficiency) as CandidateLanguageProficiency, certificates };
   });
-  for (const [path, values] of [["skills", skills.map((s) => s.skillCode || s.customSkillName!.toLowerCase())], ["languages", languages.map((l) => l.languageCode || l.customLanguageName!.toLowerCase())]] as const) {
-    if (new Set(values).size !== values.length) invalid(path);
-  }
+  const skillKeys = skills.map((s) => s.skillCode ? `catalog:${s.skillCode.toLowerCase()}` : `custom:${s.customSkillName!.toLowerCase()}`);
+  if (new Set(skillKeys).size !== skillKeys.length) duplicateSource("SKILL", "skills");
+  const languageKeys = languages.map((l) => l.languageCode ? `catalog:${l.languageCode.toLowerCase()}` : `custom:${l.customLanguageName!.toLowerCase()}`);
+  if (new Set(languageKeys).size !== languageKeys.length) duplicateSource("LANGUAGE", "languages");
 
   const pref = obj(root.preferences, "preferences", ["desiredPositions", "preferredCategoryCodes", "locationPreference", "employmentTypes", "workplaceTypes", "salaryExpectation", "desiredCareerLevel", "availability", "willingToRelocate"]);
   const location = obj(pref.locationPreference, "preferences.locationPreference", ["mode", "provinceCodes"]);
