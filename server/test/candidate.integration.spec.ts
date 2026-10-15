@@ -548,6 +548,144 @@ describe("Candidate integration", () => {
       .send({ version, confirmPrivacy: true, ...(confirmOmitUnsupportedAssets === undefined ? {} : { confirmOmitUnsupportedAssets }) });
   }
 
+  function customImportSkill(name: string, id = "custom-skill") {
+    return { id, skillCode: "other", customSkillName: name, level: "advanced", yearsOfExperience: "1.5", isHighlighted: true };
+  }
+
+  function importLanguage(code: string, customName = "", id = "custom-language") {
+    return { id, languageCode: code, customLanguageName: customName, overallLevel: "basic", listeningLevel: "basic", speakingLevel: "basic", readingLevel: "basic", writingLevel: "basic", certificates: [] };
+  }
+
+  describe("custom import acceptance", () => {
+    it("persists a custom skill with null FK and no new master skill", async () => {
+      const { user, accessToken } = await seedAuthenticatedUser("custom-skill");
+      const content = importDraftContent(user.email);
+      content.skills = [customImportSkill("Kỹ năng chuyên ngành")] as never;
+      const masterCount = await prisma.skill.count();
+      await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+
+      const response = await importDraft(accessToken).expect(201);
+      const saved = await prisma.candidateSkill.findFirstOrThrow({ where: { candidateProfile: { userId: user.id } } });
+      expect(response.body.userId).toBe(user.id);
+      expect(saved).toMatchObject({ candidateProfileId: response.body.id, skillId: null, customSkillName: "Kỹ năng chuyên ngành" });
+      expect(await prisma.skill.count()).toBe(masterCount);
+      expect(await prisma.candidatePrivacySetting.findFirst({ where: { candidateProfileId: response.body.id } })).toMatchObject({ searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true });
+      const role = await prisma.role.findUniqueOrThrow({ where: { systemCode: "CANDIDATE" }, select: { id: true } });
+      expect(await prisma.systemUserRole.count({ where: { userId: user.id, roleId: role.id } })).toBe(1);
+      expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
+      await importDraft(accessToken).expect(409);
+      expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(1);
+    });
+
+    it("persists a custom language with null FK and no new master language", async () => {
+      const { user, accessToken } = await seedAuthenticatedUser("custom-language");
+      const content = importDraftContent(user.email);
+      content.languages = [importLanguage("other", "Ngoại ngữ riêng")] as never;
+      const masterCount = await prisma.language.count();
+      await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+
+      const response = await importDraft(accessToken).expect(201);
+      const saved = await prisma.candidateLanguage.findFirstOrThrow({ where: { candidateProfile: { userId: user.id } } });
+      expect(saved).toMatchObject({ candidateProfileId: response.body.id, languageId: null, customLanguageName: "Ngoại ngữ riêng" });
+      expect(await prisma.language.count()).toBe(masterCount);
+      expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
+    });
+
+    it("imports custom rows alongside active language and job category references", async () => {
+      const activeLanguage = await prisma.language.findFirst({ where: { isActive: true }, select: { id: true, code: true } });
+      const activeCategory = await prisma.jobCategory.findFirst({ where: { isActive: true }, select: { id: true, code: true } });
+      if (!activeLanguage || !activeCategory) throw new Error("Custom import acceptance requires existing active Language and JobCategory references.");
+      const { user, accessToken } = await seedAuthenticatedUser("custom-mixed");
+      const content = importDraftContent(user.email);
+      content.skills = [customImportSkill("Kỹ năng chuyên ngành")] as never;
+      content.languages = [importLanguage("other", "Ngoại ngữ riêng"), importLanguage(activeLanguage.code, "", "catalog-language")] as never;
+      content.preferences.preferredCategoryCodes = [activeCategory.code] as never;
+      await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+
+      await importDraft(accessToken).expect(201);
+      expect(await prisma.candidateSkill.findMany({ where: { candidateProfile: { userId: user.id } }, select: { skillId: true, customSkillName: true } })).toEqual([{ skillId: null, customSkillName: "Kỹ năng chuyên ngành" }]);
+      expect(await prisma.candidateLanguage.findMany({ where: { candidateProfile: { userId: user.id } }, select: { languageId: true, customLanguageName: true } })).toEqual(expect.arrayContaining([
+        { languageId: null, customLanguageName: "Ngoại ngữ riêng" },
+        { languageId: activeLanguage.id, customLanguageName: null },
+      ]));
+      expect(await prisma.candidateLanguage.count({ where: { candidateProfile: { userId: user.id } } })).toBe(2);
+      expect(await prisma.candidatePreferredCategory.count({ where: { careerPreference: { candidateProfile: { userId: user.id } }, jobCategoryId: activeCategory.id } })).toBe(1);
+    });
+
+    it.each([
+      ["empty custom skill", (content: ReturnType<typeof importDraftContent>) => { content.skills = [customImportSkill("   ")] as never; }, "CANDIDATE_SKILL_SOURCE_INVALID"],
+      ["conflicting skill source", (content: ReturnType<typeof importDraftContent>) => { content.skills = [{ ...customImportSkill("Conflicting"), skillCode: "catalog-code" }] as never; }, "CANDIDATE_SKILL_SOURCE_INVALID"],
+      ["duplicate custom skills", (content: ReturnType<typeof importDraftContent>) => { content.skills = [customImportSkill("Craft"), customImportSkill("craft", "second")] as never; }, "CANDIDATE_SKILL_DUPLICATE"],
+      ["empty custom language", (content: ReturnType<typeof importDraftContent>) => { content.languages = [importLanguage("other", "")] as never; }, "CANDIDATE_LANGUAGE_SOURCE_INVALID"],
+      ["conflicting language source", (content: ReturnType<typeof importDraftContent>) => { content.languages = [importLanguage("en", "Conflicting")] as never; }, "CANDIDATE_LANGUAGE_SOURCE_INVALID"],
+      ["duplicate custom languages", (content: ReturnType<typeof importDraftContent>) => { content.languages = [importLanguage("other", "Tongue"), importLanguage("other", "tongue", "second")] as never; }, "CANDIDATE_LANGUAGE_DUPLICATE"],
+      ["unknown language code", (content: ReturnType<typeof importDraftContent>) => { content.languages = [importLanguage("zz-invalid")] as never; }, "CANDIDATE_REFERENCE_INVALID"],
+      ["missing skill source", (content: ReturnType<typeof importDraftContent>) => { content.skills = [{ ...customImportSkill(""), skillCode: "" }] as never; }, "CANDIDATE_SKILL_SOURCE_INVALID"],
+      ["malformed custom name", (content: ReturnType<typeof importDraftContent>) => { content.skills = [{ ...customImportSkill("Valid"), customSkillName: 42 }] as never; }, "CANDIDATE_ONBOARDING_INVALID"],
+    ])("rejects %s before any profile write", async (label, mutate, code) => {
+      const { user, accessToken } = await seedAuthenticatedUser(`invalid-${label.replace(/ /g, "-")}`);
+      const content = importDraftContent(user.email);
+      mutate(content);
+      await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+      const response = await importDraft(accessToken).expect(400);
+      expect(response.body.code).toBe(code);
+      expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+      expect(await prisma.systemUserRole.count({ where: { userId: user.id } })).toBe(0);
+      expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
+    });
+
+    it("keeps a custom draft private to its authenticated owner", async () => {
+      const owner = await seedAuthenticatedUser("custom-auth-owner");
+      const other = await seedAuthenticatedUser("custom-auth-other");
+      const content = importDraftContent(owner.user.email);
+      content.skills = [customImportSkill("Private Custom Skill")] as never;
+      await prisma.candidateOnboardingDraft.create({ data: { userId: owner.user.id, content, stepIndex: 6 } });
+      await request(app.getHttpServer()).post(`${API}/profile/import-onboarding`).send({ version: 1, confirmPrivacy: true }).expect(401);
+      await importDraft(other.accessToken).expect(404);
+      expect(await prisma.candidateProfile.count({ where: { userId: { in: [owner.user.id, other.user.id] } } })).toBe(0);
+      await importDraft(owner.accessToken).expect(201);
+      expect(await prisma.candidateProfile.count({ where: { userId: owner.user.id } })).toBe(1);
+      expect(await prisma.candidateProfile.count({ where: { userId: other.user.id } })).toBe(0);
+    });
+
+    it("rolls back custom skill and language rows after a database write-path failure", async () => {
+      const { user } = await seedAuthenticatedUser("custom-rollback");
+      const content = importDraftContent(user.email);
+      content.skills = [customImportSkill("Rollback Skill")] as never;
+      content.languages = [importLanguage("other", "Rollback Language")] as never;
+      await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+      const observed = { profile: 0, skill: 0, language: 0 };
+      const faultingPrisma = {
+        $transaction: (work: (tx: Prisma.TransactionClient) => Promise<unknown>, options: { isolationLevel: Prisma.TransactionIsolationLevel; timeout: number }) =>
+          prisma.$transaction(async (tx) => {
+            const faultingTx = new Proxy(tx, {
+              get(target, property, receiver) {
+                if (property === "candidateLanguage") return {
+                  create: async (args: Parameters<typeof target.candidateLanguage.create>[0]) => {
+                    await target.candidateLanguage.create(args);
+                    observed.profile = await target.candidateProfile.count({ where: { userId: user.id } });
+                    observed.skill = await target.candidateSkill.count({ where: { candidateProfile: { userId: user.id } } });
+                    observed.language = await target.candidateLanguage.count({ where: { candidateProfile: { userId: user.id } } });
+                    throw new Error("CP8A_CUSTOM_INJECTED_AFTER_DATABASE_WRITES");
+                  },
+                };
+                return Reflect.get(target, property, receiver);
+              },
+            });
+            return work(faultingTx);
+          }, options),
+      };
+      await expect(new CandidateOnboardingImportService(faultingPrisma as never).import(user.id, { version: 1, confirmPrivacy: true }))
+        .rejects.toThrow("CP8A_CUSTOM_INJECTED_AFTER_DATABASE_WRITES");
+      expect(observed).toEqual({ profile: 1, skill: 1, language: 1 });
+      expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+      expect(await prisma.candidateSkill.count({ where: { candidateProfile: { userId: user.id } } })).toBe(0);
+      expect(await prisma.candidateLanguage.count({ where: { candidateProfile: { userId: user.id } } })).toBe(0);
+      expect(await prisma.systemUserRole.count({ where: { userId: user.id } })).toBe(0);
+      expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
+    });
+  });
+
   it("imports an owned draft atomically with private defaults and retains the draft", async () => {
     const { user, accessToken } = await seedAuthenticatedUser("import-success");
     const content = importDraftContent(user.email);
