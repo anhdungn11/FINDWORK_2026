@@ -237,8 +237,11 @@ describe("Candidate integration", () => {
     const { user, accessToken } = await seedAuthenticatedUser("bootstrap-expired");
     await request(app.getHttpServer()).get(`${API}/bootstrap`)
       .set("Authorization", "Bearer invalid").expect(401);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     await prisma.authSession.updateMany({
-      where: { userId: user.id }, data: { expiresAt: new Date(0) },
+      where: { userId: user.id },
+      data: { createdAt: twoHoursAgo, expiresAt: oneHourAgo },
     });
     await bootstrap(accessToken).expect(401);
   });

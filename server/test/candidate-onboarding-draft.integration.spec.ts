@@ -53,12 +53,12 @@ describe("candidate private onboarding draft", () => {
       ownedUserIds.clear();
     }
   }
-  beforeEach(() => { fixturePrefix = `phase-onboarding-draft.${randomUUID()}.`; });
+  beforeEach(() => { fixturePrefix = `cp8a-draft.${randomUUID().replace(/-/g, "")}.`; });
   afterEach(cleanup);
   afterAll(async () => app?.close());
 
   async function user() {
-    const email = `${fixturePrefix}${randomUUID()}@findwork.local`;
+    const email = `${fixturePrefix}${randomUUID().replace(/-/g, "").slice(0, 12)}@example.com`;
     const created = await prisma.user.create({
       data: { email, emailNormalized: email, passwordHash: await passwords.hash("TestStrongPassword123!"), status: "ACTIVE" },
     });
