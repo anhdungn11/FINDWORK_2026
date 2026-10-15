@@ -295,7 +295,7 @@ export const ExperienceSection = ({
               </button>
             </header>
 
-            <form onSubmit={handleSubmit} style={{ display: "contents" }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {errorMsg && (
                   <div id="experience-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>

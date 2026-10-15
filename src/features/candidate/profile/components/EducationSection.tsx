@@ -276,7 +276,7 @@ export const EducationSection = ({
               </button>
             </header>
 
-            <form onSubmit={handleSubmit} style={{ display: "contents" }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {errorMsg && (
                   <div id="education-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>

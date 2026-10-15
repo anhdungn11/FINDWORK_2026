@@ -230,6 +230,14 @@ export const OnboardingImportPreviewModal = ({
           <button
             type="button"
             className={formStyles.btnSecondary}
+            onClick={onClose}
+            disabled={isImporting}
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            className={formStyles.btnSecondary}
             onClick={onGoToOnboarding}
             disabled={isImporting}
           >

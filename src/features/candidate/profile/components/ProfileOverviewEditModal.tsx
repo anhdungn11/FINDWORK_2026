@@ -103,7 +103,7 @@ export const ProfileOverviewEditModal = ({
           </button>
         </header>
 
-        <form onSubmit={handleSubmit} style={{ display: "contents" }}>
+        <form onSubmit={handleSubmit} noValidate style={{ display: "contents" }}>
           <div className={styles.modalBody}>
             {errorMsg && (
               <div id="overview-error" className={styles.errorSummary} role="alert" tabIndex={-1}>

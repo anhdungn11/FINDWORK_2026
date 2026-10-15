@@ -266,7 +266,7 @@ export const CareerPreferencesSection = ({
               </button>
             </header>
 
-            <form onSubmit={handleSubmit} style={{ display: "contents" }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {errorMsg && (
                   <div id="pref-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>

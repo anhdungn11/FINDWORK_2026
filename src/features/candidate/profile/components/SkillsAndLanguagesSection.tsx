@@ -361,7 +361,7 @@ export const SkillsAndLanguagesSection = ({
               </button>
             </header>
 
-            <form onSubmit={handleSkillSubmit} style={{ display: "contents" }}>
+            <form onSubmit={handleSkillSubmit} noValidate style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {skillError && (
                   <div id="skill-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>
@@ -491,7 +491,7 @@ export const SkillsAndLanguagesSection = ({
               </button>
             </header>
 
-            <form onSubmit={handleLangSubmit} style={{ display: "contents" }}>
+            <form onSubmit={handleLangSubmit} noValidate style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {langError && (
                   <div id="lang-error-summary" className={formStyles.errorSummary} role="alert" tabIndex={-1}>

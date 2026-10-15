@@ -183,7 +183,7 @@ export const PersonalInfoSection = ({
               </button>
             </header>
 
-            <form onSubmit={handleSubmit} style={{ display: "contents" }}>
+            <form onSubmit={handleSubmit} noValidate style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
                 {errorMsg && (
                   <div className={formStyles.errorSummary} role="alert" tabIndex={-1}>
