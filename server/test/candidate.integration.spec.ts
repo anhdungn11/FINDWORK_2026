@@ -534,10 +534,10 @@ describe("Candidate integration", () => {
     };
   }
 
-  function importDraft(accessToken: string, version = 1) {
+  function importDraft(accessToken: string, version = 1, confirmOmitUnsupportedAssets?: boolean) {
     return request(app.getHttpServer()).post(`${API}/profile/import-onboarding`)
       .set("Authorization", `Bearer ${accessToken}`)
-      .send({ version, confirmPrivacy: true });
+      .send({ version, confirmPrivacy: true, ...(confirmOmitUnsupportedAssets === undefined ? {} : { confirmOmitUnsupportedAssets }) });
   }
 
   it("imports an owned draft atomically with private defaults and retains the draft", async () => {
@@ -549,6 +549,46 @@ describe("Candidate integration", () => {
     expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id, version: 1 } })).toBe(1);
     expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(1);
     await importDraft(accessToken).expect(409);
+  });
+
+  it("imports changed draft privacy but stores only backend defaults and retains draft choices", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("import-privacy-diff");
+    const content = importDraftContent(user.email);
+    content.privacy = { searchableProfile: true, showEmail: true, showPhone: true, allowResumeDownload: true, allowJobMatching: false };
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    await importDraft(accessToken).expect(201);
+    expect(await prisma.candidatePrivacySetting.findFirst({ where: { candidateProfile: { userId: user.id } } })).toMatchObject({ searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true });
+    expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
+  });
+
+  it.each([
+    ["avatar", (content: ReturnType<typeof importDraftContent>) => { content.personal.avatarUrl = "blob:sensitive-avatar"; }, ["avatar"]],
+    ["resume", (content: ReturnType<typeof importDraftContent>) => { content.resume.fileName = "private-cv.pdf"; content.resume.fileSize = 100 as never; }, ["resume"]],
+    ["both", (content: ReturnType<typeof importDraftContent>) => { content.personal.avatarUrl = "blob:sensitive-avatar"; content.resume.resumeUrl = "https://private.example.test/cv"; }, ["avatar", "resume"]],
+  ])("rejects unsupported %s without confirmation and creates no candidate rows", async (label, mutate, groups) => {
+    const { user, accessToken } = await seedAuthenticatedUser(`import-asset-${label}`);
+    const content = importDraftContent(user.email); mutate(content);
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    const response = await importDraft(accessToken).expect(400);
+    expect(response.body.code).toBe("CANDIDATE_IMPORT_UNSUPPORTED_ASSETS");
+    expect(response.body.details).toEqual({ unsupportedAssets: groups });
+    expect(JSON.stringify(response.body)).not.toMatch(/sensitive-avatar|private-cv\.pdf|private\.example/);
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.systemUserRole.count({ where: { userId: user.id } })).toBe(0);
+    expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
+  });
+
+  it("omits only confirmed unsupported assets while importing supported fields", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("import-asset-confirmed");
+    const content = importDraftContent(user.email);
+    content.personal.avatarUrl = "blob:sensitive-avatar";
+    content.resume.fileName = "private-cv.pdf";
+    content.privacy.showEmail = true;
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    const response = await importDraft(accessToken, 1, true).expect(201);
+    expect(response.body).toMatchObject({ fullName: "Import Fixture", avatarAssetKey: null, privacySetting: { searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true } });
+    expect(await prisma.resume.count({ where: { candidateProfile: { userId: user.id } } })).toBe(0);
+    expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
   });
 
   it("rejects missing, stale, foreign and invalid drafts without creating a profile", async () => {

@@ -4,7 +4,7 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
-import { parseCandidateOnboardingDraft, type ParsedCandidateDraft } from "./candidate-onboarding-import.parser";
+import { CANDIDATE_IMPORT_PRIVACY_DEFAULTS, parseCandidateOnboardingDraft, type ParsedCandidateDraft } from "./candidate-onboarding-import.parser";
 import type { ImportCandidateOnboardingDto } from "./dto/import-onboarding.dto";
 
 type Tx = Prisma.TransactionClient;
@@ -15,7 +15,8 @@ export class CandidateOnboardingImportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async import(userId: string, dto: ImportCandidateOnboardingDto) {
-    if (!Number.isInteger(dto.version) || dto.version < 1 || dto.confirmPrivacy !== true) {
+    if (!Number.isInteger(dto.version) || dto.version < 1 || dto.confirmPrivacy !== true ||
+      (dto.confirmOmitUnsupportedAssets !== undefined && typeof dto.confirmOmitUnsupportedAssets !== "boolean")) {
       throw new BadRequestException({ code: "CANDIDATE_IMPORT_REQUEST_INVALID", message: "A valid draft version and privacy confirmation are required." });
     }
     try {
@@ -28,6 +29,13 @@ export class CandidateOnboardingImportService {
         if (draft.version !== dto.version) throw new ConflictException({ code: "CANDIDATE_ONBOARDING_VERSION_CONFLICT", message: "Onboarding draft version changed." });
 
         const parsed = parseCandidateOnboardingDraft(draft.content);
+        if (parsed.unsupportedAssets.length > 0 && dto.confirmOmitUnsupportedAssets !== true) {
+          throw new BadRequestException({
+            code: "CANDIDATE_IMPORT_UNSUPPORTED_ASSETS",
+            message: "Confirm omission of unsupported onboarding assets before importing.",
+            details: { unsupportedAssets: parsed.unsupportedAssets },
+          });
+        }
         const user = await tx.user.findUnique({ where: { id: userId }, select: { emailNormalized: true } });
         if (!user) throw new NotFoundException({ code: "CANDIDATE_ACCOUNT_NOT_FOUND", message: "Account does not exist." });
         if (parsed.personal.email && parsed.personal.email.toLowerCase() !== user.emailNormalized) {
@@ -72,7 +80,7 @@ export class CandidateOnboardingImportService {
           countryCode: parsed.personal.countryCode, provinceId, wardId,
           addressLine: parsed.personal.addressLine, bio: parsed.personal.bio,
         }, select: { id: true } });
-        await tx.candidatePrivacySetting.create({ data: { candidateProfileId: profile.id } });
+        await tx.candidatePrivacySetting.create({ data: { candidateProfileId: profile.id, ...CANDIDATE_IMPORT_PRIVACY_DEFAULTS } });
         await tx.systemUserRole.upsert({ where: { userId_roleId: { userId, roleId: role.id } }, update: {}, create: { userId, roleId: role.id, assignedByUserId: null } });
         for (const education of parsed.education) await tx.candidateEducation.create({ data: { candidateProfileId: profile.id, ...education } });
         for (const experience of parsed.experience) {

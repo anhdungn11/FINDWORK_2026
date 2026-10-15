@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { CandidateOnboardingImportService } from "../src/modules/candidate/candidate-onboarding-import.service";
-import { parseCandidateOnboardingDraft } from "../src/modules/candidate/candidate-onboarding-import.parser";
+import { CANDIDATE_IMPORT_PRIVACY_DEFAULTS, parseCandidateOnboardingDraft } from "../src/modules/candidate/candidate-onboarding-import.parser";
 
 const validRole = { id: "role", kind: "SYSTEM", isActive: true, permissions: [
   { dataScope: "OWN", permission: { code: "profile.view" } },
@@ -31,6 +31,7 @@ function harness(content: unknown = draft()) {
     candidateSkill: { create: jest.fn().mockResolvedValue({}) },
     candidateLanguage: { create: jest.fn().mockResolvedValue({ id: "candidate-language" }) },
     candidateLanguageCertificate: { create: jest.fn().mockResolvedValue({}) },
+    resume: { create: jest.fn().mockResolvedValue({}) },
     candidateCareerPreference: { create: jest.fn().mockResolvedValue({}) },
     jobCategory: { findFirst: jest.fn().mockResolvedValue({ id: "category" }), count: jest.fn().mockResolvedValue(1) },
     skill: { findFirst: jest.fn().mockResolvedValue({ id: "skill" }), count: jest.fn().mockResolvedValue(1) },
@@ -70,16 +71,82 @@ describe("Candidate onboarding import", () => {
     expect(invalid.tx.candidateProfile.create).not.toHaveBeenCalled();
   });
 
-  it("rejects unmappable assets, draft privacy changes, and account email mismatch", async () => {
+  it("imports changed draft privacy while saving every backend default", async () => {
+    const content = draft();
+    content.privacy = { searchableProfile: true, showEmail: true, showPhone: true, allowResumeDownload: true, allowJobMatching: false };
+    expect(parseCandidateOnboardingDraft(content).privacyDifferences).toEqual([
+      "searchableProfile", "showEmail", "showPhone", "allowResumeDownload", "allowJobMatching",
+    ]);
+    const { service, tx } = harness(content);
+    await expect(service.import("self", { version: 3, confirmPrivacy: true })).resolves.toMatchObject({ id: "profile" });
+    expect(tx.candidatePrivacySetting.create).toHaveBeenCalledWith({ data: { candidateProfileId: "profile", ...CANDIDATE_IMPORT_PRIVACY_DEFAULTS } });
+    await expect(tx.candidateOnboardingDraft.findUnique.mock.results[0]?.value).resolves.toMatchObject({ content });
+    expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["avatar", (value: ReturnType<typeof draft>) => { value.personal.avatarUrl = "data:image/png;base64,SENSITIVE"; }, ["avatar"]],
+    ["resume", (value: ReturnType<typeof draft>) => { value.resume.fileName = "private.pdf"; value.resume.fileSize = 100 as never; }, ["resume"]],
+    ["both", (value: ReturnType<typeof draft>) => { value.personal.avatarUrl = "blob:sensitive"; value.resume.resumeUrl = "https://private.example.test/cv"; }, ["avatar", "resume"]],
+  ])("rejects unsupported %s without confirmation and reports only asset groups", async (_label, mutate, expected) => {
+    const content = draft(); mutate(content);
+    const { service, tx } = harness(content);
+    const error = await service.import("self", { version: 3, confirmPrivacy: true }).then(() => null, (failure: unknown) => failure as BadRequestException);
+    expect(error).toBeInstanceOf(BadRequestException);
+    const response = error!.getResponse();
+    expect(response).toEqual({
+      code: "CANDIDATE_IMPORT_UNSUPPORTED_ASSETS",
+      message: "Confirm omission of unsupported onboarding assets before importing.",
+      details: { unsupportedAssets: expected },
+    });
+    expect(JSON.stringify(response)).not.toMatch(/SENSITIVE|private\.pdf|blob:|https:/);
+    expect(tx.candidateProfile.create).not.toHaveBeenCalled();
+    expect(tx.candidatePrivacySetting.create).not.toHaveBeenCalled();
+    expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
+  });
+
+  it("imports supported data after explicit asset omission and retains the original draft", async () => {
+    const content = draft();
+    content.personal.avatarUrl = "data:image/png;base64,SENSITIVE";
+    content.resume.fileName = "private.pdf";
+    content.resume.hasExistingResume = true;
+    content.privacy.showEmail = true;
+    const { service, tx } = harness(content);
+    await expect(service.import("self", { version: 3, confirmPrivacy: true, confirmOmitUnsupportedAssets: true })).resolves.toMatchObject({ id: "profile" });
+    expect(tx.candidateProfile.create).toHaveBeenCalledWith({ data: expect.objectContaining({ fullName: "Test Candidate" }), select: { id: true } });
+    expect(tx.candidateProfile.create.mock.calls[0]?.[0].data).not.toHaveProperty("avatarAssetKey");
+    expect(tx.resume.create).not.toHaveBeenCalled();
+    expect(tx.candidatePrivacySetting.create).toHaveBeenCalledWith({ data: { candidateProfileId: "profile", ...CANDIDATE_IMPORT_PRIVACY_DEFAULTS } });
+    expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
+    expect(content.personal.avatarUrl).toBe("data:image/png;base64,SENSITIVE");
+    expect(content.resume.fileName).toBe("private.pdf");
+  });
+
+  it("treats an explicit false omission flag as no asset confirmation", async () => {
+    const content = draft();
+    content.personal.avatarUrl = "blob:sensitive";
+    const { service, tx } = harness(content);
+    await expect(service.import("self", { version: 3, confirmPrivacy: true, confirmOmitUnsupportedAssets: false })).rejects.toMatchObject({ status: 400 });
+    expect(tx.candidateProfile.create).not.toHaveBeenCalled();
+    expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
+  });
+
+  it("does not require asset omission when there are no unsupported assets", async () => {
+    const { service } = harness();
+    await expect(service.import("self", { version: 3, confirmPrivacy: true, confirmOmitUnsupportedAssets: false })).resolves.toMatchObject({ id: "profile" });
+    expect(parseCandidateOnboardingDraft(draft()).unsupportedAssets).toEqual([]);
+    expect(parseCandidateOnboardingDraft(draft()).privacyDifferences).toEqual([]);
+  });
+
+  it("still rejects unmappable non-asset data and account email mismatch with omission confirmed", async () => {
     for (const content of [
-      { ...draft(), personal: { ...draft().personal, avatarUrl: "https://example.test/avatar.png" } },
-      { ...draft(), resume: { ...draft().resume, fileName: "resume.pdf" } },
-      { ...draft(), privacy: { ...draft().privacy, searchableProfile: true } },
+      { ...draft(), personal: { ...draft().personal, fullName: "", avatarUrl: "blob:sensitive" } },
       { ...draft(), personal: { ...draft().personal, email: "other@example.test" } },
     ]) {
       const { service, tx } = harness(content);
-      await expect(service.import("self", { version: 3, confirmPrivacy: true })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.import("self", { version: 3, confirmPrivacy: true, confirmOmitUnsupportedAssets: true })).rejects.toBeInstanceOf(BadRequestException);
       expect(tx.candidateProfile.create).not.toHaveBeenCalled();
+      expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
     }
   });
 
@@ -99,7 +166,7 @@ describe("Candidate onboarding import", () => {
     expect(tx.candidateProfile.create).toHaveBeenCalledWith({ data: expect.objectContaining({ userId: "self", provinceId: "province", wardId: "ward" }), select: { id: true } });
     expect(tx.candidateSkill.create).toHaveBeenCalledWith({ data: expect.objectContaining({ skillId: "skill", level: "ADVANCED" }) });
     expect(tx.candidateLanguage.create).toHaveBeenCalledWith({ data: expect.objectContaining({ languageId: "language", overallLevel: "FLUENT" }), select: { id: true } });
-    expect(tx.candidatePrivacySetting.create).toHaveBeenCalledWith({ data: { candidateProfileId: "profile" } });
+    expect(tx.candidatePrivacySetting.create).toHaveBeenCalledWith({ data: { candidateProfileId: "profile", ...CANDIDATE_IMPORT_PRIVACY_DEFAULTS } });
     expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
     expect(tx.candidateCareerPreference.create).toHaveBeenCalledWith({ data: expect.objectContaining({ preferredCategories: { create: [{ jobCategoryId: "category" }] }, preferredLocations: { create: [{ provinceId: "province" }] } }) });
   });

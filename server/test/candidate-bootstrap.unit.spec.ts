@@ -1,8 +1,9 @@
 import "reflect-metadata";
-import { type INestApplication, RequestMethod, ValidationPipe } from "@nestjs/common";
+import { BadRequestException, type INestApplication, RequestMethod, ValidationPipe } from "@nestjs/common";
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
+import { ApiExceptionFilter } from "../src/common/exceptions/api-exception.filter";
 import { AuthRepository } from "../src/modules/auth/auth.repository";
 import { AccessTokenGuard } from "../src/modules/auth/guards/access-token.guard";
 import { TokenService } from "../src/modules/auth/services/token.service";
@@ -137,6 +138,7 @@ describe("GET /api/v1/candidate/bootstrap authentication", () => {
     app.useLogger(false);
     app.setGlobalPrefix("api/v1");
     app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
+    app.useGlobalFilters(new ApiExceptionFilter());
     await app.init();
   });
   afterAll(async () => app.close());
@@ -195,6 +197,11 @@ describe("GET /api/v1/candidate/bootstrap authentication", () => {
       .send({ version: 3, confirmPrivacy: true }).expect(201);
     expect(importOnboarding).toHaveBeenCalledWith("self", { version: 3, confirmPrivacy: true });
     expect(response.body).toEqual({ id: "profile", userId: "self" });
+    await request(app.getHttpServer())
+      .post("/api/v1/candidate/profile/import-onboarding")
+      .set("Authorization", "Bearer valid")
+      .send({ version: 3, confirmPrivacy: true, confirmOmitUnsupportedAssets: true }).expect(201);
+    expect(importOnboarding).toHaveBeenLastCalledWith("self", { version: 3, confirmPrivacy: true, confirmOmitUnsupportedAssets: true });
   });
 
   it("rejects invalid import requests before calling the importer", async () => {
@@ -202,6 +209,20 @@ describe("GET /api/v1/candidate/bootstrap authentication", () => {
       .set("Authorization", "Bearer valid").send({ version: 3, confirmPrivacy: false }).expect(400);
     await request(app.getHttpServer()).post("/api/v1/candidate/profile/import-onboarding")
       .set("Authorization", "Bearer valid").send({ version: 3, confirmPrivacy: true, userId: "other" }).expect(400);
+    await request(app.getHttpServer()).post("/api/v1/candidate/profile/import-onboarding")
+      .set("Authorization", "Bearer valid").send({ version: 3, confirmPrivacy: true, confirmOmitUnsupportedAssets: "true" }).expect(400);
     expect(importOnboarding).not.toHaveBeenCalled();
+  });
+
+  it("returns machine-readable asset groups without leaking asset values", async () => {
+    importOnboarding.mockRejectedValue(new BadRequestException({
+      code: "CANDIDATE_IMPORT_UNSUPPORTED_ASSETS",
+      message: "Confirm omission of unsupported onboarding assets before importing.",
+      details: { unsupportedAssets: ["avatar", "resume"] },
+    }));
+    const response = await request(app.getHttpServer()).post("/api/v1/candidate/profile/import-onboarding")
+      .set("Authorization", "Bearer valid").send({ version: 3, confirmPrivacy: true }).expect(400);
+    expect(response.body).toMatchObject({ code: "CANDIDATE_IMPORT_UNSUPPORTED_ASSETS", details: { unsupportedAssets: ["avatar", "resume"] } });
+    expect(JSON.stringify(response.body)).not.toMatch(/data:image|blob:|private\.pdf/);
   });
 });

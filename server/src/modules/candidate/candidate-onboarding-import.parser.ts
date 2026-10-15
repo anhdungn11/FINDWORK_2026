@@ -6,6 +6,15 @@ import type {
 } from "./types/candidate.types";
 
 type RecordValue = Record<string, unknown>;
+export type UnsupportedOnboardingAsset = "avatar" | "resume";
+export const CANDIDATE_IMPORT_PRIVACY_DEFAULTS = {
+  searchableProfile: false,
+  showEmail: false,
+  showPhone: false,
+  allowResumeDownload: false,
+  allowJobMatching: true,
+} as const;
+export type CandidateImportPrivacyField = keyof typeof CANDIDATE_IMPORT_PRIVACY_DEFAULTS;
 type Education = Omit<Prisma.CandidateEducationUncheckedCreateInput, "candidateProfileId">;
 type Experience = Omit<Prisma.CandidateExperienceUncheckedCreateInput, "candidateProfileId"> & { skillsUsed: string[] };
 type Skill = Omit<Prisma.CandidateSkillUncheckedCreateInput, "candidateProfileId" | "skillId"> & { skillCode: string | null };
@@ -19,6 +28,8 @@ type Language = Omit<Prisma.CandidateLanguageUncheckedCreateInput, "candidatePro
 };
 
 export interface ParsedCandidateDraft {
+  unsupportedAssets: UnsupportedOnboardingAsset[];
+  privacyDifferences: CandidateImportPrivacyField[];
   personal: {
     fullName: string; email: string | null; phone: string | null; dateOfBirth: Date | null;
     gender: "MALE" | "FEMALE" | "OTHER" | null; countryCode: string | null;
@@ -109,6 +120,10 @@ function nonnegative(value: unknown, path: string): number | null {
 function nullableString(value: unknown, path: string, max: number): string | null {
   return str(value, path, max);
 }
+function assetText(value: unknown, path: string): boolean {
+  if (typeof value !== "string") invalid(path);
+  return value.trim().length > 0;
+}
 function localId(record: RecordValue, path: string) { str(record.id, `${path}.id`, 120, true); }
 function order(start: { month: number | null; year: number | null }, end: { month: number | null; year: number | null }, path: string) {
   if (end.year !== null && start.year !== null && (end.year * 12 + end.month!) < (start.year * 12 + start.month!)) invalid(path);
@@ -117,8 +132,7 @@ function order(start: { month: number | null; year: number | null }, end: { mont
 export function parseCandidateOnboardingDraft(value: unknown): ParsedCandidateDraft {
   const root = obj(value, "data", ["personal", "education", "experience", "skills", "languages", "preferences", "resume", "privacy"]);
   const p = obj(root.personal, "personal", ["fullName", "email", "phone", "dateOfBirth", "gender", "countryCode", "provinceCode", "wardCode", "addressLine", "bio", "avatarUrl"]);
-  const avatarUrl = str(p.avatarUrl, "personal.avatarUrl", 2048);
-  if (avatarUrl) invalid("personal.avatarUrl");
+  const hasAvatar = assetText(p.avatarUrl, "personal.avatarUrl");
   const countryCode = str(p.countryCode, "personal.countryCode", 2);
   if (countryCode && !/^[A-Z]{2}$/.test(countryCode)) invalid("personal.countryCode");
   const provinceCode = str(p.provinceCode, "personal.provinceCode", 10);
@@ -230,12 +244,22 @@ export function parseCandidateOnboardingDraft(value: unknown): ParsedCandidateDr
     availabilityType, availableFrom, willingToRelocate: bool(pref.willingToRelocate, "preferences.willingToRelocate"),
   };
   const resume = obj(root.resume, "resume", ["resumeName", "resumeUrl", "fileName", "fileSize", "mimeType", "hasExistingResume", "createLater"]);
-  for (const key of ["resumeName", "resumeUrl", "fileName", "mimeType"]) {
-    if (str(resume[key], `resume.${key}`, 2048)) invalid(`resume.${key}`);
-  }
-  if (resume.fileSize !== null || bool(resume.hasExistingResume, "resume.hasExistingResume")) invalid("resume");
+  const hasResumeText = ["resumeName", "resumeUrl", "fileName", "mimeType"].map((key) => assetText(resume[key], `resume.${key}`)).some(Boolean);
+  if (resume.fileSize !== null && (typeof resume.fileSize !== "number" || !Number.isSafeInteger(resume.fileSize) || resume.fileSize < 0)) invalid("resume.fileSize");
+  const hasExistingResume = bool(resume.hasExistingResume, "resume.hasExistingResume");
   bool(resume.createLater, "resume.createLater");
   const privacy = obj(root.privacy, "privacy", ["searchableProfile", "showEmail", "showPhone", "allowResumeDownload", "allowJobMatching"]);
-  if (bool(privacy.searchableProfile, "privacy.searchableProfile") || bool(privacy.showEmail, "privacy.showEmail") || bool(privacy.showPhone, "privacy.showPhone") || bool(privacy.allowResumeDownload, "privacy.allowResumeDownload") || !bool(privacy.allowJobMatching, "privacy.allowJobMatching")) invalid("privacy");
-  return { personal, education, experience, skills, languages, preferences };
+  const privacyValues = {
+    searchableProfile: bool(privacy.searchableProfile, "privacy.searchableProfile"),
+    showEmail: bool(privacy.showEmail, "privacy.showEmail"),
+    showPhone: bool(privacy.showPhone, "privacy.showPhone"),
+    allowResumeDownload: bool(privacy.allowResumeDownload, "privacy.allowResumeDownload"),
+    allowJobMatching: bool(privacy.allowJobMatching, "privacy.allowJobMatching"),
+  };
+  const privacyDifferences = (Object.keys(CANDIDATE_IMPORT_PRIVACY_DEFAULTS) as CandidateImportPrivacyField[])
+    .filter((field) => privacyValues[field] !== CANDIDATE_IMPORT_PRIVACY_DEFAULTS[field]);
+  const unsupportedAssets: UnsupportedOnboardingAsset[] = [];
+  if (hasAvatar) unsupportedAssets.push("avatar");
+  if (hasResumeText || resume.fileSize !== null || hasExistingResume) unsupportedAssets.push("resume");
+  return { personal, education, experience, skills, languages, preferences, unsupportedAssets, privacyDifferences };
 }
