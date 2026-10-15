@@ -24,3 +24,10 @@ export { OnboardingImportBanner } from "./components/OnboardingImportBanner";
 export { OnboardingImportPreviewModal } from "./components/OnboardingImportPreviewModal";
 export { ProfileSkeletonLoader } from "./components/ProfileSkeletonLoader";
 export { ProfileStateFeedback } from "./components/ProfileStateFeedback";
+
+// CP8C Integration Foundation
+export * from "./types/candidateApi.types";
+export * from "./config/candidateIntegrationConfig";
+export * from "./adapters/candidateProfileNormalizer";
+export * from "./services/candidateProfileService";
+export * from "./hooks/useCandidateProfileIntegration";

@@ -129,6 +129,11 @@ export interface OnboardingImportPreviewModalProps {
   onClose: () => void;
   onConfirmImport: (payload: ImportOnboardingPayload) => Promise<void> | void;
   onGoToOnboarding: () => void;
+
+  /** Dữ liệu bản nháp thực tế để tính toán chính xác khác biệt quyền riêng tư và asset */
+  draftData?: import("../../types/onboarding.types").CandidateOnboardingData | null;
+  detectedUnsupportedAssets?: import("./candidateApi.types").UnsupportedOnboardingAsset[];
+  privacyDifferences?: import("../adapters/candidateProfileNormalizer").PrivacyDifferenceItem[];
 }
 
 /** Props cho State Feedback Card (Error, Forbidden, Eligibility Unknown, etc.) */
@@ -144,6 +149,7 @@ export interface CandidateProfileViewProps {
   state: CandidateProfilePresentationState;
   profile?: FullCandidateProfileRecord | null;
   draftSummary?: OnboardingDraftSummary | null;
+  draftData?: import("../../types/onboarding.types").CandidateOnboardingData | null;
   accountEmail: string;
   errorMessage?: string | null;
   isSaving?: boolean;

@@ -29,6 +29,7 @@ export const CandidateProfileView = ({
   state,
   profile,
   draftSummary,
+  draftData,
   accountEmail,
   errorMessage,
   isSaving = false,
@@ -110,6 +111,7 @@ export const CandidateProfileView = ({
           <OnboardingImportPreviewModal
             isOpen={isImportModalOpen}
             draftSummary={draftSummary}
+            draftData={draftData}
             isImporting={isSaving}
             importError={importError}
             onClose={() => setIsImportModalOpen(false)}

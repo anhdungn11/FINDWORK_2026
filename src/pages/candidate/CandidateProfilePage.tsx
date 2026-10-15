@@ -1,15 +1,15 @@
 /**
- * FINDWORK CP8B — CANDIDATE PROFILE PAGE (PRESENTATION ROUTE)
+ * FINDWORK CP8C — CANDIDATE PROFILE PAGE (INTEGRATION ROUTE)
  *
  * Vị trí: src/pages/candidate/CandidateProfilePage.tsx
- * Phạm vi: Presentation Layer Only.
+ * Phạm vi: Kết nối tầng tích hợp API (Read-side) và chuẩn bị Adapter CRUD (Phase 4, 5, 6, 7).
  *
  * ĐẢM BẢO RÀNG BUỘC KỸ THUẬT:
- * - Không tự ý gọi API hoặc xây TanStack Query hooks (thuộc thẩm quyền CP8C).
- * - Không hiển thị hồ sơ giả như dữ liệu thật ở production route.
- * - Trước khi CP8C tích hợp, trang phản ánh trung thực trạng thái chờ API integration.
- * - Hỗ trợ tham số URL an toàn (?preview=...) để kiểm thử giao diện các trạng thái
- *   (full, fresher, draft, loading, unknown, forbidden, error) có gắn nhãn cảnh báo rõ ràng.
+ * - Read-side được tích hợp trực tiếp với API backend: GET /api/v1/candidate/bootstrap.
+ * - Phân định rõ 401 != 403 != 404, không coi lỗi API là hồ sơ rỗng.
+ * - Không gửi mutation ghi dữ liệu khi Activation Safety Gate (ENABLE_LIVE_WRITES) đang tắt.
+ * - Bảo toàn chế độ preview (?preview=...) trong môi trường DEV để phục vụ kiểm thử giao diện.
+ * - Không để lọt dữ liệu fixture giả mạo vào môi trường sản xuất.
  */
 
 import { useState } from "react";
@@ -19,6 +19,7 @@ import { useAuthStore } from "@/store/authStore";
 import {
   CandidateProfileView,
   resolveCandidateProfilePageState,
+  useCandidateProfileIntegration,
   type FullCandidateProfileRecord,
 } from "@/features/candidate/profile";
 import {
@@ -40,13 +41,16 @@ const CandidateProfilePage = () => {
     previewParam === "fresher" ? MOCK_FIXTURE_FRESHER_PROFILE : MOCK_FIXTURE_FULL_PROFILE
   );
 
-  // P0 Boundary: Production builds strictly lock out fixtures and ?preview= queries
-  const {
-    presentationState,
-    activeProfile,
-    activeDraft,
-    showDevBanner,
-  } = resolveCandidateProfilePageState({
+  // Hook tích hợp API thực tế và quản lý Activation Safety Gate
+  const integration = useCandidateProfileIntegration({
+    isDev,
+    previewParam,
+    demoProfileFixture: demoProfile,
+    draftSummaryFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
+  });
+
+  // Điều khiển thanh xem trước (Chỉ bật khi ở Development mode)
+  const { showDevBanner } = resolveCandidateProfilePageState({
     isDev,
     previewParam,
     demoProfile,
@@ -70,97 +74,21 @@ const CandidateProfilePage = () => {
             flexWrap: "wrap",
             gap: "0.5rem",
           }}
-          aria-label="Thanh điều khiển chế độ xem trước CP8B"
+          aria-label="Thanh điều khiển chế độ xem trước CP8C"
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Info size={14} color="var(--color-primary, #4f6ef7)" aria-hidden="true" />
             <span>
-              <strong>CP8B Development Preview:</strong>{" "}
+              <strong>CP8C Development Preview:</strong>{" "}
               {previewParam
                 ? `Đang xem kịch bản mẫu (?preview=${previewParam}) — Dữ liệu Mock Fixture.`
-                : "Trạng thái sẵn sàng giao diện. Kết nối dữ liệu máy chủ thực tế sẽ được bàn giao tại CP8C."}
+                : "Đang kết nối API Backend thực tế (GET /api/v1/candidate/bootstrap). Tầng ghi được bảo vệ an toàn."}
             </span>
           </div>
 
-        {/* Nút chuyển đổi nhanh các kịch bản preview phục vụ Review */}
-        <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
-          <span style={{ alignSelf: "center", marginRight: "4px", fontWeight: 600 }}>Xem kịch bản:</span>
-          <button
-            type="button"
-            style={{
-              padding: "2px 6px",
-              fontSize: "0.6875rem",
-              borderRadius: "4px",
-              border: "1px solid var(--color-border)",
-              background: previewParam === "full" ? "var(--color-primary)" : "#ffffff",
-              color: previewParam === "full" ? "#ffffff" : "inherit",
-              cursor: "pointer",
-            }}
-            onClick={() => setSearchParams({ preview: "full" })}
-          >
-            Hồ sơ đầy đủ
-          </button>
-          <button
-            type="button"
-            style={{
-              padding: "2px 6px",
-              fontSize: "0.6875rem",
-              borderRadius: "4px",
-              border: "1px solid var(--color-border)",
-              background: previewParam === "fresher" ? "var(--color-primary)" : "#ffffff",
-              color: previewParam === "fresher" ? "#ffffff" : "inherit",
-              cursor: "pointer",
-            }}
-            onClick={() => setSearchParams({ preview: "fresher" })}
-          >
-            Sinh viên/Fresher
-          </button>
-          <button
-            type="button"
-            style={{
-              padding: "2px 6px",
-              fontSize: "0.6875rem",
-              borderRadius: "4px",
-              border: "1px solid var(--color-border)",
-              background: previewParam === "draft" ? "var(--color-primary)" : "#ffffff",
-              color: previewParam === "draft" ? "#ffffff" : "inherit",
-              cursor: "pointer",
-            }}
-            onClick={() => setSearchParams({ preview: "draft" })}
-          >
-            Có bản nháp (Import)
-          </button>
-          <button
-            type="button"
-            style={{
-              padding: "2px 6px",
-              fontSize: "0.6875rem",
-              borderRadius: "4px",
-              border: "1px solid var(--color-border)",
-              background: previewParam === "nodraft" ? "var(--color-primary)" : "#ffffff",
-              color: previewParam === "nodraft" ? "#ffffff" : "inherit",
-              cursor: "pointer",
-            }}
-            onClick={() => setSearchParams({ preview: "nodraft" })}
-          >
-            Chưa có nháp
-          </button>
-          <button
-            type="button"
-            style={{
-              padding: "2px 6px",
-              fontSize: "0.6875rem",
-              borderRadius: "4px",
-              border: "1px solid var(--color-border)",
-              background: previewParam === "loading" ? "var(--color-primary)" : "#ffffff",
-              color: previewParam === "loading" ? "#ffffff" : "inherit",
-              cursor: "pointer",
-            }}
-            onClick={() => setSearchParams({ preview: "loading" })}
-          >
-            Skeleton Loading
-          </button>
-          {previewParam && (
+          {/* Nút chuyển đổi nhanh các kịch bản preview phục vụ Review */}
+          <div style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}>
+            <span style={{ alignSelf: "center", marginRight: "4px", fontWeight: 600 }}>Xem kịch bản:</span>
             <button
               type="button"
               style={{
@@ -168,131 +96,256 @@ const CandidateProfilePage = () => {
                 fontSize: "0.6875rem",
                 borderRadius: "4px",
                 border: "1px solid var(--color-border)",
-                background: "#ffffff",
+                background: previewParam === "full" ? "var(--color-primary)" : "#ffffff",
+                color: previewParam === "full" ? "#ffffff" : "inherit",
                 cursor: "pointer",
               }}
-              onClick={() => setSearchParams({})}
+              onClick={() => setSearchParams({ preview: "full" })}
             >
-              Mặc định
+              Hồ sơ đầy đủ
             </button>
-          )}
-        </div>
-      </aside>
+            <button
+              type="button"
+              style={{
+                padding: "2px 6px",
+                fontSize: "0.6875rem",
+                borderRadius: "4px",
+                border: "1px solid var(--color-border)",
+                background: previewParam === "fresher" ? "var(--color-primary)" : "#ffffff",
+                color: previewParam === "fresher" ? "#ffffff" : "inherit",
+                cursor: "pointer",
+              }}
+              onClick={() => setSearchParams({ preview: "fresher" })}
+            >
+              Sinh viên/Fresher
+            </button>
+            <button
+              type="button"
+              style={{
+                padding: "2px 6px",
+                fontSize: "0.6875rem",
+                borderRadius: "4px",
+                border: "1px solid var(--color-border)",
+                background: previewParam === "draft" ? "var(--color-primary)" : "#ffffff",
+                color: previewParam === "draft" ? "#ffffff" : "inherit",
+                cursor: "pointer",
+              }}
+              onClick={() => setSearchParams({ preview: "draft" })}
+            >
+              Có bản nháp (Import)
+            </button>
+            <button
+              type="button"
+              style={{
+                padding: "2px 6px",
+                fontSize: "0.6875rem",
+                borderRadius: "4px",
+                border: "1px solid var(--color-border)",
+                background: previewParam === "nodraft" ? "var(--color-primary)" : "#ffffff",
+                color: previewParam === "nodraft" ? "#ffffff" : "inherit",
+                cursor: "pointer",
+              }}
+              onClick={() => setSearchParams({ preview: "nodraft" })}
+            >
+              Chưa có nháp
+            </button>
+            <button
+              type="button"
+              style={{
+                padding: "2px 6px",
+                fontSize: "0.6875rem",
+                borderRadius: "4px",
+                border: "1px solid var(--color-border)",
+                background: previewParam === "loading" ? "var(--color-primary)" : "#ffffff",
+                color: previewParam === "loading" ? "#ffffff" : "inherit",
+                cursor: "pointer",
+              }}
+              onClick={() => setSearchParams({ preview: "loading" })}
+            >
+              Skeleton Loading
+            </button>
+            {previewParam && (
+              <button
+                type="button"
+                style={{
+                  padding: "2px 6px",
+                  fontSize: "0.6875rem",
+                  borderRadius: "4px",
+                  border: "1px solid var(--color-border)",
+                  background: "#ffffff",
+                  cursor: "pointer",
+                }}
+                onClick={() => setSearchParams({})}
+              >
+                Kết nối API
+              </button>
+            )}
+          </div>
+        </aside>
       )}
 
       {/* Presentation Master Container */}
       <CandidateProfileView
-        state={presentationState}
-        profile={activeProfile}
-        draftSummary={activeDraft}
+        state={integration.presentationState}
+        profile={integration.profile}
+        draftSummary={integration.draftSummary}
+        draftData={integration.rawDraft?.data}
         accountEmail={accountEmail}
-        errorMessage="Chưa thể kết nối tới dịch vụ hồ sơ ứng viên. Vui lòng thử lại sau."
-        onRetry={() => {
-          // Handled in CP8C
-        }}
-        onConfirmImport={async () => {
-          // In development preview mode, transition to full profile view
-          if (isDev) {
+        errorMessage={integration.errorMessage || "Chưa thể kết nối tới dịch vụ hồ sơ ứng viên. Vui lòng thử lại sau."}
+        isSaving={integration.isSaving || integration.isImporting}
+        onRetry={integration.refetch}
+        onConfirmImport={async (payload) => {
+          if (isDev && previewParam) {
             setSearchParams({ preview: "full" });
+            return;
           }
+          await integration.handleConfirmImport(payload);
         }}
         onSaveOverview={async (data) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            fullName: data.fullName,
-            careerStatus: data.careerStatus,
-            bio: data.bio,
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              fullName: data.fullName,
+              careerStatus: data.careerStatus,
+              bio: data.bio,
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleSaveOverview(data);
         }}
         onSavePersonalInfo={async (data) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            ...data,
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              ...data,
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleSavePersonalInfo(data);
         }}
         onAddEducation={async (edu) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            education: [
-              ...prev.education,
-              { ...edu, id: `edu-${Date.now()}` },
-            ],
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              education: [
+                ...prev.education,
+                { ...edu, id: `edu-${Date.now()}` },
+              ],
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleAddEducation(edu);
         }}
         onDeleteEducation={async (id) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            education: prev.education.filter((e) => e.id !== id),
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              education: prev.education.filter((e) => e.id !== id),
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleDeleteEducation(id);
         }}
         onAddExperience={async (exp) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            experience: [
-              ...prev.experience,
-              { ...exp, id: `exp-${Date.now()}` },
-            ],
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              experience: [
+                ...prev.experience,
+                { ...exp, id: `exp-${Date.now()}` },
+              ],
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleAddExperience(exp);
         }}
         onDeleteExperience={async (id) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            experience: prev.experience.filter((e) => e.id !== id),
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              experience: prev.experience.filter((e) => e.id !== id),
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleDeleteExperience(id);
         }}
         onAddSkill={async (skill) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            skills: [
-              ...prev.skills,
-              { ...skill, id: `sk-${Date.now()}` },
-            ],
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              skills: [
+                ...prev.skills,
+                { ...skill, id: `sk-${Date.now()}` },
+              ],
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleAddSkill(skill);
         }}
         onDeleteSkill={async (id) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            skills: prev.skills.filter((s) => s.id !== id),
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              skills: prev.skills.filter((s) => s.id !== id),
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleDeleteSkill(id);
         }}
         onAddLanguage={async (lang) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            languages: [
-              ...prev.languages,
-              { ...lang, id: `lang-${Date.now()}` },
-            ],
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              languages: [
+                ...prev.languages,
+                { ...lang, id: `lang-${Date.now()}` },
+              ],
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleAddLanguage(lang);
         }}
         onDeleteLanguage={async (id) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            languages: prev.languages.filter((l) => l.id !== id),
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              languages: prev.languages.filter((l) => l.id !== id),
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleDeleteLanguage(id);
         }}
         onSaveCareerPreference={async (pref) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            careerPreference: pref,
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              careerPreference: pref,
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleSaveCareerPreference(pref);
         }}
         onSavePrivacy={async (privacy) => {
-          setDemoProfile((prev) => ({
-            ...prev,
-            privacySetting: privacy,
-            updatedAt: new Date().toISOString(),
-          }));
+          if (isDev && previewParam) {
+            setDemoProfile((prev) => ({
+              ...prev,
+              privacySetting: privacy,
+              updatedAt: new Date().toISOString(),
+            }));
+            return;
+          }
+          await integration.handleSavePrivacy(privacy);
         }}
       />
     </div>

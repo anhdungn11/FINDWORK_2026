@@ -237,10 +237,11 @@ export interface FullCandidateProfileRecord {
   privacySetting?: CandidatePrivacySettingRecord | null;
 }
 
-/** Hợp đồng đề xuất tạo hồ sơ từ Onboarding */
+/** Hợp đồng tạo hồ sơ từ Onboarding */
 export interface ImportOnboardingPayload {
   version: number;
   confirmPrivacy: boolean;
+  confirmOmitUnsupportedAssets?: boolean;
 }
 
 /** Tóm tắt dữ liệu Onboarding khả dụng cho Import Preview */
