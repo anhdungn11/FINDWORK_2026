@@ -84,4 +84,21 @@ describe("reference foundation snapshot", () => {
     expect(db.stores.skills.get("custom-skill")?.isActive).toBe(true);
     expect(db.skill.upsert.mock.calls.every(([call]) => !("id" in call.create) && !("id" in call.update))).toBe(true);
   });
+
+  it("treats reordered scoreFields object keys as unchanged and preserves updatedAt", async () => {
+    const db = fakeDb();
+    await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply");
+    const code = REFERENCE_SNAPSHOT.certificates[0]!.code;
+    const original = db.stores.certificates.get(code)!;
+    const reordered = (original.scoreFields as Record<string, unknown>[]).map((field) =>
+      Object.fromEntries(Object.entries(field).reverse()));
+    db.stores.certificates.set(code, { ...original, id: "existing-id", updatedAt: "unchanged-time", scoreFields: reordered });
+    db.languageCertificateType.upsert.mockClear();
+    const preview = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "dry-run");
+    const replay = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply");
+    expect(preview.tables.certificates).toEqual({ create: 0, update: 0, unchanged: 30 });
+    expect(replay.tables.certificates).toEqual({ create: 0, update: 0, unchanged: 30 });
+    expect(db.languageCertificateType.upsert).not.toHaveBeenCalled();
+    expect(db.stores.certificates.get(code)).toMatchObject({ id: "existing-id", updatedAt: "unchanged-time" });
+  });
 });

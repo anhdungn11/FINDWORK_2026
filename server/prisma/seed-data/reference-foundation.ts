@@ -1,4 +1,5 @@
 import type { Prisma } from "../../src/generated/prisma/client";
+import { isDeepStrictEqual } from "node:util";
 
 export interface SkillSource {
   code: string; name: string; categoryCode: string; aliases: string[];
@@ -83,7 +84,7 @@ function count(operations: Operation[]): Record<Operation, number> {
 
 function action(current: object | undefined, expected: object): Operation {
   if (!current) return "create";
-  return JSON.stringify(current) === JSON.stringify(expected) ? "unchanged" : "update";
+  return isDeepStrictEqual(current, expected) ? "unchanged" : "update";
 }
 
 /** Reads and parent checks happen inside the caller's transaction. Apply uses code upserts only. */

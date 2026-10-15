@@ -6,8 +6,8 @@ import { CertificateQueryDto, ReferenceQueryDto, SkillCategoryQueryDto, SkillQue
 export class ReferenceService {
   constructor(private readonly db: PrismaService) {}
 
-  private whereActive(query: ReferenceQueryDto) {
-    return query.active === "all" ? {} : { isActive: query.active === "true" };
+  private whereActive() {
+    return { isActive: true };
   }
 
   private page(query: ReferenceQueryDto) {
@@ -19,7 +19,7 @@ export class ReferenceService {
   }
 
   async jobCategories(query: ReferenceQueryDto) {
-    const where = this.whereActive(query);
+    const where = this.whereActive();
     const [data, total] = await Promise.all([
       this.db.jobCategory.findMany({ where, orderBy: [{ sortOrder: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, name: true, isActive: true, sortOrder: true } }),
       this.db.jobCategory.count({ where }),
@@ -28,7 +28,9 @@ export class ReferenceService {
   }
 
   async skillCategories(query: SkillCategoryQueryDto) {
-    const where = { ...this.whereActive(query), ...(query.parentCode && { parent: { code: query.parentCode } }) };
+    const where = { ...this.whereActive(), ...(query.parentCode
+      ? { parent: { code: query.parentCode, isActive: true } }
+      : { OR: [{ parentId: null }, { parent: { isActive: true } }] }) };
     const [rows, total] = await Promise.all([
       this.db.skillCategory.findMany({ where, orderBy: [{ sortOrder: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, name: true, isActive: true, sortOrder: true, parent: { select: { code: true } } } }),
       this.db.skillCategory.count({ where }),
@@ -37,7 +39,7 @@ export class ReferenceService {
   }
 
   async skills(query: SkillQueryDto) {
-    const where = { ...this.whereActive(query), ...(query.categoryCode && { category: { code: query.categoryCode } }) };
+    const where = { ...this.whereActive(), category: { isActive: true, ...(query.categoryCode && { code: query.categoryCode }) } };
     const [rows, total] = await Promise.all([
       this.db.skill.findMany({ where, orderBy: [{ sortOrder: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, name: true, aliases: true, isActive: true, sortOrder: true, category: { select: { code: true } } } }),
       this.db.skill.count({ where }),
@@ -46,7 +48,7 @@ export class ReferenceService {
   }
 
   async languages(query: ReferenceQueryDto) {
-    const where = this.whereActive(query);
+    const where = this.whereActive();
     const [data, total] = await Promise.all([
       this.db.language.findMany({ where, orderBy: [{ sortOrder: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, label: true, englishLabel: true, isActive: true, sortOrder: true } }),
       this.db.language.count({ where }),
@@ -55,7 +57,7 @@ export class ReferenceService {
   }
 
   async certificates(query: CertificateQueryDto) {
-    const where = { ...this.whereActive(query), ...(query.languageCode && { language: { code: query.languageCode } }) };
+    const where = { ...this.whereActive(), language: { isActive: true, ...(query.languageCode && { code: query.languageCode }) } };
     const [rows, total] = await Promise.all([
       this.db.languageCertificateType.findMany({ where, orderBy: [{ sortOrder: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, label: true, supportsOverallScore: true, supportsLevel: true, levelOptions: true, scoreFields: true, isActive: true, sortOrder: true, language: { select: { code: true } } } }),
       this.db.languageCertificateType.count({ where }),
@@ -64,7 +66,7 @@ export class ReferenceService {
   }
 
   async provinces(query: ReferenceQueryDto) {
-    const where = this.whereActive(query);
+    const where = this.whereActive();
     const [data, total] = await Promise.all([
       this.db.province.findMany({ where, orderBy: [{ name: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, name: true, divisionType: true, isActive: true } }),
       this.db.province.count({ where }),
@@ -73,7 +75,7 @@ export class ReferenceService {
   }
 
   async wards(query: WardQueryDto) {
-    const where = { ...this.whereActive(query), ...(query.provinceCode && { province: { code: query.provinceCode } }) };
+    const where = { ...this.whereActive(), province: { isActive: true, ...(query.provinceCode && { code: query.provinceCode }) } };
     const [rows, total] = await Promise.all([
       this.db.ward.findMany({ where, orderBy: [{ name: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, name: true, divisionType: true, codename: true, isActive: true, province: { select: { code: true } } } }),
       this.db.ward.count({ where }),

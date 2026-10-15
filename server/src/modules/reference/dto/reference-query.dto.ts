@@ -1,9 +1,9 @@
 import { Type } from "class-transformer";
-import { IsIn, IsInt, IsOptional, Matches, Max, Min } from "class-validator";
+import { IsInt, IsOptional, Matches, Max, Min } from "class-validator";
 
 export class ReferenceQueryDto {
-  @IsOptional() @IsIn(["true", "false", "all"])
-  active: "true" | "false" | "all" = "true";
+  @IsOptional() @Matches(/^true$/, { message: "Public reference catalogs only support active=true." })
+  active: "true" = "true";
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1_000_000)
   page = 1;
