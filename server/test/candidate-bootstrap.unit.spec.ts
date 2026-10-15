@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { type INestApplication, RequestMethod } from "@nestjs/common";
+import { type INestApplication, RequestMethod, ValidationPipe } from "@nestjs/common";
 import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
@@ -9,6 +9,7 @@ import { TokenService } from "../src/modules/auth/services/token.service";
 import { AuthorizationService } from "../src/modules/authorization/authorization.service";
 import { CandidateController } from "../src/modules/candidate/candidate.controller";
 import { CandidateOnboardingDraftService } from "../src/modules/candidate/candidate-onboarding-draft.service";
+import { CandidateOnboardingImportService } from "../src/modules/candidate/candidate-onboarding-import.service";
 import { CandidateService } from "../src/modules/candidate/candidate.service";
 
 const validRole = () => ({
@@ -99,6 +100,7 @@ describe("candidate bootstrap business logic", () => {
 describe("GET /api/v1/candidate/bootstrap authentication", () => {
   let app: INestApplication;
   const bootstrap = jest.fn();
+  const importOnboarding = jest.fn();
   const verifyAccessToken = jest.fn();
   const findAccessSession = jest.fn();
 
@@ -126,6 +128,7 @@ describe("GET /api/v1/candidate/bootstrap authentication", () => {
         { provide: AuthorizationService, useValue: {} },
         { provide: CandidateService, useValue: { getBootstrap: bootstrap } },
         { provide: CandidateOnboardingDraftService, useValue: {} },
+        { provide: CandidateOnboardingImportService, useValue: { import: importOnboarding } },
         { provide: TokenService, useValue: { verifyAccessToken } },
         { provide: AuthRepository, useValue: { findAccessSession } },
       ],
@@ -133,6 +136,7 @@ describe("GET /api/v1/candidate/bootstrap authentication", () => {
     app = moduleRef.createNestApplication();
     app.useLogger(false);
     app.setGlobalPrefix("api/v1");
+    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
     await app.init();
   });
   afterAll(async () => app.close());
@@ -179,5 +183,25 @@ describe("GET /api/v1/candidate/bootstrap authentication", () => {
   it("propagates backend failures as HTTP 500", async () => {
     bootstrap.mockRejectedValue(new Error("DB unavailable"));
     await request(app.getHttpServer()).get("/api/v1/candidate/bootstrap").set("Authorization", "Bearer valid").expect(500);
+  });
+
+  it("protects import with the access token and uses only the principal account", async () => {
+    await request(app.getHttpServer()).post("/api/v1/candidate/profile/import-onboarding").send({ version: 3, confirmPrivacy: true }).expect(401);
+    expect(importOnboarding).not.toHaveBeenCalled();
+    importOnboarding.mockResolvedValue({ id: "profile", userId: "self" });
+    const response = await request(app.getHttpServer())
+      .post("/api/v1/candidate/profile/import-onboarding?userId=other")
+      .set("Authorization", "Bearer valid")
+      .send({ version: 3, confirmPrivacy: true }).expect(201);
+    expect(importOnboarding).toHaveBeenCalledWith("self", { version: 3, confirmPrivacy: true });
+    expect(response.body).toEqual({ id: "profile", userId: "self" });
+  });
+
+  it("rejects invalid import requests before calling the importer", async () => {
+    await request(app.getHttpServer()).post("/api/v1/candidate/profile/import-onboarding")
+      .set("Authorization", "Bearer valid").send({ version: 3, confirmPrivacy: false }).expect(400);
+    await request(app.getHttpServer()).post("/api/v1/candidate/profile/import-onboarding")
+      .set("Authorization", "Bearer valid").send({ version: 3, confirmPrivacy: true, userId: "other" }).expect(400);
+    expect(importOnboarding).not.toHaveBeenCalled();
   });
 });

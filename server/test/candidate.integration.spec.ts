@@ -523,4 +523,66 @@ describe("Candidate integration", () => {
 
     expect(response.body.code).toBe("CANDIDATE_LANGUAGE_HAS_CERTIFICATES");
   });
+
+  function importDraftContent(email: string) {
+    return {
+      personal: { fullName: "Import Fixture", email, phone: "", dateOfBirth: "", gender: "", countryCode: "VN", provinceCode: "", wardCode: "", addressLine: "", bio: "", avatarUrl: "" },
+      education: [], experience: [], skills: [], languages: [],
+      preferences: { desiredPositions: ["Engineer"], preferredCategoryCodes: [], locationPreference: { mode: "selected", provinceCodes: [] }, employmentTypes: [], workplaceTypes: [], salaryExpectation: { type: "range", min: null, max: null, currency: "VND", period: "month" }, desiredCareerLevel: "", availability: { type: "", availableFrom: "" }, willingToRelocate: false },
+      resume: { resumeName: "", resumeUrl: "", fileName: "", fileSize: null, mimeType: "", hasExistingResume: false, createLater: true },
+      privacy: { searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true },
+    };
+  }
+
+  function importDraft(accessToken: string, version = 1) {
+    return request(app.getHttpServer()).post(`${API}/profile/import-onboarding`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ version, confirmPrivacy: true });
+  }
+
+  it("imports an owned draft atomically with private defaults and retains the draft", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("import-success");
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content: importDraftContent(user.email), stepIndex: 0 } });
+    const result = await importDraft(accessToken).expect(201);
+    expect(result.body).toMatchObject({ userId: user.id, fullName: "Import Fixture", privacySetting: { searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true } });
+    expect(result.body.careerPreference.desiredPositions).toEqual(expect.arrayContaining([expect.objectContaining({ title: "Engineer" })]));
+    expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id, version: 1 } })).toBe(1);
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(1);
+    await importDraft(accessToken).expect(409);
+  });
+
+  it("rejects missing, stale, foreign and invalid drafts without creating a profile", async () => {
+    const owner = await seedAuthenticatedUser("import-owner");
+    const other = await seedAuthenticatedUser("import-other");
+    await importDraft(owner.accessToken).expect(404);
+    await prisma.candidateOnboardingDraft.create({ data: { userId: owner.user.id, content: importDraftContent(owner.user.email), stepIndex: 6 } });
+    await importDraft(owner.accessToken, 2).expect(409);
+    await importDraft(other.accessToken).expect(404);
+    await request(app.getHttpServer()).post(`${API}/profile/import-onboarding?userId=${owner.user.id}`)
+      .set("Authorization", `Bearer ${other.accessToken}`).send({ version: 1, confirmPrivacy: true }).expect(404);
+    await request(app.getHttpServer()).post(`${API}/profile/import-onboarding`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).send({ version: 1, confirmPrivacy: false }).expect(400);
+    expect(await prisma.candidateProfile.count({ where: { userId: { in: [owner.user.id, other.user.id] } } })).toBe(0);
+  });
+
+  it("classifies an unknown or unloaded reference and leaves every owned table unchanged", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("import-reference");
+    const content = importDraftContent(user.email);
+    content.personal.provinceCode = "INVALID";
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
+    const catalogLoaded = (await prisma.province.count()) > 0;
+    const response = await importDraft(accessToken).expect(catalogLoaded ? 400 : 503);
+    expect(response.body.code).toBe(catalogLoaded ? "CANDIDATE_REFERENCE_INVALID" : "CANDIDATE_REFERENCE_CATALOG_UNAVAILABLE");
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.systemUserRole.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.candidateOnboardingDraft.count({ where: { userId: user.id } })).toBe(1);
+  });
+
+  it("permits only one concurrent import for the same account", async () => {
+    const { user, accessToken } = await seedAuthenticatedUser("import-race");
+    await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content: importDraftContent(user.email), stepIndex: 6 } });
+    const responses = await Promise.all([importDraft(accessToken), importDraft(accessToken)]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(1);
+  });
 });

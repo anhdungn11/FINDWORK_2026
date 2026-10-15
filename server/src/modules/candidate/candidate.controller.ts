@@ -22,6 +22,8 @@ import { RequirePermissions } from "../authorization/decorators/require-permissi
 import { PermissionGuard } from "../authorization/guards/permission.guard";
 import { CandidateService } from "./candidate.service";
 import { CandidateOnboardingDraftService } from "./candidate-onboarding-draft.service";
+import { CandidateOnboardingImportService } from "./candidate-onboarding-import.service";
+import { ImportCandidateOnboardingDto } from "./dto/import-onboarding.dto";
 import { SaveCandidateOnboardingDraftDto } from "./dto/onboarding-draft.dto";
 import { PutCandidateCareerPreferenceDto } from "./dto/career-preference.dto";
 import {
@@ -58,6 +60,7 @@ export class CandidateController {
   constructor(
     private readonly candidateService: CandidateService,
     private readonly candidateDrafts: CandidateOnboardingDraftService,
+    private readonly candidateImport: CandidateOnboardingImportService,
   ) {}
 
   @Get("bootstrap")
@@ -90,6 +93,15 @@ export class CandidateController {
     @Body() dto: CreateCandidateProfileDto,
   ) {
     return this.candidateService.createProfile(auth.userId, dto);
+  }
+
+  @Post("profile/import-onboarding")
+  @ApiOperation({ summary: "Import the current account's versioned onboarding draft into a private candidate profile" })
+  importOnboarding(
+    @CurrentAuth() auth: AuthenticatedPrincipal,
+    @Body() dto: ImportCandidateOnboardingDto,
+  ) {
+    return this.candidateImport.import(auth.userId, dto);
   }
 
   @Get("profile")
