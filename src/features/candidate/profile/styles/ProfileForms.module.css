@@ -301,3 +301,30 @@
   outline: 2px solid var(--color-danger, #ef4444);
   outline-offset: 2px;
 }
+
+/* Informational & Warning Callouts inside forms */
+.noticeBox {
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-surface-soft, #f1f5f9);
+  border: 1px solid var(--color-border, #cbd5e1);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2, 0.5rem);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-secondary, #475569);
+  line-height: 1.5;
+}
+
+.warningBox {
+  padding: var(--space-3, 0.75rem);
+  border-radius: var(--radius-md, 10px);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2, 0.5rem);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: #92400e;
+  line-height: 1.5;
+}

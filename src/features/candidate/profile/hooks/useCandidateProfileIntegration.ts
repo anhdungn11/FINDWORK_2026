@@ -110,6 +110,7 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
           setDraftSummary(draftSummaryFixture || null);
           return;
         case "nodraft":
+        case "no-draft":
           setPresentationState("not_created_no_draft");
           setProfile(null);
           setDraftSummary(null);
@@ -225,11 +226,11 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
     // Kiểm tra Activation Safety Gate
     if (!isLiveWritesEnabled()) {
       setIsImporting(false);
-      setImportError(
-        "Chức năng khởi tạo hồ sơ từ bản nháp đang tạm khóa trong giai đoạn nghiệm thu kiểm thử CP8A/CP8C. " +
-        "Dữ liệu chưa được gửi lên cơ sở dữ liệu."
-      );
-      return;
+      const msg =
+        "Chức năng khởi tạo hồ sơ từ bản nháp đang tạm khóa trong giai đoạn nghiệm thu kiểm thử CP8A/CP8C (ENABLE_LIVE_WRITES=false). " +
+        "Dữ liệu chưa được gửi lên cơ sở dữ liệu.";
+      setImportError(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     try {
@@ -254,6 +255,7 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       } else {
         setImportError("Đã có lỗi xảy ra khi tạo hồ sơ.");
       }
+      throw err;
     } finally {
       setIsImporting(false);
     }
@@ -267,11 +269,11 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
     careerStatus: CandidateCareerStatus | null;
   }) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage(
-        "Chức năng lưu thông tin đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C. " +
-        "Thay đổi chưa được lưu lên cơ sở dữ liệu."
-      );
-      return;
+      const msg =
+        "Chức năng lưu thông tin đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false). " +
+        "Thay đổi chưa được lưu lên cơ sở dữ liệu.";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -283,7 +285,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       });
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể lưu thông tin.");
+      const msg = err instanceof Error ? err.message : "Không thể lưu thông tin.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -292,10 +296,11 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý lưu Thông tin cá nhân */
   const handleSavePersonalInfo = async (data: Partial<FullCandidateProfileRecord>) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage(
-        "Chức năng cập nhật thông tin cá nhân đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C."
-      );
-      return;
+      const msg =
+        "Chức năng cập nhật thông tin cá nhân đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false). " +
+        "Thay đổi chưa được lưu lên cơ sở dữ liệu.";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -313,7 +318,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       });
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể lưu thông tin cá nhân.");
+      const msg = err instanceof Error ? err.message : "Không thể lưu thông tin cá nhân.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -322,8 +329,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý thêm Học vấn */
   const handleAddEducation = async (edu: Omit<CandidateEducationRecord, "id">) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng thêm học vấn đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng thêm học vấn đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -331,7 +339,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.createEducation(toCreateEducationDto(edu));
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể thêm học vấn.");
+      const msg = err instanceof Error ? err.message : "Không thể thêm học vấn.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -340,8 +350,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý xóa Học vấn */
   const handleDeleteEducation = async (id: string) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng xóa học vấn đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng xóa học vấn đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -349,7 +360,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.deleteEducation(id);
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể xóa học vấn.");
+      const msg = err instanceof Error ? err.message : "Không thể xóa học vấn.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -358,8 +371,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý thêm Kinh nghiệm */
   const handleAddExperience = async (exp: Omit<CandidateExperienceRecord, "id">) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng thêm kinh nghiệm đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng thêm kinh nghiệm đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -367,7 +381,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.createExperience(toCreateExperienceDto(exp));
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể thêm kinh nghiệm.");
+      const msg = err instanceof Error ? err.message : "Không thể thêm kinh nghiệm.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -376,8 +392,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý xóa Kinh nghiệm */
   const handleDeleteExperience = async (id: string) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng xóa kinh nghiệm đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng xóa kinh nghiệm đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -385,7 +402,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.deleteExperience(id);
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể xóa kinh nghiệm.");
+      const msg = err instanceof Error ? err.message : "Không thể xóa kinh nghiệm.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -394,8 +413,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý thêm Kỹ năng */
   const handleAddSkill = async (skill: Omit<CandidateSkillRecord, "id">) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng thêm kỹ năng đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng thêm kỹ năng đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -403,7 +423,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.createSkill(toCreateSkillDto(skill));
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể thêm kỹ năng.");
+      const msg = err instanceof Error ? err.message : "Không thể thêm kỹ năng.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -412,8 +434,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý xóa Kỹ năng */
   const handleDeleteSkill = async (id: string) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng xóa kỹ năng đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng xóa kỹ năng đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -421,7 +444,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.deleteSkill(id);
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể xóa kỹ năng.");
+      const msg = err instanceof Error ? err.message : "Không thể xóa kỹ năng.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -430,8 +455,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý thêm Ngoại ngữ */
   const handleAddLanguage = async (lang: Omit<CandidateLanguageRecord, "id">) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng thêm ngoại ngữ đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng thêm ngoại ngữ đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -439,7 +465,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.createLanguage(toCreateLanguageDto(lang));
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể thêm ngoại ngữ.");
+      const msg = err instanceof Error ? err.message : "Không thể thêm ngoại ngữ.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -448,8 +476,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý xóa Ngoại ngữ */
   const handleDeleteLanguage = async (id: string) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng xóa ngoại ngữ đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng xóa ngoại ngữ đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -457,7 +486,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.deleteLanguage(id);
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể xóa ngoại ngữ.");
+      const msg = err instanceof Error ? err.message : "Không thể xóa ngoại ngữ.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -466,8 +497,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý lưu Nguyện vọng nghề nghiệp */
   const handleSaveCareerPreference = async (pref: NonNullable<FullCandidateProfileRecord["careerPreference"]>) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng lưu nguyện vọng đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng lưu nguyện vọng đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -475,7 +507,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.putCareerPreference(toPutCareerPreferenceDto(pref));
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể lưu nguyện vọng.");
+      const msg = err instanceof Error ? err.message : "Không thể lưu nguyện vọng.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -484,8 +518,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   /** Xử lý lưu Quyền riêng tư */
   const handleSavePrivacy = async (privacy: CandidatePrivacySettingRecord) => {
     if (!isLiveWritesEnabled()) {
-      setErrorMessage("Chức năng cập nhật quyền riêng tư đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C.");
-      return;
+      const msg = "Chức năng cập nhật quyền riêng tư đang tạm khóa trong giai đoạn nghiệm thu CP8A/CP8C (ENABLE_LIVE_WRITES=false).";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
     }
 
     setIsSaving(true);
@@ -493,7 +528,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       await candidateProfileService.updatePrivacy(toUpdatePrivacyDto(privacy));
       await loadData();
     } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : "Không thể lưu quyền riêng tư.");
+      const msg = err instanceof Error ? err.message : "Không thể lưu quyền riêng tư.";
+      setErrorMessage(msg);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -514,6 +551,7 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
     validationErrors,
     showImportModal,
     setShowImportModal,
+    isLiveWritesEnabled: isLiveWritesEnabled(),
     refetch: loadData,
     handleConfirmImport,
     handleSaveOverview,

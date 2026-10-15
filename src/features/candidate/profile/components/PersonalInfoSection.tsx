@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertCircle, Pencil, User, X } from "lucide-react";
+import { AlertCircle, Info, Pencil, User, X } from "lucide-react";
 import type { Gender } from "../types/candidateProfile.types";
 import type { PersonalInfoSectionProps } from "../types/uiProfileProps.types";
 import { formatDateOfBirth, formatGenderLabel } from "../utils/profileFormatters";
@@ -19,6 +19,8 @@ export const PersonalInfoSection = ({
   accountEmail,
   onSavePersonalInfo,
   isSaving = false,
+  isPreview = false,
+  isLiveWritesEnabled = false,
 }: PersonalInfoSectionProps) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -53,16 +55,22 @@ export const PersonalInfoSection = ({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    if (onSavePersonalInfo) {
-      await onSavePersonalInfo({
-        phone: phone.trim() || null,
-        dateOfBirth: dateOfBirth ? dateOfBirth : null,
-        gender: gender === "" ? null : gender,
-        addressLine: addressLine.trim() || null,
-      });
+    try {
+      if (onSavePersonalInfo) {
+        await onSavePersonalInfo({
+          phone: phone.trim() || null,
+          dateOfBirth: dateOfBirth ? dateOfBirth : null,
+          gender: gender === "" ? null : gender,
+          addressLine: addressLine.trim() || null,
+        });
+      }
+      setIsEditOpen(false);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Không thể lưu thông tin cá nhân.");
     }
-    setIsEditOpen(false);
   };
+
+  const liveWritesAllowed = isPreview || isLiveWritesEnabled;
 
   const fullAddress = [
     profile.addressLine,
@@ -185,6 +193,24 @@ export const PersonalInfoSection = ({
 
             <form onSubmit={handleSubmit} noValidate style={{ display: "contents" }}>
               <div className={formStyles.modalBody}>
+                {isPreview && (
+                  <div className={formStyles.noticeBox} role="note">
+                    <Info size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color: "var(--color-primary, #4f6ef7)" }} />
+                    <span>
+                      <strong>Chế độ xem trước (Development Preview):</strong> Chỉnh sửa chỉ lưu tạm thời trong bộ nhớ phiên làm việc hiện tại và sẽ được đặt lại về dữ liệu mẫu khi tải lại trang (F5). Dữ liệu không ghi vào cơ sở dữ liệu.
+                    </span>
+                  </div>
+                )}
+
+                {!liveWritesAllowed && (
+                  <div className={formStyles.warningBox} role="note">
+                    <AlertCircle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color: "#d97706" }} />
+                    <span>
+                      <strong>Tầng ghi dữ liệu đang tạm khóa (ENABLE_LIVE_WRITES=false):</strong> Nhằm bảo đảm an toàn kiểm thử tích hợp, chức năng lưu cơ sở dữ liệu hiện đang tắt. Thay đổi chưa thể gửi lên máy chủ.
+                    </span>
+                  </div>
+                )}
+
                 {errorMsg && (
                   <div className={formStyles.errorSummary} role="alert" tabIndex={-1}>
                     <div className={formStyles.errorSummaryTitle}>
@@ -269,7 +295,8 @@ export const PersonalInfoSection = ({
                 <button
                   type="submit"
                   className={formStyles.btnPrimary}
-                  disabled={isSaving}
+                  disabled={isSaving || !liveWritesAllowed}
+                  title={!liveWritesAllowed ? "Tầng ghi cơ sở dữ liệu đang tạm khóa (ENABLE_LIVE_WRITES=false)" : undefined}
                 >
                   {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
                 </button>

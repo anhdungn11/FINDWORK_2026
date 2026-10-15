@@ -246,7 +246,7 @@ export const PrivacySettingsSection = ({
       <div className={sectionStyles.noticeBox} role="note">
         <Info size={15} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
         <div>
-          <strong>Minh bạch kỹ thuật:</strong> Các tùy chọn này ghi nhận thiết lập dữ liệu cá nhân của bạn trong cơ sở dữ liệu. FINDWORK cam kết tôn trọng tuyệt đối quyền kiểm soát thông tin của ứng viên.
+          <strong>Minh bạch kỹ thuật:</strong> Hồ sơ ứng viên được khởi tạo với 5 thiết lập quyền riêng tư mặc định theo hợp đồng backend (chỉ bật gợi ý việc làm, tắt tìm kiếm công khai, ẩn email, ẩn số điện thoại và tắt tải CV). Trong giai đoạn nghiệm thu kiểm thử (ENABLE_LIVE_WRITES=false), các thay đổi cài đặt chưa được lưu vĩnh viễn vào cơ sở dữ liệu.
         </div>
       </div>
     </section>

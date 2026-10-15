@@ -32,6 +32,8 @@ export const ProfileOverviewCard = ({
   updatedAt,
   onSaveOverview,
   isSaving = false,
+  isPreview = false,
+  isLiveWritesEnabled = false,
 }: Props) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const initials = getAvatarInitials(fullName);
@@ -144,12 +146,13 @@ export const ProfileOverviewCard = ({
           isOpen={isEditModalOpen}
           initialData={{ fullName, headline, bio, careerStatus }}
           isSaving={isSaving}
+          isPreview={isPreview}
+          isLiveWritesEnabled={isLiveWritesEnabled}
           onClose={() => setIsEditModalOpen(false)}
           onSave={async (data) => {
             if (onSaveOverview) {
               await onSaveOverview(data);
             }
-            setIsEditModalOpen(false);
           }}
         />
       )}

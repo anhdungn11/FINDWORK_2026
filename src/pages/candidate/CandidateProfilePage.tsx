@@ -36,16 +36,21 @@ const CandidateProfilePage = () => {
   const user = useAuthStore((state) => state.user);
   const accountEmail = user?.email || "candidate@findwork.vn";
 
-  // Quản lý dữ liệu giả định chỉ trong bộ nhớ khi bật chế độ Preview trong Development
-  const [demoProfile, setDemoProfile] = useState<FullCandidateProfileRecord>(
-    previewParam === "fresher" ? MOCK_FIXTURE_FRESHER_PROFILE : MOCK_FIXTURE_FULL_PROFILE
-  );
+  // Quản lý riêng biệt dữ liệu giả định theo từng kịch bản trong bộ nhớ khi bật chế độ Preview
+  const [fullDemoProfile, setFullDemoProfile] = useState<FullCandidateProfileRecord>(() => ({
+    ...MOCK_FIXTURE_FULL_PROFILE,
+  }));
+  const [fresherDemoProfile, setFresherDemoProfile] = useState<FullCandidateProfileRecord>(() => ({
+    ...MOCK_FIXTURE_FRESHER_PROFILE,
+  }));
+
+  const activeDemoProfile = previewParam === "fresher" ? fresherDemoProfile : fullDemoProfile;
 
   // Hook tích hợp API thực tế và quản lý Activation Safety Gate
   const integration = useCandidateProfileIntegration({
     isDev,
     previewParam,
-    demoProfileFixture: demoProfile,
+    demoProfileFixture: activeDemoProfile,
     draftSummaryFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
   });
 
@@ -53,9 +58,19 @@ const CandidateProfilePage = () => {
   const { showDevBanner } = resolveCandidateProfilePageState({
     isDev,
     previewParam,
-    demoProfile,
+    demoProfile: activeDemoProfile,
     draftFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
   });
+
+  const isPreview = Boolean(isDev && previewParam);
+  const isFresher = previewParam === "fresher";
+  const updateActiveDemoProfile = (updater: (prev: FullCandidateProfileRecord) => FullCandidateProfileRecord) => {
+    if (isFresher) {
+      setFresherDemoProfile(updater);
+    } else {
+      setFullDemoProfile(updater);
+    }
+  };
 
   return (
     <div>
@@ -81,8 +96,8 @@ const CandidateProfilePage = () => {
             <span>
               <strong>CP8C Development Preview:</strong>{" "}
               {previewParam
-                ? `Đang xem kịch bản mẫu (?preview=${previewParam}) — Dữ liệu Mock Fixture.`
-                : "Đang kết nối API Backend thực tế (GET /api/v1/candidate/bootstrap). Tầng ghi được bảo vệ an toàn."}
+                ? `Đang xem kịch bản mẫu (?preview=${previewParam}) — Dữ liệu tạm thời trong bộ nhớ phiên làm việc (in-memory demo), tải lại trang (F5) sẽ đặt lại dữ liệu mẫu và KHÔNG lưu vào cơ sở dữ liệu PostgreSQL.`
+                : "Đang kết nối API Backend thực tế (GET /api/v1/candidate/bootstrap). Tầng ghi được bảo vệ an toàn (ENABLE_LIVE_WRITES=false)."}
             </span>
           </div>
 
@@ -187,15 +202,23 @@ const CandidateProfilePage = () => {
       {/* Presentation Master Container */}
       <CandidateProfileView
         state={integration.presentationState}
-        profile={integration.profile}
+        profile={isPreview ? activeDemoProfile : integration.profile}
         draftSummary={integration.draftSummary}
         draftData={integration.rawDraft?.data}
         accountEmail={accountEmail}
         errorMessage={integration.errorMessage || "Chưa thể kết nối tới dịch vụ hồ sơ ứng viên. Vui lòng thử lại sau."}
         isSaving={integration.isSaving || integration.isImporting}
+        isPreview={isPreview}
+        isLiveWritesEnabled={integration.isLiveWritesEnabled}
         onRetry={integration.refetch}
         onConfirmImport={async (payload) => {
           if (isDev && previewParam) {
+            setFullDemoProfile((prev) => ({
+              ...prev,
+              fullName: MOCK_FIXTURE_DRAFT_SUMMARY.fullName || prev.fullName,
+              phone: MOCK_FIXTURE_DRAFT_SUMMARY.phone || prev.phone,
+              updatedAt: new Date().toISOString(),
+            }));
             setSearchParams({ preview: "full" });
             return;
           }
@@ -203,7 +226,7 @@ const CandidateProfilePage = () => {
         }}
         onSaveOverview={async (data) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               fullName: data.fullName,
               careerStatus: data.careerStatus,
@@ -216,7 +239,7 @@ const CandidateProfilePage = () => {
         }}
         onSavePersonalInfo={async (data) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               ...data,
               updatedAt: new Date().toISOString(),
@@ -227,7 +250,7 @@ const CandidateProfilePage = () => {
         }}
         onAddEducation={async (edu) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               education: [
                 ...prev.education,
@@ -241,7 +264,7 @@ const CandidateProfilePage = () => {
         }}
         onDeleteEducation={async (id) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               education: prev.education.filter((e) => e.id !== id),
               updatedAt: new Date().toISOString(),
@@ -252,7 +275,7 @@ const CandidateProfilePage = () => {
         }}
         onAddExperience={async (exp) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               experience: [
                 ...prev.experience,
@@ -266,7 +289,7 @@ const CandidateProfilePage = () => {
         }}
         onDeleteExperience={async (id) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               experience: prev.experience.filter((e) => e.id !== id),
               updatedAt: new Date().toISOString(),
@@ -277,7 +300,7 @@ const CandidateProfilePage = () => {
         }}
         onAddSkill={async (skill) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               skills: [
                 ...prev.skills,
@@ -291,7 +314,7 @@ const CandidateProfilePage = () => {
         }}
         onDeleteSkill={async (id) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               skills: prev.skills.filter((s) => s.id !== id),
               updatedAt: new Date().toISOString(),
@@ -302,7 +325,7 @@ const CandidateProfilePage = () => {
         }}
         onAddLanguage={async (lang) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               languages: [
                 ...prev.languages,
@@ -316,7 +339,7 @@ const CandidateProfilePage = () => {
         }}
         onDeleteLanguage={async (id) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               languages: prev.languages.filter((l) => l.id !== id),
               updatedAt: new Date().toISOString(),
@@ -327,7 +350,7 @@ const CandidateProfilePage = () => {
         }}
         onSaveCareerPreference={async (pref) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               careerPreference: pref,
               updatedAt: new Date().toISOString(),
@@ -338,7 +361,7 @@ const CandidateProfilePage = () => {
         }}
         onSavePrivacy={async (privacy) => {
           if (isDev && previewParam) {
-            setDemoProfile((prev) => ({
+            updateActiveDemoProfile((prev) => ({
               ...prev,
               privacySetting: privacy,
               updatedAt: new Date().toISOString(),

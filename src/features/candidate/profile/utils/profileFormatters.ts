@@ -251,7 +251,7 @@ export function resolveCandidateProfilePageState({
     presentationState = "loading";
   } else if (previewParam === "forbidden") {
     presentationState = "forbidden";
-  } else if (previewParam === "nodraft") {
+  } else if (previewParam === "nodraft" || previewParam === "no-draft") {
     presentationState = "not_created_no_draft";
   } else if (previewParam === "error") {
     presentationState = "network_error";

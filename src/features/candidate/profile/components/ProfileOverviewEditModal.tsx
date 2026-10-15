@@ -6,7 +6,7 @@
  */
 
 import { useRef, useState, type FormEvent } from "react";
-import { AlertCircle, X } from "lucide-react";
+import { AlertCircle, Info, X } from "lucide-react";
 import type { CandidateCareerStatus } from "../types/candidateProfile.types";
 import { useModalAccessibility } from "../utils/useModalAccessibility";
 import styles from "../styles/ProfileForms.module.css";
@@ -20,6 +20,8 @@ interface Props {
     careerStatus: CandidateCareerStatus | null;
   };
   isSaving?: boolean;
+  isPreview?: boolean;
+  isLiveWritesEnabled?: boolean;
   onClose: () => void;
   onSave: (data: {
     fullName: string;
@@ -33,6 +35,8 @@ export const ProfileOverviewEditModal = ({
   isOpen,
   initialData,
   isSaving = false,
+  isPreview = false,
+  isLiveWritesEnabled = false,
   onClose,
   onSave,
 }: Props) => {
@@ -65,13 +69,21 @@ export const ProfileOverviewEditModal = ({
       return;
     }
     setErrorMsg(null);
-    await onSave({
-      fullName: fullName.trim(),
-      headline: headline.trim() || undefined,
-      bio: bio.trim() || null,
-      careerStatus: careerStatus === "" ? null : careerStatus,
-    });
+    try {
+      await onSave({
+        fullName: fullName.trim(),
+        headline: headline.trim() || undefined,
+        bio: bio.trim() || null,
+        careerStatus: careerStatus === "" ? null : careerStatus,
+      });
+      onClose();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Không thể lưu thông tin.");
+    }
   };
+
+
+  const liveWritesAllowed = isPreview || isLiveWritesEnabled;
 
   return (
     <div
@@ -105,6 +117,24 @@ export const ProfileOverviewEditModal = ({
 
         <form onSubmit={handleSubmit} noValidate style={{ display: "contents" }}>
           <div className={styles.modalBody}>
+            {isPreview && (
+              <div className={styles.noticeBox} role="note">
+                <Info size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color: "var(--color-primary, #4f6ef7)" }} />
+                <span>
+                  <strong>Chế độ xem trước (Development Preview):</strong> Chỉnh sửa chỉ lưu tạm thời trong bộ nhớ phiên làm việc hiện tại và sẽ được đặt lại về dữ liệu mẫu khi tải lại trang (F5). Dữ liệu không ghi vào cơ sở dữ liệu.
+                </span>
+              </div>
+            )}
+
+            {!liveWritesAllowed && (
+              <div className={styles.warningBox} role="note">
+                <AlertCircle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1, color: "#d97706" }} />
+                <span>
+                  <strong>Tầng ghi dữ liệu đang tạm khóa (ENABLE_LIVE_WRITES=false):</strong> Nhằm bảo đảm an toàn kiểm thử tích hợp, chức năng lưu cơ sở dữ liệu hiện đang tắt. Thay đổi chưa thể gửi lên máy chủ.
+                </span>
+              </div>
+            )}
+
             {errorMsg && (
               <div id="overview-error" className={styles.errorSummary} role="alert" tabIndex={-1}>
                 <div className={styles.errorSummaryTitle}>
@@ -201,7 +231,8 @@ export const ProfileOverviewEditModal = ({
             <button
               type="submit"
               className={styles.btnPrimary}
-              disabled={isSaving}
+              disabled={isSaving || !liveWritesAllowed}
+              title={!liveWritesAllowed ? "Tầng ghi cơ sở dữ liệu đang tạm khóa (ENABLE_LIVE_WRITES=false)" : undefined}
             >
               {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
             </button>

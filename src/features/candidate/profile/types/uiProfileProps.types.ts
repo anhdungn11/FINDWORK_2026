@@ -29,6 +29,8 @@ export interface ProfileOverviewCardProps {
   updatedAt: string;
   onEditOverview?: () => void;
   isSaving?: boolean;
+  isPreview?: boolean;
+  isLiveWritesEnabled?: boolean;
 }
 
 /** Props cho Section Thông tin cá nhân */
@@ -49,7 +51,10 @@ export interface PersonalInfoSectionProps {
   accountEmail: string;
   onSavePersonalInfo?: (data: Partial<FullCandidateProfileRecord>) => Promise<void> | void;
   isSaving?: boolean;
+  isPreview?: boolean;
+  isLiveWritesEnabled?: boolean;
 }
+
 
 /** Props cho Section Học vấn */
 export interface EducationSectionProps {
@@ -153,6 +158,8 @@ export interface CandidateProfileViewProps {
   accountEmail: string;
   errorMessage?: string | null;
   isSaving?: boolean;
+  isPreview?: boolean;
+  isLiveWritesEnabled?: boolean;
 
   // Handlers
   onRetry?: () => void;

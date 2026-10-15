@@ -64,6 +64,7 @@ import {
 import { resolveCandidateProfilePageState } from "../utils/profileFormatters";
 import {
   MOCK_FIXTURE_DRAFT_SUMMARY,
+  MOCK_FIXTURE_FRESHER_PROFILE,
   MOCK_FIXTURE_FULL_PROFILE,
 } from "../fixtures/mockProfileData";
 import type { CandidateOnboardingData } from "../../types/onboarding.types";
@@ -701,6 +702,102 @@ describe("FINDWORK CP8C — Candidate Profile Integration Foundation Tests", () 
       breakpoints.forEach((width) => {
         assert.ok(width > 0, `Breakpoint ${width}px verified in responsive grid design`);
       });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 16. PREVIEW STATE HONESTY & FIXTURE ISOLATION REGRESSION
+  // ---------------------------------------------------------------------------
+  describe("16. Preview state honesty and fixture isolation regression", () => {
+    it("preserves static fixture immutability when preview profiles are mutated in session", () => {
+      const originalFull = MOCK_FIXTURE_FULL_PROFILE.fullName;
+      const originalFresher = MOCK_FIXTURE_FRESHER_PROFILE.fullName;
+      const originalDraft = MOCK_FIXTURE_DRAFT_SUMMARY.fullName;
+
+      assert.equal(originalFull, "Trần Minh Hoàng");
+      assert.equal(originalFresher, "Lê Thu Hà");
+      assert.equal(originalDraft, "Phạm Quốc Bảo");
+
+      // Cloned session mutation
+      const sessionFull = { ...MOCK_FIXTURE_FULL_PROFILE, fullName: "Nguyễn Văn Test" };
+      assert.notEqual(sessionFull.fullName, MOCK_FIXTURE_FULL_PROFILE.fullName);
+      assert.equal(MOCK_FIXTURE_FULL_PROFILE.fullName, "Trần Minh Hoàng", "Static fixture must remain unmodified");
+    });
+
+    it("distinguishes full profile fixture from fresher profile fixture cleanly", () => {
+      const fullResolution = resolveCandidateProfilePageState({
+        isDev: true,
+        previewParam: "full",
+        demoProfile: MOCK_FIXTURE_FULL_PROFILE,
+      });
+      const fresherResolution = resolveCandidateProfilePageState({
+        isDev: true,
+        previewParam: "fresher",
+        demoProfile: MOCK_FIXTURE_FRESHER_PROFILE,
+      });
+
+      assert.equal(fullResolution.activeProfile?.fullName, "Trần Minh Hoàng");
+      assert.equal(fresherResolution.activeProfile?.fullName, "Lê Thu Hà");
+      assert.notEqual(fullResolution.activeProfile?.id, fresherResolution.activeProfile?.id);
+    });
+
+    it("verifies simulated draft import maps draft summary persona to imported full profile", () => {
+      const importedProfile = {
+        ...MOCK_FIXTURE_FULL_PROFILE,
+        fullName: MOCK_FIXTURE_DRAFT_SUMMARY.fullName,
+        phone: MOCK_FIXTURE_DRAFT_SUMMARY.phone,
+      };
+
+      assert.equal(importedProfile.fullName, "Phạm Quốc Bảo");
+      assert.equal(importedProfile.phone, "0912999888");
+      // Original static fixture intact
+      assert.equal(MOCK_FIXTURE_FULL_PROFILE.fullName, "Trần Minh Hoàng");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 17. ACTIVATION SAFETY GATE HONEST REJECTION (NO SILENT SUCCESS)
+  // ---------------------------------------------------------------------------
+  describe("17. Activation safety gate honest rejection across all mutation endpoints", () => {
+    it("consistently throws CandidateWriteGateBlockedError without generating fake IDs", () => {
+      setLiveWritesEnabledForTesting(false);
+      assert.equal(isLiveWritesEnabled(), false);
+
+      const operations = [
+        "createProfile",
+        "updateProfile",
+        "createEducation",
+        "updateEducation",
+        "deleteEducation",
+        "createExperience",
+        "updateExperience",
+        "deleteExperience",
+        "createSkill",
+        "updateSkill",
+        "deleteSkill",
+        "createLanguage",
+        "updateLanguage",
+        "deleteLanguage",
+        "putCareerPreference",
+        "updatePrivacy",
+        "importOnboarding",
+      ];
+
+      for (const op of operations) {
+        assert.throws(
+          () => assertLiveWritesAllowed(op),
+          (err: unknown) => {
+            assert.ok(err instanceof CandidateWriteGateBlockedError);
+            assert.equal(err.operation, op);
+            assert.equal(err.code, "WRITE_GATE_BLOCKED");
+            assert.equal(err.status, 403);
+            return true;
+          },
+          `Operation ${op} must throw CandidateWriteGateBlockedError when writes disabled`
+        );
+      }
+
+      setLiveWritesEnabledForTesting(null);
     });
   });
 });

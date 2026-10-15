@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { AlertCircle } from "lucide-react";
 import type { CandidateProfileViewProps } from "../types/uiProfileProps.types";
 import { buildGuidanceChecklist } from "../utils/profileFormatters";
 import { CareerPreferencesSection } from "./CareerPreferencesSection";
@@ -33,6 +34,8 @@ export const CandidateProfileView = ({
   accountEmail,
   errorMessage,
   isSaving = false,
+  isPreview = false,
+  isLiveWritesEnabled = false,
   onRetry,
   onGoToOnboarding = () => {
     window.location.href = "/candidate/onboarding";
@@ -156,6 +159,27 @@ export const CandidateProfileView = ({
         </p>
       </header>
 
+      {errorMessage && (
+        <div
+          role="alert"
+          style={{
+            background: "#fee2e2",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            borderRadius: "10px",
+            padding: "0.75rem 1rem",
+            marginBottom: "1.5rem",
+            color: "#b91c1c",
+            fontSize: "0.8125rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          <AlertCircle size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       <div className={layoutStyles.workspaceGrid}>
         {/* CỘT CHÍNH (70% trên Desktop) */}
         <div className={layoutStyles.mainColumn}>
@@ -168,6 +192,8 @@ export const CandidateProfileView = ({
             locationName={profile.province?.name}
             updatedAt={profile.updatedAt}
             isSaving={isSaving}
+            isPreview={isPreview}
+            isLiveWritesEnabled={isLiveWritesEnabled}
             onSaveOverview={onSaveOverview}
           />
 
@@ -176,6 +202,8 @@ export const CandidateProfileView = ({
             profile={profile}
             accountEmail={accountEmail}
             isSaving={isSaving}
+            isPreview={isPreview}
+            isLiveWritesEnabled={isLiveWritesEnabled}
             onSavePersonalInfo={onSavePersonalInfo}
           />
 
