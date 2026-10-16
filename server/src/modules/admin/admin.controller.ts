@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
@@ -44,6 +44,7 @@ export class AdminController {
   }
 
   @Post("users/:userId/disable")
+  @HttpCode(200)
   @RequirePermissions("user.disable")
   disableUser(@Req() req: AuthorizedRequest, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Param("userId", ParseUUIDPipe) userId: string) {
@@ -82,6 +83,7 @@ export class AdminController {
   }
 
   @Post("jobs/:jobId/close")
+  @HttpCode(200)
   @RequirePermissions("job.moderate")
   closeJob(@Req() req: AuthorizedRequest, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Param("jobId", ParseUUIDPipe) jobId: string) {
