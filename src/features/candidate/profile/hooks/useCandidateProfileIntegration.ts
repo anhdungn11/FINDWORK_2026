@@ -17,7 +17,7 @@
  *    - Báo lỗi trung thực và hướng dẫn khi thao tác ghi bị chặn bởi gate.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthStore } from "../../../../store/authStore";
 import {
   candidateProfileService,
@@ -34,6 +34,7 @@ import {
   toPutCareerPreferenceDto,
   toUpdatePrivacyDto,
 } from "../adapters/candidateProfileNormalizer";
+import { classifyCandidateLoadError } from "../utils/loadErrorClassifier";
 import { isLiveWritesEnabled } from "../config/candidateIntegrationConfig";
 import { loadOnboardingDraft, type OnboardingDraft } from "../../services/onboardingDraft";
 import type {
@@ -63,6 +64,9 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   const authUser = useAuthStore((s) => s.user);
   const authStatus = useAuthStore((s) => s.status);
 
+  // Monotonic sequence token to prevent stale async requests from a previous scenario overwriting current state
+  const requestSeqRef = useRef(0);
+
   // States
   const [presentationState, setPresentationState] = useState<CandidateProfilePresentationState>("loading");
   const [profile, setProfile] = useState<FullCandidateProfileRecord | null>(null);
@@ -76,6 +80,8 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string[]> | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -85,10 +91,19 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   // ---------------------------------------------------------------------------
 
   const loadData = useCallback(async () => {
+    const currentSeq = ++requestSeqRef.current;
+
     // 1. Nếu đang ở chế độ Development Preview với query param hợp lệ, sử dụng fixture cô lập
     if (isDev && previewParam) {
       setIsLoading(false);
       setErrorMessage(null);
+      setErrorStatus(null);
+      setErrorCode(null);
+      setImportError(null);
+      setValidationErrors(null);
+      setRawDraft(null);
+      setDetectedAssets([]);
+      setBootstrapData(null);
 
       switch (previewParam) {
         case "full":
@@ -110,36 +125,73 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
           return;
         case "loading":
           setPresentationState("loading");
+          setProfile(null);
+          setDraftSummary(null);
           return;
         case "forbidden":
           setPresentationState("forbidden");
+          setProfile(null);
+          setDraftSummary(null);
+          setErrorStatus(403);
+          setErrorCode("FORBIDDEN");
           setErrorMessage("Bạn không có quyền truy cập hồ sơ này.");
           return;
         case "error":
           setPresentationState("network_error");
+          setProfile(null);
+          setDraftSummary(null);
+          setErrorStatus(0);
+          setErrorCode("NETWORK_ERROR");
           setErrorMessage("Không thể kết nối tới dịch vụ hồ sơ ứng viên.");
           return;
         default:
           setPresentationState("eligibility_unknown");
+          setProfile(null);
+          setDraftSummary(null);
           return;
       }
     }
 
     // 2. Chế độ thực tế (Production hoặc Dev không có ?preview=)
-    setIsLoading(true);
+    // Xóa trạng thái preview và lỗi cũ trước khi tải từ Backend
     setErrorMessage(null);
+    setErrorStatus(null);
+    setErrorCode(null);
+    setImportError(null);
+    setValidationErrors(null);
 
-    // Kiểm tra trạng thái đăng nhập
-    if (authStatus === "unauthenticated" || (!authUser && authStatus !== "loading")) {
+    // Trong lúc phiên đăng nhập đang được khôi phục (idle / loading), giữ trạng thái loading và không báo lỗi giả
+    if (authStatus === "idle" || authStatus === "loading" || authStatus === "loggingOut") {
+      setPresentationState("loading");
+      setIsLoading(true);
+      return;
+    }
+
+    // Kiểm tra trạng thái chưa đăng nhập
+    if (authStatus === "unauthenticated" || !authUser) {
       setPresentationState("eligibility_unknown");
+      setProfile(null);
+      setDraftSummary(null);
+      setRawDraft(null);
+      setErrorStatus(401);
+      setErrorCode("UNAUTHORIZED");
+      setErrorMessage("Phiên đăng nhập đã hết hạn hoặc chưa được xác thực. Vui lòng đăng nhập lại.");
       setIsLoading(false);
       return;
     }
 
+    setIsLoading(true);
+    setPresentationState("loading");
+
     try {
       // BƯỚC 1: Lấy Bootstrap từ backend
       const bootstrap = await candidateProfileService.getBootstrap();
+      if (requestSeqRef.current !== currentSeq) return;
+
       setBootstrapData(bootstrap);
+      setErrorMessage(null);
+      setErrorStatus(null);
+      setErrorCode(null);
 
       const resolvedState = resolveBootstrapPresentationState(bootstrap, true);
       setPresentationState(resolvedState);
@@ -147,13 +199,17 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       // BƯỚC 2: Tải dữ liệu tương ứng theo trạng thái Bootstrap
       if (resolvedState === "existing_profile") {
         const full = await candidateProfileService.getFullProfile();
+        if (requestSeqRef.current !== currentSeq) return;
         setProfile(full);
         setDraftSummary(null);
+        setRawDraft(null);
+        setDetectedAssets([]);
       } else if (resolvedState === "not_created_with_draft") {
+        // Khi Bootstrap báo chưa có hồ sơ chính thức (not_created), TUYỆT ĐỐI KHÔNG gọi 7 API con của hồ sơ
         setProfile(null);
-        // Tải bản nháp để tính toán tóm tắt trung thực và phát hiện tài nguyên
         try {
           const draft = await loadOnboardingDraft();
+          if (requestSeqRef.current !== currentSeq) return;
           if (draft) {
             setRawDraft(draft);
             setDraftSummary(buildDraftSummaryFromDraft(draft));
@@ -161,9 +217,12 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
           } else {
             setPresentationState("not_created_no_draft");
             setDraftSummary(null);
+            setRawDraft(null);
+            setDetectedAssets([]);
           }
         } catch {
-          // Nếu không load được draft nhưng bootstrap báo draft exists
+          if (requestSeqRef.current !== currentSeq) return;
+          // Nếu không load được chi tiết draft nhưng bootstrap báo draft exists
           setDraftSummary({
             version: bootstrap.draft.version || 1,
             stepIndex: 0,
@@ -180,25 +239,22 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       } else {
         setProfile(null);
         setDraftSummary(null);
+        setRawDraft(null);
+        setDetectedAssets([]);
       }
     } catch (err: unknown) {
-      if (err instanceof CandidateServiceError) {
-        if (err.status === 401) {
-          setPresentationState("eligibility_unknown");
-          setErrorMessage("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.");
-        } else if (err.status === 403) {
-          setPresentationState("forbidden");
-          setErrorMessage("Bạn không có quyền xem hồ sơ ứng viên này.");
-        } else {
-          setPresentationState("network_error");
-          setErrorMessage(err.message);
-        }
-      } else {
-        setPresentationState("network_error");
-        setErrorMessage("Đã có sự cố kết nối tới máy chủ.");
-      }
+      if (requestSeqRef.current !== currentSeq) return;
+      setProfile(null);
+
+      const classified = classifyCandidateLoadError(err);
+      setErrorStatus(classified.status);
+      setErrorCode(classified.code);
+      setPresentationState(classified.state);
+      setErrorMessage(classified.message);
     } finally {
-      setIsLoading(false);
+      if (requestSeqRef.current === currentSeq) {
+        setIsLoading(false);
+      }
     }
   }, [isDev, previewParam, authUser, authStatus, demoProfileFixture, draftSummaryFixture]);
 
@@ -540,6 +596,8 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
     isSaving,
     isImporting,
     errorMessage,
+    errorStatus,
+    errorCode,
     importError,
     validationErrors,
     showImportModal,

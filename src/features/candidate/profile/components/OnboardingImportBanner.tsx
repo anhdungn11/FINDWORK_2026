@@ -14,7 +14,13 @@ export const OnboardingImportBanner = ({
   draftSummary,
   onOpenImportPreview,
   onGoToOnboarding,
+  isPreview = false,
+  isLiveWritesEnabled = false,
 }: OnboardingImportBannerProps) => {
+  // Thật: chỉ thao tác được khi Backend mở ghi. Demo: luôn mô phỏng trong bộ nhớ.
+  const importBlocked = !isPreview && !isLiveWritesEnabled;
+  const descId = "import-banner-desc";
+
   return (
     <section className={styles.importBanner} aria-labelledby="import-banner-title">
       <div className={styles.importBannerLeft}>
@@ -23,13 +29,29 @@ export const OnboardingImportBanner = ({
         </div>
         <div>
           <h3 id="import-banner-title" className={styles.importBannerTitle}>
-            Tìm thấy bản nháp thông tin từ Onboarding
+            {isPreview ? "DEMO · Bản nháp Onboarding mẫu (chưa lưu)" : "Tìm thấy bản nháp thông tin từ Onboarding"}
           </h3>
           <p className={styles.importBannerText}>
-            Bạn có dữ liệu nháp (phiên bản {draftSummary.version}) gồm thông tin liên hệ,{" "}
+            Bản nháp (phiên bản {draftSummary.version}) gồm thông tin liên hệ,{" "}
             {draftSummary.educationCount} học vấn, {draftSummary.experienceCount} kinh nghiệm.
-            Bạn có thể khởi tạo hồ sơ chính thức ngay bây giờ.
+            {importBlocked
+              ? " Bạn vẫn có thể xem lại và tiếp tục chỉnh sửa bản nháp."
+              : isPreview
+                ? " Bạn có thể chạy mô phỏng tạo hồ sơ trong bộ nhớ trình duyệt."
+                : " Bạn có thể khởi tạo hồ sơ chính thức ngay bây giờ."}
           </p>
+          {importBlocked && (
+            <p
+              id={descId}
+              role="note"
+              className={styles.importBannerText}
+              data-testid="import-disabled-notice"
+              style={{ fontWeight: 600 }}
+            >
+              Tính năng tạo hồ sơ chính thức từ bản nháp chưa được bật. Chưa có hồ sơ nào được tạo và
+              dữ liệu của bạn chưa bị thay đổi.
+            </p>
+          )}
         </div>
       </div>
 
@@ -46,10 +68,19 @@ export const OnboardingImportBanner = ({
           type="button"
           className={formStyles.btnPrimary}
           onClick={onOpenImportPreview}
-          aria-label="Xem lại và tạo hồ sơ chính thức từ bản nháp Onboarding"
+          disabled={importBlocked}
+          aria-disabled={importBlocked}
+          aria-describedby={importBlocked ? descId : undefined}
+          aria-label={
+            importBlocked
+              ? "Tạo hồ sơ chính thức chưa khả dụng"
+              : isPreview
+                ? "Xem lại và mô phỏng tạo hồ sơ từ bản nháp mẫu"
+                : "Xem lại và tạo hồ sơ chính thức từ bản nháp Onboarding"
+          }
         >
           <Sparkles size={14} aria-hidden="true" />
-          <span>Xem lại & Tạo hồ sơ</span>
+          <span>{importBlocked ? "Tạo hồ sơ (chưa khả dụng)" : isPreview ? "Xem lại & Mô phỏng" : "Xem lại & Tạo hồ sơ"}</span>
         </button>
       </div>
     </section>

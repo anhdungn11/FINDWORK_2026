@@ -62,6 +62,8 @@ export const OnboardingImportPreviewModal = ({
   isImporting = false,
   importError,
   validationErrors,
+  isPreview = false,
+  isLiveWritesEnabled = false,
   onClose,
   onConfirmImport,
   onGoToOnboarding,
@@ -69,6 +71,9 @@ export const OnboardingImportPreviewModal = ({
   const [confirmPrivacy, setConfirmPrivacy] = useState(true);
   const [confirmOmitAssets, setConfirmOmitAssets] = useState(false);
   const [clientError, setClientError] = useState<string | null>(null);
+
+  // Thật + ghi bị khóa => không được gửi POST. Demo luôn là mô phỏng trong bộ nhớ.
+  const importBlocked = !isPreview && !isLiveWritesEnabled;
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
@@ -108,6 +113,11 @@ export const OnboardingImportPreviewModal = ({
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
+    if (importBlocked) {
+      setClientError("Tính năng tạo hồ sơ chính thức chưa được bật. Chưa có yêu cầu nào được gửi tới máy chủ.");
+      return;
+    }
+
     if (!confirmPrivacy) {
       setClientError("Bạn cần xác nhận đã nắm rõ thiết lập quyền riêng tư ban đầu để tiếp tục.");
       return;
@@ -128,6 +138,7 @@ export const OnboardingImportPreviewModal = ({
       ...(hasUnsupportedAssets ? { confirmOmitUnsupportedAssets: true } : {}),
     });
   };
+
 
   const assetNames = unsupportedAssets.map((a) =>
     a === "avatar" ? "Ảnh đại diện" : "Tệp đính kèm CV (Resume)"
@@ -155,7 +166,7 @@ export const OnboardingImportPreviewModal = ({
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <ShieldCheck size={20} color="var(--color-primary, #4f6ef7)" aria-hidden="true" />
             <h3 id="import-preview-title" className={formStyles.modalTitle}>
-              Xem lại và xác nhận tạo hồ sơ ứng viên
+              {isPreview ? "Mô phỏng tạo hồ sơ (DEMO)" : "Xem lại và xác nhận tạo hồ sơ ứng viên"}
             </h3>
           </div>
           <button
@@ -171,8 +182,24 @@ export const OnboardingImportPreviewModal = ({
 
         <div className={formStyles.modalBody}>
           <p id="import-preview-desc" style={{ margin: "0 0 0.75rem 0", fontSize: "0.8125rem", color: "var(--color-text-secondary, #64748b)", lineHeight: 1.5 }}>
-            Dữ liệu từ bản nháp Onboarding (Phiên bản {draftSummary.version}) sẽ được chuyển giao vào hồ sơ ứng viên chính thức của bạn. Bản nháp gốc vẫn được lưu giữ an toàn.
+            {isPreview
+              ? 'Đây là bản nháp mẫu (Phiên bản ${draftSummary.version}). Thao tác chỉ mô phỏng trong bộ nhớ trình duyệt, KHÔNG gửi yêu cầu tới máy chủ và KHÔNG lưu vào cơ sở dữ liệu.'
+              : importBlocked
+                ? 'Bản nháp Onboarding (Phiên bản ${draftSummary.version}) đang được hiển thị để bạn xem lại. Việc tạo hồ sơ chính thức chưa được bật nên dữ liệu chưa được chuyển giao.'
+                : 'Dữ liệu từ bản nháp Onboarding (Phiên bản ${draftSummary.version}) sẽ được dùng để tạo hồ sơ ứng viên chính thức. Bản nháp gốc không bị xóa bởi thao tác này.'}
           </p>
+
+          {importBlocked && (
+            <div className={formStyles.errorSummary} role="note" data-testid="import-disabled-notice">
+              <div className={formStyles.errorSummaryTitle}>
+                <Lock size={16} aria-hidden="true" />
+                <span>Tạo hồ sơ chính thức chưa khả dụng</span>
+              </div>
+              <span style={{ fontSize: "0.8125rem" }}>
+                Chưa có hồ sơ nào được tạo và không có yêu cầu nào được gửi tới máy chủ. Bạn có thể quay lại Onboarding để xem hoặc chỉnh sửa bản nháp.
+              </span>
+            </div>
+          )}
 
           {/* Lỗi server hoặc validation */}
           {(importError || clientError) && (
@@ -360,11 +387,14 @@ export const OnboardingImportPreviewModal = ({
             >
               <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
               <span>
-                <strong>Quan trọng:</strong> Xác nhận tạo hồ sơ chỉ áp dụng các thiết lập riêng tư ban đầu, <strong>HOÀN TOÀN KHÔNG công khai</strong> hồ sơ hay tự ý chia sẻ dữ liệu của bạn cho nhà tuyển dụng.
+                <strong>Lưu ý:</strong> Hồ sơ mới sẽ dùng 5 thiết lập mặc định bên dưới: hồ sơ <strong>không</strong> bật chế độ cho phép tìm thấy, email, số điện thoại và tải CV đều mặc định ẩn/tắt. Riêng gợi ý việc làm nội bộ được bật mặc định. Bạn có thể thay đổi sau khi hồ sơ được tạo.
               </span>
             </div>
 
-            {/* 5 giá trị mặc định của Backend */}
+            {/* 5 giá trị mặc định của Backend — đây là giá trị sẽ áp dụng khi tạo, chưa phải giá trị đã lưu trong DB */}
+            <p style={{ margin: 0, fontSize: "0.6875rem", color: "var(--color-text-secondary, #64748b)" }}>
+              Đây là giá trị mặc định sẽ áp dụng khi tạo hồ sơ, chưa phải dữ liệu đã lưu trong cơ sở dữ liệu. Cờ 'searchableProfile' tắt nghĩa là hồ sơ chưa được đặt ở chế độ có thể tìm kiếm. Cờ 'allowJobMatching' là tùy chọn dùng dữ liệu nguyện vọng cho gợi ý việc làm nội bộ, khác với việc công khai hồ sơ; các tính năng này có thể chưa vận hành đầy đủ trong giai đoạn hiện tại.
+            </p>
             <div
               style={{
                 display: "grid",
@@ -376,11 +406,11 @@ export const OnboardingImportPreviewModal = ({
                 borderRadius: "8px",
               }}
             >
-              <div>• Tìm kiếm hồ sơ: <strong>Tắt (Riêng tư)</strong></div>
-              <div>• Hiển thị Email: <strong>Tắt (Ẩn)</strong></div>
-              <div>• Hiển thị Số điện thoại: <strong>Tắt (Ẩn)</strong></div>
-              <div>• Tải xuống CV: <strong>Tắt</strong></div>
-              <div>• Gợi ý việc làm tự động: <strong>Bật (Khuyên dùng)</strong></div>
+              <div data-testid="privacy-default-searchable">• Cho phép tìm thấy hồ sơ trong danh mục ứng viên (searchableProfile): <strong>Tắt</strong></div>
+              <div data-testid="privacy-default-email">• Hiển thị email (showEmail): <strong>Tắt</strong></div>
+              <div data-testid="privacy-default-phone">• Hiển thị số điện thoại (showPhone): <strong>Tắt</strong></div>
+              <div data-testid="privacy-default-resume">• Cho phép tải CV (allowResumeDownload): <strong>Tắt</strong></div>
+              <div data-testid="privacy-default-matching">• Dùng dữ liệu để gợi ý việc làm nội bộ (allowJobMatching): <strong>Bật</strong></div>
             </div>
 
             {/* Khác biệt so với bản nháp (nếu có) */}
@@ -449,18 +479,27 @@ export const OnboardingImportPreviewModal = ({
             onClick={onGoToOnboarding}
             disabled={isImporting}
           >
-            Quay lại Onboarding
+            {importBlocked ? "Xem / sửa bản nháp" : "Quay lại Onboarding"}
           </button>
           <button
             ref={confirmBtnRef}
             type="button"
             className={formStyles.btnPrimary}
             onClick={handleConfirm}
-            disabled={isImporting || !confirmPrivacy || (hasUnsupportedAssets && !confirmOmitAssets)}
+            disabled={importBlocked || isImporting || !confirmPrivacy || (hasUnsupportedAssets && !confirmOmitAssets)}
+            aria-disabled={importBlocked || undefined}
             aria-busy={isImporting}
           >
             <CheckCircle2 size={15} aria-hidden="true" />
-            <span>{isImporting ? "Đang tạo hồ sơ..." : "Xác nhận tạo hồ sơ"}</span>
+            <span>
+              {isImporting
+                ? "Đang xử lý..."
+                : importBlocked
+                  ? "Tạo hồ sơ (chưa khả dụng)"
+                  : isPreview
+                    ? "Chạy mô phỏng (không lưu)"
+                    : "Xác nhận tạo hồ sơ"}
+            </span>
           </button>
         </footer>
       </div>

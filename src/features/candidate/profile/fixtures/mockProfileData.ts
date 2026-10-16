@@ -15,6 +15,8 @@ export const MOCK_FIXTURE_FULL_PROFILE: FullCandidateProfileRecord = {
   id: "test-profile-uuid-001",
   userId: "test-user-uuid-101",
   fullName: "Trần Minh Hoàng",
+  contactEmail: "hoang.tran.demo@example.invalid",
+  isSampleData: true,
   phone: "0901234567",
   dateOfBirth: "1997-08-20",
   gender: "MALE",
@@ -173,6 +175,8 @@ export const MOCK_FIXTURE_FRESHER_PROFILE: FullCandidateProfileRecord = {
   id: "test-profile-uuid-002",
   userId: "test-user-uuid-102",
   fullName: "Lê Thu Hà",
+  contactEmail: "ha.le.demo@example.invalid",
+  isSampleData: true,
   phone: "0988776655",
   dateOfBirth: "2003-11-10",
   gender: "FEMALE",
@@ -277,6 +281,8 @@ export const MOCK_FIXTURE_DRAFT_SUMMARY: OnboardingDraftSummary = {
   stepIndex: 6,
   updatedAt: "2026-10-14T15:00:00.000Z",
   fullName: "Phạm Quốc Bảo",
+  contactEmail: "bao.pham.demo@example.invalid",
+  isSampleData: true,
   phone: "0912999888",
   dateOfBirth: "2000-03-25",
   gender: "MALE",
@@ -290,3 +296,152 @@ export const MOCK_FIXTURE_DRAFT_SUMMARY: OnboardingDraftSummary = {
   hasLocalAvatarFile: true, // Cảnh báo: File avatar blob chỉ có ở máy cục bộ
   hasLocalResumeFile: true, // Cảnh báo: File resume blob chỉ có ở máy cục bộ
 };
+
+/** Tạo bản sao sâu (deep clone) của hồ sơ mẫu để thao tác chỉnh sửa trong bộ nhớ không làm bẩn fixture gốc hoặc kịch bản khác */
+export function cloneDemoProfileFixture(fixture: FullCandidateProfileRecord): FullCandidateProfileRecord {
+  return {
+    ...fixture,
+    isSampleData: true,
+    province: fixture.province ? { ...fixture.province } : null,
+    ward: fixture.ward ? { ...fixture.ward } : null,
+    education: (fixture.education || []).map((edu) => ({ ...edu })),
+    experience: (fixture.experience || []).map((exp) => ({
+      ...exp,
+      skills: (exp.skills || []).map((s) => ({ ...s })),
+    })),
+    skills: (fixture.skills || []).map((sk) => ({ ...sk })),
+    languages: (fixture.languages || []).map((lang) => ({
+      ...lang,
+      certificates: (lang.certificates || []).map((c) => ({ ...c })),
+    })),
+    careerPreference: fixture.careerPreference
+      ? {
+          ...fixture.careerPreference,
+          desiredPositions: [...(fixture.careerPreference.desiredPositions || [])],
+          preferredCategories: [...(fixture.careerPreference.preferredCategories || [])],
+          preferredLocations: (fixture.careerPreference.preferredLocations || []).map((l) => ({ ...l })),
+          preferredEmploymentTypes: [...(fixture.careerPreference.preferredEmploymentTypes || [])],
+          preferredWorkplaceTypes: [...(fixture.careerPreference.preferredWorkplaceTypes || [])],
+        }
+      : null,
+    privacySetting: fixture.privacySetting ? { ...fixture.privacySetting } : null,
+  };
+}
+
+/** Tạo hồ sơ mô phỏng trong bộ nhớ từ bản nháp mẫu Phạm Quốc Bảo (không làm biến đổi kịch bản Full hay Fresher) */
+export function buildSimulatedProfileFromDemoDraft(
+  draftSummary: OnboardingDraftSummary = MOCK_FIXTURE_DRAFT_SUMMARY,
+): FullCandidateProfileRecord {
+  return {
+    id: "demo-simulated-draft-profile",
+    userId: "demo-simulated-draft-user",
+    fullName: draftSummary.fullName || "Phạm Quốc Bảo",
+    contactEmail: draftSummary.contactEmail || "bao.pham.demo@example.invalid",
+    isSampleData: true,
+    phone: draftSummary.phone || "0912999888",
+    dateOfBirth: draftSummary.dateOfBirth || "2000-03-25",
+    gender: "MALE",
+    countryCode: "VN",
+    provinceId: "prov-dn-01",
+    wardId: null,
+    province: {
+      id: "prov-dn-01",
+      code: "48",
+      name: draftSummary.provinceName || "Đà Nẵng",
+      divisionType: "Thành phố",
+    },
+    ward: null,
+    addressLine: draftSummary.addressLine || "Số 45, Đường Lê Duẩn",
+    bio: "Hồ sơ mẫu được mô phỏng chuyển giao trong bộ nhớ tạm từ bản nháp Onboarding (Phiên bản 2).",
+    avatarAssetKey: null,
+    careerStatus: "LOOKING_FOR_JOB",
+    createdAt: draftSummary.updatedAt,
+    updatedAt: new Date().toISOString(),
+    education: [
+      {
+        id: "edu-draft-sim-01",
+        school: "Đại học Bách Khoa — Đại học Đà Nẵng",
+        degree: "Kỹ sư",
+        major: "Kỹ thuật Phần mềm",
+        location: "Đà Nẵng",
+        startMonth: 9,
+        startYear: 2018,
+        endMonth: 6,
+        endYear: 2023,
+        isStudying: false,
+        gpa: "3.50",
+        gpaScale: "4",
+        achievements: null,
+        description: "Bản ghi học vấn mô phỏng từ bản nháp mẫu.",
+      },
+    ],
+    experience: [
+      {
+        id: "exp-draft-sim-01",
+        companyName: "DaNang Digital Lab (Demo)",
+        position: "Full-stack Developer",
+        employmentType: "FULL_TIME",
+        workplaceType: "HYBRID",
+        location: "Đà Nẵng",
+        startMonth: 7,
+        startYear: 2023,
+        endMonth: null,
+        endYear: null,
+        isCurrent: true,
+        description: "Kinh nghiệm mô phỏng từ bản nháp mẫu.",
+        achievements: null,
+        skills: [{ id: "es-draft-01", skillName: "TypeScript" }],
+      },
+    ],
+    skills: [
+      { id: "sk-draft-01", skillName: "TypeScript", level: "ADVANCED", yearsOfExperience: "2", isHighlighted: true },
+      { id: "sk-draft-02", skillName: "React", level: "ADVANCED", yearsOfExperience: "2", isHighlighted: true },
+      { id: "sk-draft-03", skillName: "Node.js", level: "INTERMEDIATE", yearsOfExperience: "2", isHighlighted: false },
+      { id: "sk-draft-04", skillName: "PostgreSQL", level: "INTERMEDIATE", yearsOfExperience: "1", isHighlighted: false },
+    ],
+    languages: [
+      {
+        id: "lang-draft-01",
+        languageName: "Tiếng Anh",
+        overallLevel: "PROFESSIONAL",
+        listeningLevel: "PROFESSIONAL",
+        speakingLevel: "CONVERSATIONAL",
+        readingLevel: "PROFESSIONAL",
+        writingLevel: "PROFESSIONAL",
+        certificates: [],
+      },
+    ],
+    careerPreference: {
+      id: "pref-draft-sim-01",
+      locationMode: "SELECTED",
+      salaryType: "RANGE",
+      salaryMin: 18000000,
+      salaryMax: 26000000,
+      currency: "VND",
+      salaryPeriod: "MONTH",
+      desiredCareerLevel: "MID",
+      availabilityType: "IMMEDIATELY",
+      availableFrom: null,
+      willingToRelocate: true,
+      desiredPositions: ["Full-stack Engineer"],
+      preferredCategories: ["IT - Phần mềm"],
+      preferredLocations: [{ id: "prov-dn-01", code: "48", name: "Đà Nẵng" }],
+      preferredEmploymentTypes: ["FULL_TIME"],
+      preferredWorkplaceTypes: ["HYBRID", "REMOTE"],
+    },
+    privacySetting: {
+      searchableProfile: false,
+      showEmail: false,
+      showPhone: false,
+      allowResumeDownload: false,
+      allowJobMatching: true,
+    },
+  };
+}
+
+/** Hồ sơ demo khởi tạo độc lập cho từng kịch bản preview (bản sao sâu). Kịch bản khác trả về null. */
+export function createScenarioDemoProfile(previewParam: string | null): FullCandidateProfileRecord | null {
+  if (previewParam === "full") return cloneDemoProfileFixture(MOCK_FIXTURE_FULL_PROFILE);
+  if (previewParam === "fresher") return cloneDemoProfileFixture(MOCK_FIXTURE_FRESHER_PROFILE);
+  return null;
+}

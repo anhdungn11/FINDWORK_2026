@@ -23,7 +23,11 @@ export const PrivacySettingsSection = ({
   privacySetting = DEFAULT_PRIVACY_SETTINGS,
   onSavePrivacy,
   isSaving = false,
+  isPreview = false,
+  isLiveWritesEnabled = false,
 }: PrivacySettingsSectionProps) => {
+  // Thật + ghi bị khóa: chỉ xem, không cho chỉnh để tránh tạo cảm giác đã lưu
+  const readOnly = !isPreview && !isLiveWritesEnabled;
   const [settings, setSettings] = useState<CandidatePrivacySettingRecord>({
     searchableProfile: privacySetting?.searchableProfile ?? false,
     showEmail: privacySetting?.showEmail ?? false,
@@ -74,9 +78,13 @@ export const PrivacySettingsSection = ({
   };
 
   const handleSave = async () => {
-    if (onSavePrivacy) {
-      await onSavePrivacy(settings);
-      setHasChanges(false);
+    if (onSavePrivacy && !readOnly) {
+      try {
+        await onSavePrivacy(settings);
+        setHasChanges(false);
+      } catch {
+        // Lỗi đã được hiển thị bởi tầng tích hợp; giữ nguyên thay đổi chưa lưu.
+      }
     }
   };
 
@@ -143,7 +151,7 @@ export const PrivacySettingsSection = ({
               settings.searchableProfile ? sectionStyles.switchToggleChecked : ""
             }`}
             onClick={() => toggleField("searchableProfile")}
-            disabled={isSaving}
+            disabled={isSaving || readOnly}
           >
             <span className={sectionStyles.switchToggleThumb} />
           </button>
@@ -166,7 +174,7 @@ export const PrivacySettingsSection = ({
               settings.showEmail ? sectionStyles.switchToggleChecked : ""
             }`}
             onClick={() => toggleField("showEmail")}
-            disabled={isSaving}
+            disabled={isSaving || readOnly}
           >
             <span className={sectionStyles.switchToggleThumb} />
           </button>
@@ -189,7 +197,7 @@ export const PrivacySettingsSection = ({
               settings.showPhone ? sectionStyles.switchToggleChecked : ""
             }`}
             onClick={() => toggleField("showPhone")}
-            disabled={isSaving}
+            disabled={isSaving || readOnly}
           >
             <span className={sectionStyles.switchToggleThumb} />
           </button>
@@ -212,7 +220,7 @@ export const PrivacySettingsSection = ({
               settings.allowResumeDownload ? sectionStyles.switchToggleChecked : ""
             }`}
             onClick={() => toggleField("allowResumeDownload")}
-            disabled={isSaving}
+            disabled={isSaving || readOnly}
           >
             <span className={sectionStyles.switchToggleThumb} />
           </button>
@@ -235,7 +243,7 @@ export const PrivacySettingsSection = ({
               settings.allowJobMatching ? sectionStyles.switchToggleChecked : ""
             }`}
             onClick={() => toggleField("allowJobMatching")}
-            disabled={isSaving}
+            disabled={isSaving || readOnly}
           >
             <span className={sectionStyles.switchToggleThumb} />
           </button>
@@ -250,7 +258,12 @@ export const PrivacySettingsSection = ({
           {privacySetting?.candidateProfileId
             ? "Đang hiển thị bản ghi quyền riêng tư của hồ sơ từ máy chủ."
             : "Hồ sơ hiện chưa có bản ghi quyền riêng tư lưu trên cơ sở dữ liệu; giao diện đang hiển thị 5 giá trị mặc định an toàn theo hợp đồng Prisma (chỉ bật gợi ý việc làm, tắt tìm kiếm công khai, ẩn email, ẩn số điện thoại và tắt tải CV) và không tự nhận đã lưu vào DB."}{" "}
-          Trong giai đoạn nghiệm thu kiểm thử (ENABLE_LIVE_WRITES=false), các thay đổi cài đặt chưa được lưu vĩnh viễn vào cơ sở dữ liệu.
+          {isPreview
+            ? "DEMO: thay đổi chỉ nằm trong bộ nhớ trình duyệt và không được lưu vào cơ sở dữ liệu."
+            : readOnly
+              ? "Tính năng chỉnh sửa quyền riêng tư chưa được bật nên các tùy chọn đang ở chế độ chỉ xem; không có thay đổi nào được lưu."
+              : ""}
+          {" "}Gợi ý việc làm (allowJobMatching) khác với việc công khai hồ sơ (searchableProfile); hai tùy chọn này độc lập.
         </div>
       </div>
     </section>

@@ -38,6 +38,8 @@ export interface PersonalInfoSectionProps {
   profile: Pick<
     FullCandidateProfileRecord,
     | "fullName"
+    | "contactEmail"
+    | "isSampleData"
     | "phone"
     | "dateOfBirth"
     | "gender"
@@ -99,6 +101,8 @@ export interface PrivacySettingsSectionProps {
   privacySetting: CandidatePrivacySettingRecord;
   onSavePrivacy?: (settings: CandidatePrivacySettingRecord) => Promise<void> | void;
   isSaving?: boolean;
+  isPreview?: boolean;
+  isLiveWritesEnabled?: boolean;
 }
 
 /** Hạng mục trong Checklist hướng dẫn */
@@ -122,6 +126,8 @@ export interface OnboardingImportBannerProps {
   draftSummary: OnboardingDraftSummary;
   onOpenImportPreview: () => void;
   onGoToOnboarding: () => void;
+  isPreview?: boolean;
+  isLiveWritesEnabled?: boolean;
 }
 
 /** Props cho Modal xem trước và xác nhận Import */
@@ -131,6 +137,8 @@ export interface OnboardingImportPreviewModalProps {
   isImporting?: boolean;
   importError?: string | null;
   validationErrors?: Record<string, string[]> | null;
+  isPreview?: boolean;
+  isLiveWritesEnabled?: boolean;
   onClose: () => void;
   onConfirmImport: (payload: ImportOnboardingPayload) => Promise<void> | void;
   onGoToOnboarding: () => void;
@@ -145,6 +153,8 @@ export interface OnboardingImportPreviewModalProps {
 export interface ProfileStateFeedbackProps {
   state: CandidateProfilePresentationState;
   errorMessage?: string | null;
+  errorStatus?: number | null;
+  errorCode?: string | null;
   onRetry?: () => void;
   onGoToOnboarding?: () => void;
 }
@@ -157,6 +167,8 @@ export interface CandidateProfileViewProps {
   draftData?: import("../../types/onboarding.types").CandidateOnboardingData | null;
   accountEmail: string;
   errorMessage?: string | null;
+  errorStatus?: number | null;
+  errorCode?: string | null;
   isSaving?: boolean;
   isPreview?: boolean;
   isLiveWritesEnabled?: boolean;

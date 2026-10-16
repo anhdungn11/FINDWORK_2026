@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { AlertCircle } from "lucide-react";
 import type { CandidateProfileViewProps } from "../types/uiProfileProps.types";
-import { buildGuidanceChecklist } from "../utils/profileFormatters";
+import { buildGuidanceChecklist, resolveProfileDisplayEmail } from "../utils/profileFormatters";
 import { CareerPreferencesSection } from "./CareerPreferencesSection";
 import { CvCenterReferenceCard } from "./CvCenterReferenceCard";
 import { EducationSection } from "./EducationSection";
@@ -33,6 +33,8 @@ export const CandidateProfileView = ({
   draftData,
   accountEmail,
   errorMessage,
+  errorStatus,
+  errorCode,
   isSaving = false,
   isPreview = false,
   isLiveWritesEnabled = false,
@@ -85,6 +87,8 @@ export const CandidateProfileView = ({
         <ProfileStateFeedback
           state={state}
           errorMessage={errorMessage}
+          errorStatus={errorStatus}
+          errorCode={errorCode}
           onRetry={onRetry}
           onGoToOnboarding={onGoToOnboarding}
         />
@@ -108,15 +112,19 @@ export const CandidateProfileView = ({
           draftSummary={draftSummary}
           onOpenImportPreview={() => setIsImportModalOpen(true)}
           onGoToOnboarding={onGoToOnboarding}
+          isPreview={isPreview}
+          isLiveWritesEnabled={isLiveWritesEnabled}
         />
 
-        {isImportModalOpen && onConfirmImport && (
+        {isImportModalOpen && onConfirmImport && (isPreview || isLiveWritesEnabled) && (
           <OnboardingImportPreviewModal
             isOpen={isImportModalOpen}
             draftSummary={draftSummary}
             draftData={draftData}
             isImporting={isSaving}
             importError={importError}
+            isPreview={isPreview}
+            isLiveWritesEnabled={isLiveWritesEnabled}
             onClose={() => setIsImportModalOpen(false)}
             onGoToOnboarding={onGoToOnboarding}
             onConfirmImport={async (payload) => {
@@ -148,6 +156,8 @@ export const CandidateProfileView = ({
   }
 
   const guidanceItems = buildGuidanceChecklist(profile);
+  // Tách biệt danh tính: hồ sơ mẫu chỉ dùng email mẫu, hồ sơ thật dùng email tài khoản
+  const displayEmail = resolveProfileDisplayEmail({ isPreview, profile, accountEmail });
 
   return (
     <div className={layoutStyles.pageContainer}>
@@ -186,7 +196,7 @@ export const CandidateProfileView = ({
           {/* Section 1: Overview */}
           <ProfileOverviewCard
             fullName={profile.fullName}
-            email={accountEmail}
+            email={displayEmail}
             careerStatus={profile.careerStatus ?? null}
             bio={profile.bio}
             locationName={profile.province?.name}
@@ -200,7 +210,7 @@ export const CandidateProfileView = ({
           {/* Section 2: Personal Info */}
           <PersonalInfoSection
             profile={profile}
-            accountEmail={accountEmail}
+            accountEmail={displayEmail}
             isSaving={isSaving}
             isPreview={isPreview}
             isLiveWritesEnabled={isLiveWritesEnabled}
@@ -257,6 +267,8 @@ export const CandidateProfileView = ({
               }
             }
             isSaving={isSaving}
+            isPreview={isPreview}
+            isLiveWritesEnabled={isLiveWritesEnabled}
             onSavePrivacy={onSavePrivacy}
           />
         </div>

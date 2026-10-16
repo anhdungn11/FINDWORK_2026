@@ -33,6 +33,7 @@
   width: 100%;
   max-width: 620px;
   max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
   display: flex;
   flex-direction: column;
   outline: none;
@@ -56,6 +57,7 @@
     max-width: 100%;
     border-radius: var(--radius-lg, 14px) var(--radius-lg, 14px) 0 0;
     max-height: 92vh;
+    max-height: 92dvh;
     animation: slideUp 200ms ease;
   }
 }
@@ -110,7 +112,8 @@
 .modalBody {
   padding: var(--space-5, 1.25rem);
   overflow-y: auto;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-4, 1rem);
@@ -125,6 +128,7 @@
   padding: var(--space-3, 0.75rem) var(--space-5, 1.25rem);
   border-top: 1px solid var(--color-border, #e2e8f0);
   background: var(--color-surface-soft, #f8fafc);
+  flex-shrink: 0;
 }
 
 /* --------------------------------------------------------------------------

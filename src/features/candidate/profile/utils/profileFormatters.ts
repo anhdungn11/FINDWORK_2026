@@ -270,3 +270,27 @@ export function resolveCandidateProfilePageState({
     showDevBanner: true,
   };
 }
+
+/**
+ * Tách biệt hoàn toàn 3 miền danh tính:
+ * - DEMO PROFILE (isPreview === true hoặc profile.isSampleData === true):
+ *   Chỉ hiển thị email mẫu giả định của nhân vật demo (RFC 2606 .example.invalid),
+ *   TUYỆT ĐỐI KHÔNG trộn lẫn email thực của tài khoản đăng nhập.
+ * - REAL CANDIDATE PROFILE (isPreview === false):
+ *   Hiển thị email thực của tài khoản đang đăng nhập từ AuthStore,
+ *   không bịa đặt email giả nếu chưa xác định.
+ */
+export function resolveProfileDisplayEmail(params: {
+  isPreview: boolean;
+  profile?: Pick<FullCandidateProfileRecord, "contactEmail" | "isSampleData"> | null;
+  accountEmail?: string | null;
+}): string {
+  const { isPreview, profile, accountEmail } = params;
+
+  if (isPreview || profile?.isSampleData) {
+    const sampleEmail = profile?.contactEmail?.trim();
+    return sampleEmail || "sample.persona@example.invalid";
+  }
+
+  return (accountEmail ?? "").trim();
+}

@@ -23,28 +23,48 @@ import {
   type FullCandidateProfileRecord,
 } from "@/features/candidate/profile";
 import {
+  buildSimulatedProfileFromDemoDraft,
+  createScenarioDemoProfile,
   MOCK_FIXTURE_DRAFT_SUMMARY,
-  MOCK_FIXTURE_FRESHER_PROFILE,
   MOCK_FIXTURE_FULL_PROFILE,
 } from "@/features/candidate/profile/fixtures/mockProfileData";
 
+/**
+ * Vỏ trang: mỗi kịch bản (hoặc chế độ thật) là một instance độc lập nhờ `key`.
+ * Chuyển kịch bản sẽ hủy toàn bộ state cũ (hồ sơ demo, lỗi, request đang bay) —
+ * không thể rò rỉ dữ liệu giữa các kịch bản; F5 khôi phục đúng fixture gốc.
+ */
 const CandidateProfilePage = () => {
   const isDev = Boolean(import.meta.env?.DEV);
   const [searchParams, setSearchParams] = useSearchParams();
-  const rawPreview = searchParams.get("preview");
-  const previewParam = isDev ? rawPreview : null;
+  const previewParam = isDev ? searchParams.get("preview") : null;
+
+  return (
+    <CandidateProfileScenario
+      key={previewParam ?? "__real__"}
+      isDev={isDev}
+      previewParam={previewParam}
+      setSearchParams={setSearchParams}
+    />
+  );
+};
+
+interface CandidateProfileScenarioProps {
+  isDev: boolean;
+  previewParam: string | null;
+  setSearchParams: ReturnType<typeof useSearchParams>[1];
+}
+
+const CandidateProfileScenario = ({ isDev, previewParam, setSearchParams }: CandidateProfileScenarioProps) => {
   const user = useAuthStore((state) => state.user);
-  const accountEmail = user?.email || "candidate@findwork.vn";
+  // Email tài khoản thật: không bịa giá trị dự phòng; chỉ dùng cho chế độ thật
+  const accountEmail = user?.email ?? "";
 
-  // Quản lý riêng biệt dữ liệu giả định theo từng kịch bản trong bộ nhớ khi bật chế độ Preview
-  const [fullDemoProfile, setFullDemoProfile] = useState<FullCandidateProfileRecord>(() => ({
-    ...MOCK_FIXTURE_FULL_PROFILE,
-  }));
-  const [fresherDemoProfile, setFresherDemoProfile] = useState<FullCandidateProfileRecord>(() => ({
-    ...MOCK_FIXTURE_FRESHER_PROFILE,
-  }));
-
-  const activeDemoProfile = previewParam === "fresher" ? fresherDemoProfile : fullDemoProfile;
+  // Dữ liệu demo độc lập theo kịch bản, chỉ nằm trong bộ nhớ (không bao giờ ghi DB)
+  const [demoProfile, setDemoProfile] = useState<FullCandidateProfileRecord | null>(() =>
+    createScenarioDemoProfile(previewParam),
+  );
+  const activeDemoProfile = demoProfile ?? undefined;
 
   // Hook tích hợp API thực tế và quản lý Activation Safety Gate
   const integration = useCandidateProfileIntegration({
@@ -58,19 +78,16 @@ const CandidateProfilePage = () => {
   const { showDevBanner } = resolveCandidateProfilePageState({
     isDev,
     previewParam,
-    demoProfile: activeDemoProfile,
+    demoProfile: activeDemoProfile ?? MOCK_FIXTURE_FULL_PROFILE,
     draftFixture: MOCK_FIXTURE_DRAFT_SUMMARY,
   });
 
   const isPreview = Boolean(isDev && previewParam);
-  const isFresher = previewParam === "fresher";
   const updateActiveDemoProfile = (updater: (prev: FullCandidateProfileRecord) => FullCandidateProfileRecord) => {
-    if (isFresher) {
-      setFresherDemoProfile(updater);
-    } else {
-      setFullDemoProfile(updater);
-    }
+    setDemoProfile((prev) => (prev ? updater(prev) : prev));
   };
+  // Hồ sơ mô phỏng (sau khi "import demo") thay thế màn hình bản nháp trong cùng kịch bản
+  const demoShowsProfile = isPreview && demoProfile !== null;
 
   return (
     <div>
@@ -90,14 +107,16 @@ const CandidateProfilePage = () => {
             gap: "0.5rem",
           }}
           aria-label="Thanh điều khiển chế độ xem trước CP8C"
+          role="status"
+          data-testid="dev-preview-banner"
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Info size={14} color="var(--color-primary, #4f6ef7)" aria-hidden="true" />
             <span>
-              <strong>CP8C Development Preview:</strong>{" "}
+              <strong>{previewParam ? "DEMO / NOT SAVED" : "DỮ LIỆU THẬT"} · CP8C Development Preview:</strong>{" "}
               {previewParam
-                ? `Đang xem kịch bản mẫu (?preview=${previewParam}) — Dữ liệu tạm thời trong bộ nhớ phiên làm việc (in-memory demo), tải lại trang (F5) sẽ đặt lại dữ liệu mẫu và KHÔNG lưu vào cơ sở dữ liệu PostgreSQL.`
-                : "Đang kết nối API Backend thực tế (GET /api/v1/candidate/bootstrap). Tầng ghi được bảo vệ an toàn (ENABLE_LIVE_WRITES=false)."}
+                ? `Đang xem kịch bản mẫu (?preview=${previewParam}) — nhân vật hư cấu, dữ liệu chỉ nằm trong bộ nhớ trình duyệt, không liên quan tới tài khoản đăng nhập. Tải lại trang (F5) sẽ khôi phục dữ liệu mẫu; KHÔNG lưu vào cơ sở dữ liệu.`
+                : "Đang dùng dữ liệu thật từ API Backend (GET /api/v1/candidate/bootstrap). Các thao tác ghi đang bị khóa (ENABLE_LIVE_WRITES=false)."}
             </span>
           </div>
 
@@ -201,31 +220,28 @@ const CandidateProfilePage = () => {
 
       {/* Presentation Master Container */}
       <CandidateProfileView
-        state={integration.presentationState}
-        profile={isPreview ? activeDemoProfile : integration.profile}
+        state={demoShowsProfile ? "existing_profile" : integration.presentationState}
+        profile={isPreview ? demoProfile : integration.profile}
         draftSummary={integration.draftSummary}
         draftData={integration.rawDraft?.data}
         accountEmail={accountEmail}
-        errorMessage={integration.errorMessage || "Chưa thể kết nối tới dịch vụ hồ sơ ứng viên. Vui lòng thử lại sau."}
+        errorMessage={integration.errorMessage}
+        errorStatus={integration.errorStatus}
+        errorCode={integration.errorCode}
         isSaving={integration.isSaving || integration.isImporting}
         isPreview={isPreview}
         isLiveWritesEnabled={integration.isLiveWritesEnabled}
         onRetry={integration.refetch}
         onConfirmImport={async (payload) => {
-          if (isDev && previewParam) {
-            setFullDemoProfile((prev) => ({
-              ...prev,
-              fullName: MOCK_FIXTURE_DRAFT_SUMMARY.fullName || prev.fullName,
-              phone: MOCK_FIXTURE_DRAFT_SUMMARY.phone || prev.phone,
-              updatedAt: new Date().toISOString(),
-            }));
-            setSearchParams({ preview: "full" });
+          if (isPreview) {
+            // MÔ PHỎNG trong bộ nhớ: không gọi endpoint import thật, không đổi kịch bản khác
+            setDemoProfile(buildSimulatedProfileFromDemoDraft(MOCK_FIXTURE_DRAFT_SUMMARY));
             return;
           }
           await integration.handleConfirmImport(payload);
         }}
         onSaveOverview={async (data) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               fullName: data.fullName,
@@ -238,7 +254,7 @@ const CandidateProfilePage = () => {
           await integration.handleSaveOverview(data);
         }}
         onSavePersonalInfo={async (data) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               ...data,
@@ -249,7 +265,7 @@ const CandidateProfilePage = () => {
           await integration.handleSavePersonalInfo(data);
         }}
         onAddEducation={async (edu) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               education: [
@@ -263,7 +279,7 @@ const CandidateProfilePage = () => {
           await integration.handleAddEducation(edu);
         }}
         onDeleteEducation={async (id) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               education: prev.education.filter((e) => e.id !== id),
@@ -274,7 +290,7 @@ const CandidateProfilePage = () => {
           await integration.handleDeleteEducation(id);
         }}
         onAddExperience={async (exp) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               experience: [
@@ -288,7 +304,7 @@ const CandidateProfilePage = () => {
           await integration.handleAddExperience(exp);
         }}
         onDeleteExperience={async (id) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               experience: prev.experience.filter((e) => e.id !== id),
@@ -299,7 +315,7 @@ const CandidateProfilePage = () => {
           await integration.handleDeleteExperience(id);
         }}
         onAddSkill={async (skill) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               skills: [
@@ -313,7 +329,7 @@ const CandidateProfilePage = () => {
           await integration.handleAddSkill(skill);
         }}
         onDeleteSkill={async (id) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               skills: prev.skills.filter((s) => s.id !== id),
@@ -324,7 +340,7 @@ const CandidateProfilePage = () => {
           await integration.handleDeleteSkill(id);
         }}
         onAddLanguage={async (lang) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               languages: [
@@ -338,7 +354,7 @@ const CandidateProfilePage = () => {
           await integration.handleAddLanguage(lang);
         }}
         onDeleteLanguage={async (id) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               languages: prev.languages.filter((l) => l.id !== id),
@@ -349,7 +365,7 @@ const CandidateProfilePage = () => {
           await integration.handleDeleteLanguage(id);
         }}
         onSaveCareerPreference={async (pref) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               careerPreference: pref,
@@ -360,7 +376,7 @@ const CandidateProfilePage = () => {
           await integration.handleSaveCareerPreference(pref);
         }}
         onSavePrivacy={async (privacy) => {
-          if (isDev && previewParam) {
+          if (isPreview) {
             updateActiveDemoProfile((prev) => ({
               ...prev,
               privacySetting: privacy,

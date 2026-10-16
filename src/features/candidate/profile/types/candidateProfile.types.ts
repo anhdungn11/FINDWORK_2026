@@ -215,6 +215,10 @@ export interface FullCandidateProfileRecord {
   id: string;
   userId: string;
   fullName: string;
+  /** Email liên hệ riêng của hồ sơ mẫu (chỉ dùng cho DEMO PROFILE để tách biệt hoàn toàn khỏi AUTHENTICATED ACCOUNT) */
+  contactEmail?: string | null;
+  /** Đánh dấu dữ liệu mẫu trong bộ nhớ phát triển — tuyệt đối không lưu vào DB */
+  isSampleData?: boolean;
   phone?: string | null;
   dateOfBirth?: string | null;
   gender?: Gender | null;
@@ -251,6 +255,10 @@ export interface OnboardingDraftSummary {
   stepIndex: number;
   updatedAt: string;
   fullName?: string;
+  /** Email mẫu độc lập của bản nháp demo (không trộn lẫn email tài khoản đăng nhập) */
+  contactEmail?: string;
+  /** Đánh dấu bản nháp mẫu trong bộ nhớ phát triển */
+  isSampleData?: boolean;
   phone?: string;
   dateOfBirth?: string;
   gender?: string;
@@ -275,8 +283,8 @@ export type CandidateProfilePresentationState =
   | "existing_profile"        // Hồ sơ chính thức đã tồn tại
   | "not_created_with_draft"  // Chưa tạo hồ sơ nhưng CÓ bản nháp Onboarding
   | "not_created_no_draft"    // Chưa tạo hồ sơ và KHÔNG CÓ bản nháp Onboarding
-  | "eligibility_unknown"     // Chưa thể xác định an toàn quyền hạn (ví dụ mới đăng ký)
-  | "forbidden"               // Xác định rõ thiếu quyền profile.view
+  | "eligibility_unknown"     // Chưa thể xác định an toàn quyền hạn (ví dụ mới đăng ký hoặc hết phiên 401)
+  | "forbidden"               // Xác định rõ thiếu quyền profile.view (403)
   | "import_conflict"         // Xung đột phiên bản khi import (409)
   | "profile_already_exists"  // Hồ sơ đã được tạo từ phiên khác (409 on import)
-  | "network_error";          // Sự cố kết nối hoặc lỗi 500
+  | "network_error";          // Sự cố kết nối hoặc lỗi dịch vụ (503 / 500)
