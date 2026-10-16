@@ -464,11 +464,7 @@ export class CandidateService {
 
   async getPrivacy(userId: string) {
     await this.requireProfile(userId);
-    const privacy = await this.candidateRepository.getPrivacy(userId);
-    if (!privacy) {
-      return this.candidateRepository.updatePrivacy(userId, {});
-    }
-    return privacy;
+    return this.candidateRepository.getPrivacy(userId);
   }
 
   async updatePrivacy(userId: string, dto: UpdateCandidatePrivacyDto) {
