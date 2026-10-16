@@ -7,7 +7,7 @@ Base path: `/api/v1`. Responses are JSON. Protected endpoints require `Authoriza
 | Capability | Status | Source evidence |
 | --- | --- | --- |
 | Auth/session and system/company RBAC | WORKING | `auth`, `authorization` modules; session-backed access guard; permission seed. |
-| Company creation, owner membership, roles, profile, locations and invitations | WORKING | `company` module controllers and transaction-backed repositories. Company workspace discovery is MISSING. |
+| Company creation, owner membership, profile, locations and invitations | WORKING | `company` module controllers and transaction-backed repositories. Company workspace discovery was MISSING at base HEAD. Member/role management beyond invitations is PARTIAL. |
 | Jobs | PARTIAL | Prisma `Job`, `JobLocation`, `JobSkill` and status/indexes exist; no Nest Job controller at base HEAD. |
 | Applications | PARTIAL | Prisma `Application` and related models/unique candidate+job constraint exist; no Nest Application controller at base HEAD. |
 | Resume attachment | BLOCKED | Prisma `Resume`/`ResumeVersion` exist; no backend resume create/upload API at base HEAD. Browser CV pages do not establish a persisted attachment. |
@@ -49,8 +49,25 @@ Only JSON builder resumes are persisted. No file upload, object storage or uploa
 
 One application per candidate profile and job **for life**, even if withdrawn or rejected; the database unique key enforces this. Review transitions are `SUBMITTED -> REVIEWING/REJECTED -> SHORTLISTED/REJECTED -> INTERVIEW/REJECTED -> OFFERED/REJECTED`. The arrow sequence means each forward step starts from the preceding status. Existing company roles need a separately authorized permission backfill for `application.view` and `application.review`; new company roles receive the grants automatically. `APPLICATION_DUPLICATE` is 409, `APPLICATION_NOT_FOUND` is 404, `APPLICATION_VERSION_CONFLICT` and `APPLICATION_STATE_CONFLICT` are 409, `RESUME_UNAVAILABLE` is 400, and `JOB_UNAVAILABLE` is 409.
 
-## Deferred contracts and integration limits
+## Implemented contract: platform administration
 
-Admin APIs must use system permissions and audit mutations. No Admin endpoint is promised by this document yet.
+All routes below require Bearer authentication and the named **SYSTEM-scope** permission. A company role cannot call them. List responses use `{data,pagination}` with `page` 1..1,000,000 and `pageSize` 1..100. No list selects password hashes. Audit listing deliberately excludes stored `beforeData`, `afterData` and `metadata` because earlier records could contain sensitive payloads.
 
-Existing company profile/locations/invitations and Candidate/Reference APIs retain their current DTOs and guards. Province/Ward catalog availability is separate from this sprint. The new Job MVP does not accept job locations; province filtering and CV attachments remain out of scope until their persistence flows are implemented.
+| Method / endpoint | System permission | Request | Response / DB dependencies |
+| --- | --- | --- | --- |
+| `GET /admin/dashboard` | `user.view` + `company.view` + `job.view` | none | Real counts: users, active users, companies, active companies, pending verification companies, jobs, published jobs, applications. |
+| `GET /admin/users` | `user.view` | `page`, `pageSize`, optional `status`, `q` email substring | Paged ID, email, status, verification and timestamps. |
+| `PATCH /admin/users/:userId/status` | `user.update` | `{status:ACTIVE\|SUSPENDED}` | Updated user; self mutation and reactivation of DISABLED users forbidden. Audit in transaction. |
+| `POST /admin/users/:userId/disable` | `user.disable` | none | DISABLED user; self mutation forbidden. Audit in transaction. |
+| `GET /admin/companies` | `company.view` | `page`, `pageSize`, optional `status` | Paged company summaries. |
+| `PATCH /admin/companies/:companyId/verification` | `company.verify` | `{status:VERIFIED\|REJECTED}` | Verification decision on ACTIVE company, with audit. |
+| `PATCH /admin/companies/:companyId/status` | `company.suspend` | `{status:ACTIVE\|SUSPENDED}` | Suspend/reactivate non-archived company, with audit. Suspension removes its jobs from public discovery. |
+| `GET /admin/jobs` | `job.view` | `page`, `pageSize`, optional `status`, `companyId` UUID | Paged job summaries. |
+| `POST /admin/jobs/:jobId/close` | `job.moderate` | none | Closes PUBLISHED/PAUSED job with version check and audit. |
+| `GET /admin/audit` | `audit.view` | `page`, `pageSize` | Paged audit metadata only; sensitive payload fields omitted. |
+
+Admin mutations return 404 (`USER_NOT_FOUND`, `COMPANY_NOT_FOUND`, `JOB_NOT_FOUND`) or 409 (`*_STATE_CONFLICT`) as applicable. `ADMIN_SELF_MUTATION_FORBIDDEN` is 403. These APIs grant no privileges themselves. The existing `SUPPORT_ADMIN` role can use dashboard and listings; `VERIFICATION_ADMIN` can moderate companies; `MODERATION_ADMIN` can close jobs. `user.update`, `user.disable` and `audit.view` are intentionally not granted by those default roles; these routes require separately provisioned SYSTEM grants.
+
+## Integration limits and deployment dependencies
+
+Existing company profile/locations/invitations and Candidate/Reference APIs retain their current DTOs and guards. Province/Ward catalog availability is separate from this sprint. The new Job MVP does not accept job locations; province filtering, screening question answers and uploaded CV attachments remain out of scope until their persistence flows are implemented. Existing companies need a separately approved grant backfill for `application.view`/`application.review`; no database writes were made during this sprint.

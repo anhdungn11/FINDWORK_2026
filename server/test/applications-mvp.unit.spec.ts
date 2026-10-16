@@ -7,6 +7,7 @@ import { CompanyPermissionGuard } from "../src/modules/authorization/guards/comp
 import { REQUIRED_PERMISSIONS_KEY } from "../src/modules/authorization/decorators/require-permissions.decorator";
 import { REQUIRED_COMPANY_PERMISSIONS_KEY } from "../src/modules/authorization/decorators/require-company-permissions.decorator";
 import { CandidateResumesService } from "../src/modules/candidate/candidate-resumes.service";
+import { Prisma } from "../src/generated/prisma/client";
 
 const companyId = "11111111-1111-4111-8111-111111111111";
 const jobId = "22222222-2222-4222-8222-222222222222";
@@ -62,6 +63,15 @@ describe("applications MVP security", () => {
     tx.resumeVersion.findFirst.mockResolvedValue(null);
     await expect(new ApplicationsService(db as never).submit(userId, jobId, { resumeId, resumeVersionId: versionId })).rejects.toMatchObject({ status: 400 });
     expect(tx.application.create).not.toHaveBeenCalled();
+  });
+
+  it("maps the database candidate/job unique constraint to a stable duplicate conflict", async () => {
+    const { tx, db } = fakeDb();
+    tx.application.create.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("duplicate", {
+      code: "P2002", clientVersion: "7.10.0",
+    }));
+    await expect(new ApplicationsService(db as never).submit(userId, jobId, { resumeId, resumeVersionId: versionId }))
+      .rejects.toMatchObject({ status: 409, response: { code: "APPLICATION_DUPLICATE" } });
   });
 
   it("scopes candidate and recruiter detail reads by account and company/job", async () => {

@@ -17,6 +17,7 @@ import { HealthModule } from "./modules/health/health.module";
 import { ReferenceModule } from "./modules/reference/reference.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { ApplicationsModule } from "./modules/applications/applications.module";
+import { AdminModule } from "./modules/admin/admin.module";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ApplicationsModule } from "./modules/applications/applications.module";
     CompanyModule,
     JobsModule,
     ApplicationsModule,
+    AdminModule,
   ],
 })
 export class AppModule implements NestModule {
