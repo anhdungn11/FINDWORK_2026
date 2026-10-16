@@ -101,6 +101,11 @@ export interface BackendCandidateProfileDto {
     name: string;
     divisionType?: string;
   } | null;
+  education?: BackendCandidateEducationDto[];
+  experience?: BackendCandidateExperienceDto[];
+  skills?: BackendCandidateSkillDto[];
+  languages?: BackendCandidateLanguageDto[];
+  careerPreference?: BackendCandidateCareerPreferenceDto | null;
   privacySetting?: BackendCandidatePrivacyDto | null;
 }
 
@@ -135,8 +140,8 @@ export interface BackendCandidateEducationDto {
   endMonth: number | null;
   endYear: number | null;
   isStudying: boolean;
-  gpa: number | null;
-  gpaScale: number | null;
+  gpa: number | string | null;
+  gpaScale: number | string | null;
   achievements: string | null;
   description: string | null;
   createdAt: string;
@@ -215,7 +220,7 @@ export interface BackendCandidateSkillDto {
   skillId: string | null;
   customSkillName: string | null;
   level: CandidateSkillLevel;
-  yearsOfExperience: number | null;
+  yearsOfExperience: number | string | null;
   isHighlighted: boolean;
   createdAt: string;
   updatedAt: string;
@@ -252,6 +257,12 @@ export interface BackendCandidateLanguageCertificateDto {
   verificationUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  certificateType?: {
+    id: string;
+    code: string;
+    label: string;
+    languageId?: string;
+  } | null;
 }
 
 export interface CreateCandidateLanguageCertificateDto {
@@ -309,8 +320,8 @@ export interface BackendCandidateCareerPreferenceDto {
   candidateProfileId: string;
   locationMode: CandidateLocationPreferenceMode;
   salaryType: CandidateSalaryExpectationType;
-  salaryMin: number | null;
-  salaryMax: number | null;
+  salaryMin: number | string | null;
+  salaryMax: number | string | null;
   currency: string;
   salaryPeriod: CandidateSalaryPeriod;
   desiredCareerLevel: CandidateCareerLevel | null;
@@ -319,23 +330,23 @@ export interface BackendCandidateCareerPreferenceDto {
   willingToRelocate: boolean;
   createdAt: string;
   updatedAt: string;
-  desiredPositions: { id: string; title: string; displayOrder: number }[];
+  desiredPositions: { id?: string; title: string; displayOrder: number }[];
   preferredCategories: {
-    id: string;
+    id?: string;
     jobCategoryId: string;
     jobCategory?: { id: string; code: string; name: string };
   }[];
   preferredLocations: {
-    id: string;
+    id?: string;
     provinceId: string;
     province?: { id: string; code: string; name: string };
   }[];
   preferredEmploymentTypes: {
-    id: string;
+    id?: string;
     employmentType: CandidateEmploymentType;
   }[];
   preferredWorkplaceTypes: {
-    id: string;
+    id?: string;
     workplaceType: CandidateWorkplaceType;
   }[];
 }
@@ -358,16 +369,14 @@ export interface PutCandidateCareerPreferenceDto {
   preferredWorkplaceTypes?: CandidateWorkplaceType[];
 }
 
-/** DTO Quyền riêng tư: GET /api/v1/candidate/privacy */
+/** DTO Quyền riêng tư: GET /api/v1/candidate/privacy (PK trên wire là candidateProfileId, không có id) */
 export interface BackendCandidatePrivacyDto {
-  id: string;
   candidateProfileId: string;
   searchableProfile: boolean;
   showEmail: boolean;
   showPhone: boolean;
   allowResumeDownload: boolean;
   allowJobMatching: boolean;
-  createdAt?: string;
   updatedAt?: string;
 }
 
@@ -389,18 +398,27 @@ export interface ImportCandidateOnboardingDto {
 /** Mã lỗi chuẩn hóa từ NestJS candidate module */
 export type CandidateApiErrorCode =
   | "CANDIDATE_BOOTSTRAP_FAILED"
+  | "CANDIDATE_ACCOUNT_NOT_FOUND"
   | "CANDIDATE_PROFILE_NOT_FOUND"
   | "CANDIDATE_PROFILE_ALREADY_EXISTS"
   | "CANDIDATE_ROLE_NOT_CONFIGURED"
   | "CANDIDATE_DATE_OF_BIRTH_INVALID"
+  | "CANDIDATE_SALARY_RANGE_INVALID"
   | "CANDIDATE_UPDATE_EMPTY"
   | "CANDIDATE_EDUCATION_NOT_FOUND"
   | "CANDIDATE_EXPERIENCE_NOT_FOUND"
   | "CANDIDATE_SKILL_NOT_FOUND"
+  | "CANDIDATE_SKILL_SOURCE_INVALID"
   | "CANDIDATE_LANGUAGE_NOT_FOUND"
+  | "CANDIDATE_LANGUAGE_SOURCE_INVALID"
   | "CANDIDATE_CERTIFICATE_NOT_FOUND"
+  | "CANDIDATE_CERTIFICATE_SOURCE_INVALID"
+  | "CANDIDATE_CAREER_PREFERENCE_NOT_FOUND"
   | "CANDIDATE_ONBOARDING_DRAFT_NOT_FOUND"
   | "CANDIDATE_ONBOARDING_VERSION_CONFLICT"
+  | "CANDIDATE_DRAFT_INVALID"
+  | "CANDIDATE_DRAFT_TOO_LARGE"
+  | "CANDIDATE_DRAFT_VERSION_CONFLICT"
   | "CANDIDATE_IMPORT_UNSUPPORTED_ASSETS"
   | "CANDIDATE_IMPORT_REQUEST_INVALID"
   | "CANDIDATE_ONBOARDING_EMAIL_MISMATCH"
@@ -409,6 +427,9 @@ export type CandidateApiErrorCode =
   | "CANDIDATE_REFERENCE_INVALID"
   | "CANDIDATE_CERTIFICATE_SCORE_INVALID"
   | "CANDIDATE_IMPORT_CONFLICT"
+  | "AUTH_ACCESS_TOKEN_REQUIRED"
+  | "AUTH_ACCESS_TOKEN_INVALID"
+  | "AUTH_SESSION_INVALID"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   | "NETWORK_ERROR"

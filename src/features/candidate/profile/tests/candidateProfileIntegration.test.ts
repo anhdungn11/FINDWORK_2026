@@ -22,37 +22,34 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import axios from "axios";
 import {
   computePrivacyDifferences,
   detectUnsupportedAssets,
+  isPersistedPrivacySetting,
   normalizeEducation,
   normalizeExperience,
   normalizeFullCandidateProfile,
-  normalizeLanguage,
-  normalizeLanguageCertificate,
   normalizePrivacy,
+  normalizePrivacyPayload,
   normalizeSkill,
   resolveBootstrapPresentationState,
   toCreateEducationDto,
-  toCreateExperienceDto,
-  toCreateLanguageDto,
-  toCreateSkillDto,
   toPutCareerPreferenceDto,
   toUpdatePrivacyDto,
-  toUpdateProfileDto,
 } from "../adapters/candidateProfileNormalizer";
 import {
-  CANDIDATE_IMPORT_PRIVACY_DEFAULTS,
   type BackendCandidateCareerPreferenceDto,
   type BackendCandidateEducationDto,
   type BackendCandidateExperienceDto,
   type BackendCandidateLanguageDto,
+  type BackendCandidatePrivacyDto,
   type BackendCandidateProfileDto,
   type BackendCandidateSkillDto,
   type CandidateBootstrapResponse,
 } from "../types/candidateApi.types";
 import {
-  CandidateServiceError,
+  candidateProfileService,
   mapCandidateApiError,
 } from "../services/candidateProfileService";
 import {
@@ -61,7 +58,11 @@ import {
   isLiveWritesEnabled,
   setLiveWritesEnabledForTesting,
 } from "../config/candidateIntegrationConfig";
-import { resolveCandidateProfilePageState } from "../utils/profileFormatters";
+import {
+  buildGuidanceChecklist,
+  resolveCandidateProfilePageState,
+} from "../utils/profileFormatters";
+import { apiClient } from "../../../../services/http/apiClient";
 import {
   MOCK_FIXTURE_DRAFT_SUMMARY,
   MOCK_FIXTURE_FRESHER_PROFILE,
@@ -798,6 +799,268 @@ describe("FINDWORK CP8C — Candidate Profile Integration Foundation Tests", () 
       }
 
       setLiveWritesEnabledForTesting(null);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 18. PRIVACY CONTRACT REGRESSION: MISMATCH A (EMPTY 200 BODY) & MISMATCH B (candidateProfileId PK)
+  // ---------------------------------------------------------------------------
+  describe("18. Privacy contract regression: HTTP 200 empty body & candidateProfileId primary key", () => {
+    it("verifies Axios default transformResponse returns empty string '' for HTTP 200 with empty body", () => {
+      const transforms = Array.isArray(axios.defaults.transformResponse)
+        ? axios.defaults.transformResponse
+        : axios.defaults.transformResponse
+          ? [axios.defaults.transformResponse]
+          : [];
+      let parsed: unknown = "";
+      for (const fn of transforms) {
+        parsed = fn.call(
+          { responseType: "json" } as never,
+          parsed,
+          axios.AxiosHeaders.from({ "content-type": "application/json; charset=utf-8" }),
+          200,
+        );
+      }
+      assert.equal(parsed, "", "Axios leaves an empty 200 response body as empty string ''");
+      assert.equal(normalizePrivacyPayload(parsed), null, "Boundary normalizer converts '' to null");
+    });
+
+    it("normalizes empty string, null, undefined, and non-privacy objects to null at the API boundary", async () => {
+      assert.equal(normalizePrivacyPayload(""), null);
+      assert.equal(normalizePrivacyPayload(null), null);
+      assert.equal(normalizePrivacyPayload(undefined), null);
+      assert.equal(normalizePrivacyPayload({}), null);
+      assert.equal(normalizePrivacyPayload([]), null);
+
+      const originalGet = apiClient.get;
+      try {
+        apiClient.get = (async () => ({ data: "", status: 200 })) as unknown as typeof apiClient.get;
+        const result = await candidateProfileService.getPrivacy();
+        assert.equal(result, null, "candidateProfileService.getPrivacy() must return null when backend returns 200 with empty body");
+      } finally {
+        apiClient.get = originalGet;
+      }
+    });
+
+    it("preserves missing-privacy semantics without claiming defaults were persisted or throwing UI exceptions", () => {
+      const fallback = normalizePrivacy("");
+      assert.equal(fallback.searchableProfile, false);
+      assert.equal(fallback.showEmail, false);
+      assert.equal(fallback.showPhone, false);
+      assert.equal(fallback.allowResumeDownload, false);
+      assert.equal(fallback.allowJobMatching, true);
+      assert.equal(fallback.candidateProfileId, undefined);
+      assert.equal(fallback.id, undefined);
+      assert.equal(isPersistedPrivacySetting(fallback), false);
+
+      const profileWithoutPersistedPrivacy = normalizeFullCandidateProfile({
+        id: "prof-no-priv",
+        userId: "user-no-priv",
+        fullName: "Nguyễn Văn A",
+        phone: null,
+        dateOfBirth: null,
+        gender: null,
+        countryCode: "VN",
+        provinceId: null,
+        wardId: null,
+        addressLine: null,
+        bio: null,
+        avatarAssetKey: null,
+        careerStatus: null,
+        createdAt: "2026-10-16T00:00:00.000Z",
+        updatedAt: "2026-10-16T00:00:00.000Z",
+        privacySetting: null,
+      });
+
+      assert.equal(isPersistedPrivacySetting(profileWithoutPersistedPrivacy.privacySetting), false);
+      const checklist = buildGuidanceChecklist(profileWithoutPersistedPrivacy);
+      const privacyChecklistItem = checklist.find((item) => item.id === "privacy");
+      assert.equal(
+        privacyChecklistItem?.isCompleted,
+        false,
+        "Checklist must not claim missing privacy defaults were persisted",
+      );
+    });
+
+    it("maps persisted backend PrivacySetting using candidateProfileId PK without fabricating id", () => {
+      const wireDto: BackendCandidatePrivacyDto = {
+        candidateProfileId: "prof-pk-999",
+        searchableProfile: false,
+        showEmail: false,
+        showPhone: false,
+        allowResumeDownload: false,
+        allowJobMatching: true,
+        updatedAt: "2026-10-16T01:00:00.000Z",
+      };
+
+      const boundary = normalizePrivacyPayload(wireDto);
+      assert.ok(boundary);
+      assert.equal(boundary.candidateProfileId, "prof-pk-999");
+      assert.equal("id" in boundary, false, "Wire DTO normalizer must not fabricate id");
+
+      const domainRecord = normalizePrivacy(wireDto);
+      assert.equal(domainRecord.candidateProfileId, "prof-pk-999");
+      assert.equal(domainRecord.id, undefined, "Domain normalizer must not fabricate id");
+      assert.equal("id" in domainRecord, false);
+      assert.equal(domainRecord.allowJobMatching, true);
+      assert.equal(domainRecord.updatedAt, "2026-10-16T01:00:00.000Z");
+      assert.equal(isPersistedPrivacySetting(domainRecord), true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 19. MOCKED AUTHENTICATED READ FLOWS & PRISMA WIRE TYPES
+  // ---------------------------------------------------------------------------
+  describe("19. Mocked authenticated read flows and Prisma wire contract compatibility", () => {
+    it("assembles full profile from mocked authenticated GET endpoints when privacy returns empty body and decimals are strings", async () => {
+      const originalGet = apiClient.get;
+      try {
+        apiClient.get = (async (url: string) => {
+          switch (url) {
+            case "/candidate/profile":
+              return {
+                status: 200,
+                data: {
+                  id: "prof-live-1",
+                  userId: "user-live-1",
+                  fullName: "Phạm Minh Tuấn",
+                  phone: "0909111222",
+                  dateOfBirth: "1999-04-15T00:00:00.000Z",
+                  gender: "MALE",
+                  countryCode: "VN",
+                  provinceId: null,
+                  wardId: null,
+                  addressLine: "Quận 3",
+                  bio: null,
+                  avatarAssetKey: null,
+                  careerStatus: "LOOKING_FOR_JOB",
+                  createdAt: "2026-10-15T00:00:00.000Z",
+                  updatedAt: "2026-10-16T00:00:00.000Z",
+                  province: null,
+                  ward: null,
+                  privacySetting: null,
+                } satisfies BackendCandidateProfileDto,
+              };
+            case "/candidate/education":
+              return {
+                status: 200,
+                data: [
+                  {
+                    id: "edu-live-1",
+                    candidateProfileId: "prof-live-1",
+                    school: "ĐH Công Nghệ",
+                    degree: "Cử nhân",
+                    major: "Kỹ thuật Phần mềm",
+                    location: null,
+                    startMonth: 9,
+                    startYear: 2017,
+                    endMonth: 6,
+                    endYear: 2021,
+                    isStudying: false,
+                    gpa: "3.750",
+                    gpaScale: "4.000",
+                    achievements: null,
+                    description: null,
+                    createdAt: "2026-10-15T00:00:00.000Z",
+                    updatedAt: "2026-10-15T00:00:00.000Z",
+                  } satisfies BackendCandidateEducationDto,
+                ],
+              };
+            case "/candidate/experience":
+              return { status: 200, data: [] };
+            case "/candidate/skills":
+              return {
+                status: 200,
+                data: [
+                  {
+                    id: "sk-live-1",
+                    candidateProfileId: "prof-live-1",
+                    skillId: null,
+                    customSkillName: "NestJS",
+                    level: "ADVANCED",
+                    yearsOfExperience: "2.50",
+                    isHighlighted: true,
+                    skill: null,
+                    createdAt: "2026-10-15T00:00:00.000Z",
+                    updatedAt: "2026-10-15T00:00:00.000Z",
+                  } satisfies BackendCandidateSkillDto,
+                ],
+              };
+            case "/candidate/languages":
+              return {
+                status: 200,
+                data: [
+                  {
+                    id: "lang-live-1",
+                    candidateProfileId: "prof-live-1",
+                    languageId: "lang-en",
+                    customLanguageName: null,
+                    overallLevel: "PROFESSIONAL",
+                    listeningLevel: "PROFESSIONAL",
+                    speakingLevel: "CONVERSATIONAL",
+                    readingLevel: "FLUENT",
+                    writingLevel: "PROFESSIONAL",
+                    language: { id: "lang-en", code: "en", label: "Tiếng Anh", englishLabel: "English" },
+                    certificates: [],
+                    createdAt: "2026-10-15T00:00:00.000Z",
+                    updatedAt: "2026-10-15T00:00:00.000Z",
+                  } satisfies BackendCandidateLanguageDto,
+                ],
+              };
+            case "/candidate/career-preference":
+              return {
+                status: 200,
+                data: {
+                  id: "pref-live-1",
+                  candidateProfileId: "prof-live-1",
+                  locationMode: "NATIONWIDE",
+                  salaryType: "RANGE",
+                  salaryMin: "18000000.00",
+                  salaryMax: "28000000.00",
+                  currency: "VND",
+                  salaryPeriod: "MONTH",
+                  desiredCareerLevel: "MID",
+                  availabilityType: "IMMEDIATELY",
+                  availableFrom: null,
+                  willingToRelocate: true,
+                  createdAt: "2026-10-15T00:00:00.000Z",
+                  updatedAt: "2026-10-15T00:00:00.000Z",
+                  desiredPositions: [{ id: "dp-1", title: "Backend Engineer", displayOrder: 0 }],
+                  preferredCategories: [
+                    {
+                      jobCategoryId: "cat-it",
+                      jobCategory: { id: "cat-it", code: "it-software", name: "CNTT - Phần mềm" },
+                    },
+                  ],
+                  preferredLocations: [],
+                  preferredEmploymentTypes: [{ employmentType: "FULL_TIME" }],
+                  preferredWorkplaceTypes: [{ workplaceType: "HYBRID" }],
+                } satisfies BackendCandidateCareerPreferenceDto,
+              };
+            case "/candidate/privacy":
+              return { status: 200, data: "" };
+            default:
+              throw new Error(`Unexpected URL: ${url}`);
+          }
+        }) as unknown as typeof apiClient.get;
+
+        const full = await candidateProfileService.getFullProfile();
+        assert.equal(full.id, "prof-live-1");
+        assert.equal(full.dateOfBirth, "1999-04-15");
+        assert.equal(full.province, null);
+        assert.equal(full.ward, null);
+        assert.equal(full.education[0].gpa, 3.75);
+        assert.equal(full.skills[0].skillName, "NestJS");
+        assert.equal(full.skills[0].yearsOfExperience, 2.5);
+        assert.equal(full.careerPreference?.salaryMin, 18000000);
+        assert.equal(full.careerPreference?.salaryMax, 28000000);
+        assert.deepEqual(full.careerPreference?.preferredCategories, ["CNTT - Phần mềm"]);
+        assert.deepEqual(full.careerPreference?.preferredCategoryIds, ["cat-it"]);
+        assert.equal(full.privacySetting?.candidateProfileId, undefined);
+        assert.equal(full.privacySetting?.allowJobMatching, true);
+      } finally {
+        apiClient.get = originalGet;
+      }
     });
   });
 });

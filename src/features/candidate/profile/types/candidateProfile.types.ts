@@ -202,6 +202,7 @@ export interface CandidateCareerPreferenceRecord {
   willingToRelocate: boolean;
   desiredPositions: string[];
   preferredCategories: string[];
+  preferredCategoryIds?: string[];
   preferredLocations: CandidateLocationRef[];
   preferredEmploymentTypes: EmploymentType[];
   preferredWorkplaceTypes: WorkplaceType[];

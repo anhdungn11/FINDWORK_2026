@@ -25,7 +25,6 @@ import {
 } from "../services/candidateProfileService";
 import {
   buildDraftSummaryFromDraft,
-  computePrivacyDifferences,
   detectUnsupportedAssets,
   resolveBootstrapPresentationState,
   toCreateEducationDto,
@@ -33,12 +32,7 @@ import {
   toCreateLanguageDto,
   toCreateSkillDto,
   toPutCareerPreferenceDto,
-  toUpdateEducationDto,
-  toUpdateExperienceDto,
-  toUpdateLanguageDto,
-  toUpdateProfileDto,
   toUpdatePrivacyDto,
-  toUpdateSkillDto,
 } from "../adapters/candidateProfileNormalizer";
 import { isLiveWritesEnabled } from "../config/candidateIntegrationConfig";
 import { loadOnboardingDraft, type OnboardingDraft } from "../../services/onboardingDraft";
@@ -55,7 +49,6 @@ import type {
   OnboardingDraftSummary,
 } from "../types/candidateProfile.types";
 import type { CandidateBootstrapResponse, UnsupportedOnboardingAsset } from "../types/candidateApi.types";
-import type { CandidateOnboardingData } from "../../types/onboarding.types";
 
 export interface UseCandidateProfileIntegrationOptions {
   isDev?: boolean;

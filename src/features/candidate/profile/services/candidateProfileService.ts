@@ -50,6 +50,7 @@ import type {
 } from "../types/candidateApi.types";
 import {
   normalizeFullCandidateProfile,
+  normalizePrivacyPayload,
 } from "../adapters/candidateProfileNormalizer";
 import type { FullCandidateProfileRecord } from "../types/candidateProfile.types";
 
@@ -299,22 +300,29 @@ export const candidateProfileService = {
   /** Gọi GET /api/v1/candidate/career-preference */
   async getCareerPreference(): Promise<BackendCandidateCareerPreferenceDto | null> {
     try {
-      const response = await apiClient.get<BackendCandidateCareerPreferenceDto | null>(
+      const response = await apiClient.get<unknown>(
         API_ENDPOINTS.CANDIDATE.CAREER_PREFERENCE,
       );
-      return response.data;
+      if (!response.data || typeof response.data !== "object" || Array.isArray(response.data)) {
+        return null;
+      }
+      return response.data as BackendCandidateCareerPreferenceDto;
     } catch (error) {
       throw mapCandidateApiError(error);
     }
   },
 
-  /** Gọi GET /api/v1/candidate/privacy */
+  /**
+   * Gọi GET /api/v1/candidate/privacy
+   * Khi chưa có bản ghi PrivacySetting, CP8A trả về HTTP 200 kèm body rỗng ("")
+   * thay vì literal JSON null. Chuẩn hóa về null ngay tại ranh giới API.
+   */
   async getPrivacy(): Promise<BackendCandidatePrivacyDto | null> {
     try {
-      const response = await apiClient.get<BackendCandidatePrivacyDto | null>(
+      const response = await apiClient.get<unknown>(
         API_ENDPOINTS.CANDIDATE.PRIVACY,
       );
-      return response.data;
+      return normalizePrivacyPayload(response.data);
     } catch (error) {
       throw mapCandidateApiError(error);
     }

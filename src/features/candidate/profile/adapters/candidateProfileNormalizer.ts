@@ -60,13 +60,39 @@ import { DEFAULT_PRIVACY_SETTINGS } from "../types/candidateProfile.types";
 import type { CandidateOnboardingData } from "../../types/onboarding.types";
 import type { OnboardingDraft } from "../../services/onboardingDraft";
 
+/** Chuyển đổi an toàn giá trị Decimal (string | number | null) từ Prisma sang number | null */
+export function toNullableNumber(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Chuẩn hóa chuỗi ngày (@db.Date hoặc ISO 8601) về định dạng YYYY-MM-DD */
+export function normalizeDateOnly(value: string | null | undefined): string | null {
+  if (!value || typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const isoMatch = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  return isoMatch ? isoMatch[1] : trimmed;
+}
+
 /** Phân tích và quyết định trạng thái giao diện khởi tạo từ Bootstrap API */
 export function resolveBootstrapPresentationState(
   bootstrap: CandidateBootstrapResponse,
   hasViewPermission = true,
 ): CandidateProfilePresentationState {
-  // 1. Nếu tài khoản bị từ chối quyền xem hồ sơ
-  if (!hasViewPermission || (bootstrap.profile.canViewProfile === false && bootstrap.profile.state === "exists")) {
+  // 1. Nếu tài khoản bị từ chối quyền xem hồ sơ hoặc không có bất kỳ quyền ứng viên nào
+  if (
+    !hasViewPermission ||
+    (bootstrap.profile.canViewProfile === false && bootstrap.profile.state === "exists") ||
+    (bootstrap.profile.canViewProfile === false && bootstrap.profile.canCreateProfile === false)
+  ) {
     return "forbidden";
   }
 
@@ -100,8 +126,8 @@ export function normalizeEducation(dto: BackendCandidateEducationDto): Candidate
     endMonth: dto.endMonth,
     endYear: dto.endYear,
     isStudying: Boolean(dto.isStudying),
-    gpa: dto.gpa,
-    gpaScale: dto.gpaScale,
+    gpa: toNullableNumber(dto.gpa),
+    gpaScale: toNullableNumber(dto.gpaScale),
     achievements: dto.achievements,
     description: dto.description,
     createdAt: dto.createdAt,
@@ -148,7 +174,7 @@ export function normalizeSkill(dto: BackendCandidateSkillDto): CandidateSkillRec
     customSkillName: dto.customSkillName,
     skillName: resolvedName,
     level: dto.level,
-    yearsOfExperience: dto.yearsOfExperience,
+    yearsOfExperience: toNullableNumber(dto.yearsOfExperience),
     isHighlighted: Boolean(dto.isHighlighted),
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
@@ -159,17 +185,22 @@ export function normalizeSkill(dto: BackendCandidateSkillDto): CandidateSkillRec
 export function normalizeLanguageCertificate(
   dto: BackendCandidateLanguageCertificateDto,
 ): CandidateLanguageCertificateRecord {
+  const resolvedCertificateName =
+    dto.certificateType?.label ||
+    dto.certificateType?.code ||
+    dto.customCertificateName ||
+    "Chứng chỉ ngoại ngữ";
   return {
     id: dto.id,
     candidateLanguageId: dto.candidateLanguageId,
     certificateTypeId: dto.certificateTypeId,
     customCertificateName: dto.customCertificateName,
-    certificateName: dto.customCertificateName || "Chứng chỉ ngoại ngữ",
+    certificateName: resolvedCertificateName,
     level: dto.level,
     overallScore: dto.overallScore,
     scores: dto.scores,
-    issuedDate: dto.issuedDate,
-    expiryDate: dto.expiryDate,
+    issuedDate: normalizeDateOnly(dto.issuedDate),
+    expiryDate: normalizeDateOnly(dto.expiryDate),
     issuer: dto.issuer,
     credentialId: dto.credentialId,
     verificationUrl: dto.verificationUrl,
@@ -207,19 +238,22 @@ export function normalizeCareerPreference(
     candidateProfileId: dto.candidateProfileId,
     locationMode: dto.locationMode,
     salaryType: dto.salaryType,
-    salaryMin: dto.salaryMin,
-    salaryMax: dto.salaryMax,
+    salaryMin: toNullableNumber(dto.salaryMin),
+    salaryMax: toNullableNumber(dto.salaryMax),
     currency: dto.currency || "VND",
     salaryPeriod: dto.salaryPeriod || "MONTH",
     desiredCareerLevel: dto.desiredCareerLevel,
     availabilityType: dto.availabilityType,
-    availableFrom: dto.availableFrom,
+    availableFrom: normalizeDateOnly(dto.availableFrom),
     willingToRelocate: Boolean(dto.willingToRelocate),
     desiredPositions: Array.isArray(dto.desiredPositions)
       ? dto.desiredPositions.map((pos) => pos.title)
       : [],
     preferredCategories: Array.isArray(dto.preferredCategories)
       ? dto.preferredCategories.map((cat) => cat.jobCategory?.name || cat.jobCategoryId)
+      : [],
+    preferredCategoryIds: Array.isArray(dto.preferredCategories)
+      ? dto.preferredCategories.map((cat) => cat.jobCategoryId)
       : [],
     preferredLocations: Array.isArray(dto.preferredLocations)
       ? dto.preferredLocations.map((loc) => ({
@@ -239,23 +273,67 @@ export function normalizeCareerPreference(
   };
 }
 
-/** Chuẩn hóa bản ghi Quyền riêng tư */
+/**
+ * Chuẩn hóa payload phản hồi từ GET /api/v1/candidate/privacy tại ranh giới API.
+ * Khi chưa tồn tại bản ghi CandidatePrivacySetting trong DB, NestJS trả về HTTP 200
+ * với body rỗng ("") — Axios giữ nguyên chuỗi rỗng "" thay vì JSON null.
+ */
+export function normalizePrivacyPayload(raw: unknown): BackendCandidatePrivacyDto | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+  const candidate = raw as Record<string, unknown>;
+  if (
+    typeof candidate.candidateProfileId !== "string" ||
+    candidate.candidateProfileId.trim().length === 0
+  ) {
+    return null;
+  }
+  return {
+    candidateProfileId: candidate.candidateProfileId.trim(),
+    searchableProfile: Boolean(candidate.searchableProfile),
+    showEmail: Boolean(candidate.showEmail),
+    showPhone: Boolean(candidate.showPhone),
+    allowResumeDownload: Boolean(candidate.allowResumeDownload),
+    allowJobMatching:
+      candidate.allowJobMatching !== undefined ? Boolean(candidate.allowJobMatching) : true,
+    ...(typeof candidate.updatedAt === "string" ? { updatedAt: candidate.updatedAt } : {}),
+  };
+}
+
+/** Kiểm tra xem bản ghi quyền riêng tư có phải là bản ghi đã lưu trên cơ sở dữ liệu hay chỉ là mặc định tạm */
+export function isPersistedPrivacySetting(
+  record?: CandidatePrivacySettingRecord | null,
+): boolean {
+  return Boolean(
+    record &&
+      typeof record.candidateProfileId === "string" &&
+      record.candidateProfileId.trim().length > 0,
+  );
+}
+
+/**
+ * Chuẩn hóa bản ghi Quyền riêng tư cho Domain View Model.
+ * - Khi vắng mặt (null / undefined / empty body ""): trả về giá trị mặc định an toàn
+ *   tương thích Prisma (false, false, false, false, true) để tránh ngoại lệ UI, nhưng
+ *   không gán candidateProfileId hay id giả mạo nhằm bảo toàn ngữ nghĩa "chưa lưu DB".
+ * - Khi có bản ghi từ backend: ánh xạ theo khóa chính candidateProfileId, không bịa id.
+ */
 export function normalizePrivacy(
-  dto?: BackendCandidatePrivacyDto | null,
+  dto?: BackendCandidatePrivacyDto | null | unknown,
 ): CandidatePrivacySettingRecord {
-  if (!dto) {
+  const normalizedDto = normalizePrivacyPayload(dto);
+  if (!normalizedDto) {
     return { ...DEFAULT_PRIVACY_SETTINGS };
   }
   return {
-    id: dto.id,
-    candidateProfileId: dto.candidateProfileId,
-    searchableProfile: Boolean(dto.searchableProfile),
-    showEmail: Boolean(dto.showEmail),
-    showPhone: Boolean(dto.showPhone),
-    allowResumeDownload: Boolean(dto.allowResumeDownload),
-    allowJobMatching: Boolean(dto.allowJobMatching),
-    createdAt: dto.createdAt,
-    updatedAt: dto.updatedAt,
+    candidateProfileId: normalizedDto.candidateProfileId,
+    searchableProfile: normalizedDto.searchableProfile,
+    showEmail: normalizedDto.showEmail,
+    showPhone: normalizedDto.showPhone,
+    allowResumeDownload: normalizedDto.allowResumeDownload,
+    allowJobMatching: normalizedDto.allowJobMatching,
+    ...(normalizedDto.updatedAt ? { updatedAt: normalizedDto.updatedAt } : {}),
   };
 }
 
@@ -289,12 +367,25 @@ export function normalizeFullCandidateProfile(
       }
     : null;
 
+  const rawEducation = options?.education ?? profileDto.education ?? [];
+  const rawExperience = options?.experience ?? profileDto.experience ?? [];
+  const rawSkills = options?.skills ?? profileDto.skills ?? [];
+  const rawLanguages = options?.languages ?? profileDto.languages ?? [];
+  const rawCareerPreference =
+    options?.careerPreference !== undefined
+      ? (options.careerPreference ?? profileDto.careerPreference ?? null)
+      : (profileDto.careerPreference ?? null);
+  const rawPrivacySetting =
+    options?.privacySetting !== undefined
+      ? (options.privacySetting ?? profileDto.privacySetting ?? null)
+      : (profileDto.privacySetting ?? null);
+
   return {
     id: profileDto.id,
     userId: profileDto.userId,
     fullName: profileDto.fullName,
     phone: profileDto.phone,
-    dateOfBirth: profileDto.dateOfBirth,
+    dateOfBirth: normalizeDateOnly(profileDto.dateOfBirth),
     gender: profileDto.gender,
     countryCode: profileDto.countryCode,
     provinceId: profileDto.provinceId,
@@ -307,14 +398,12 @@ export function normalizeFullCandidateProfile(
     careerStatus: profileDto.careerStatus,
     createdAt: profileDto.createdAt,
     updatedAt: profileDto.updatedAt,
-    education: options?.education ? options.education.map(normalizeEducation) : [],
-    experience: options?.experience ? options.experience.map(normalizeExperience) : [],
-    skills: options?.skills ? options.skills.map(normalizeSkill) : [],
-    languages: options?.languages ? options.languages.map(normalizeLanguage) : [],
-    careerPreference: options?.careerPreference
-      ? normalizeCareerPreference(options.careerPreference)
-      : null,
-    privacySetting: normalizePrivacy(options?.privacySetting ?? profileDto.privacySetting),
+    education: Array.isArray(rawEducation) ? rawEducation.map(normalizeEducation) : [],
+    experience: Array.isArray(rawExperience) ? rawExperience.map(normalizeExperience) : [],
+    skills: Array.isArray(rawSkills) ? rawSkills.map(normalizeSkill) : [],
+    languages: Array.isArray(rawLanguages) ? rawLanguages.map(normalizeLanguage) : [],
+    careerPreference: rawCareerPreference ? normalizeCareerPreference(rawCareerPreference) : null,
+    privacySetting: normalizePrivacy(rawPrivacySetting),
   };
 }
 
@@ -434,7 +523,7 @@ export function toCreateProfileDto(data: Partial<FullCandidateProfileRecord>): C
   return {
     fullName: data.fullName || "",
     phone: data.phone ?? null,
-    dateOfBirth: data.dateOfBirth ?? null,
+    dateOfBirth: normalizeDateOnly(data.dateOfBirth),
     gender: data.gender ?? null,
     countryCode: data.countryCode ?? "VN",
     provinceId: data.provinceId ?? null,
@@ -450,7 +539,7 @@ export function toUpdateProfileDto(data: Partial<FullCandidateProfileRecord>): U
   const dto: UpdateCandidateProfileDto = {};
   if (data.fullName !== undefined) dto.fullName = data.fullName;
   if (data.phone !== undefined) dto.phone = data.phone;
-  if (data.dateOfBirth !== undefined) dto.dateOfBirth = data.dateOfBirth;
+  if (data.dateOfBirth !== undefined) dto.dateOfBirth = normalizeDateOnly(data.dateOfBirth);
   if (data.gender !== undefined) dto.gender = data.gender;
   if (data.countryCode !== undefined) dto.countryCode = data.countryCode;
   if (data.provinceId !== undefined) dto.provinceId = data.provinceId;
@@ -473,8 +562,8 @@ export function toCreateEducationDto(record: Omit<CandidateEducationRecord, "id"
     endMonth: record.endMonth ?? null,
     endYear: record.endYear ?? null,
     isStudying: record.isStudying ?? false,
-    gpa: record.gpa !== null && record.gpa !== undefined ? Number(record.gpa) : null,
-    gpaScale: record.gpaScale !== null && record.gpaScale !== undefined ? Number(record.gpaScale) : null,
+    gpa: toNullableNumber(record.gpa),
+    gpaScale: toNullableNumber(record.gpaScale),
     achievements: record.achievements ?? null,
     description: record.description ?? null,
   };
@@ -491,8 +580,8 @@ export function toUpdateEducationDto(record: Partial<CandidateEducationRecord>):
   if (record.endMonth !== undefined) dto.endMonth = record.endMonth;
   if (record.endYear !== undefined) dto.endYear = record.endYear;
   if (record.isStudying !== undefined) dto.isStudying = record.isStudying;
-  if (record.gpa !== undefined) dto.gpa = record.gpa !== null ? Number(record.gpa) : null;
-  if (record.gpaScale !== undefined) dto.gpaScale = record.gpaScale !== null ? Number(record.gpaScale) : null;
+  if (record.gpa !== undefined) dto.gpa = toNullableNumber(record.gpa);
+  if (record.gpaScale !== undefined) dto.gpaScale = toNullableNumber(record.gpaScale);
   if (record.achievements !== undefined) dto.achievements = record.achievements;
   if (record.description !== undefined) dto.description = record.description;
   return dto;
@@ -513,10 +602,13 @@ export function toCreateExperienceDto(record: Omit<CandidateExperienceRecord, "i
     description: record.description ?? null,
     achievements: record.achievements ?? null,
     skills: Array.isArray(record.skills)
-      ? record.skills.map((s) => ({
-          skillId: s.skillId ?? null,
-          skillName: s.skillName,
-        }))
+      ? record.skills.map((s) => {
+          const hasMasterSkillId = Boolean(s.skillId && s.skillId.trim().length > 0);
+          return {
+            skillId: hasMasterSkillId ? s.skillId!.trim() : null,
+            skillName: hasMasterSkillId ? null : (s.skillName?.trim() || null),
+          };
+        })
       : [],
   };
 }
@@ -536,43 +628,60 @@ export function toUpdateExperienceDto(record: Partial<CandidateExperienceRecord>
   if (record.description !== undefined) dto.description = record.description;
   if (record.achievements !== undefined) dto.achievements = record.achievements;
   if (record.skills !== undefined) {
-    dto.skills = record.skills.map((s) => ({
-      skillId: s.skillId ?? null,
-      skillName: s.skillName,
-    }));
+    dto.skills = record.skills.map((s) => {
+      const hasMasterSkillId = Boolean(s.skillId && s.skillId.trim().length > 0);
+      return {
+        skillId: hasMasterSkillId ? s.skillId!.trim() : null,
+        skillName: hasMasterSkillId ? null : (s.skillName?.trim() || null),
+      };
+    });
   }
   return dto;
 }
 
 export function toCreateSkillDto(record: Omit<CandidateSkillRecord, "id">): CreateCandidateSkillDto {
+  const hasMasterSkillId = Boolean(record.skillId && record.skillId.trim().length > 0);
+  const customSkillName = hasMasterSkillId
+    ? null
+    : (record.customSkillName?.trim() || record.skillName?.trim() || null);
   return {
-    skillId: record.skillId ?? null,
-    customSkillName: record.customSkillName ?? null,
+    skillId: hasMasterSkillId ? record.skillId!.trim() : null,
+    customSkillName,
     level: record.level,
-    yearsOfExperience:
-      record.yearsOfExperience !== null && record.yearsOfExperience !== undefined
-        ? Number(record.yearsOfExperience)
-        : null,
+    yearsOfExperience: toNullableNumber(record.yearsOfExperience),
     isHighlighted: record.isHighlighted ?? false,
   };
 }
 
 export function toUpdateSkillDto(record: Partial<CandidateSkillRecord>): UpdateCandidateSkillDto {
   const dto: UpdateCandidateSkillDto = {};
-  if (record.skillId !== undefined) dto.skillId = record.skillId;
-  if (record.customSkillName !== undefined) dto.customSkillName = record.customSkillName;
+  if (
+    record.skillId !== undefined ||
+    record.customSkillName !== undefined ||
+    record.skillName !== undefined
+  ) {
+    const hasMasterSkillId = Boolean(record.skillId && record.skillId.trim().length > 0);
+    dto.skillId = hasMasterSkillId ? record.skillId!.trim() : null;
+    dto.customSkillName = hasMasterSkillId
+      ? null
+      : (record.customSkillName?.trim() || record.skillName?.trim() || null);
+  }
   if (record.level !== undefined) dto.level = record.level;
   if (record.yearsOfExperience !== undefined) {
-    dto.yearsOfExperience = record.yearsOfExperience !== null ? Number(record.yearsOfExperience) : null;
+    dto.yearsOfExperience = toNullableNumber(record.yearsOfExperience);
   }
   if (record.isHighlighted !== undefined) dto.isHighlighted = record.isHighlighted;
   return dto;
 }
 
 export function toCreateLanguageDto(record: Omit<CandidateLanguageRecord, "id">): CreateCandidateLanguageDto {
+  const hasMasterLanguageId = Boolean(record.languageId && record.languageId.trim().length > 0);
+  const customLanguageName = hasMasterLanguageId
+    ? null
+    : (record.customLanguageName?.trim() || record.languageName?.trim() || null);
   return {
-    languageId: record.languageId ?? null,
-    customLanguageName: record.customLanguageName ?? null,
+    languageId: hasMasterLanguageId ? record.languageId!.trim() : null,
+    customLanguageName,
     overallLevel: record.overallLevel,
     listeningLevel: record.listeningLevel ?? record.overallLevel,
     speakingLevel: record.speakingLevel ?? record.overallLevel,
@@ -583,27 +692,48 @@ export function toCreateLanguageDto(record: Omit<CandidateLanguageRecord, "id">)
 
 export function toUpdateLanguageDto(record: Partial<CandidateLanguageRecord>): UpdateCandidateLanguageDto {
   const dto: UpdateCandidateLanguageDto = {};
-  if (record.languageId !== undefined) dto.languageId = record.languageId;
-  if (record.customLanguageName !== undefined) dto.customLanguageName = record.customLanguageName;
+  if (
+    record.languageId !== undefined ||
+    record.customLanguageName !== undefined ||
+    record.languageName !== undefined
+  ) {
+    const hasMasterLanguageId = Boolean(record.languageId && record.languageId.trim().length > 0);
+    dto.languageId = hasMasterLanguageId ? record.languageId!.trim() : null;
+    dto.customLanguageName = hasMasterLanguageId
+      ? null
+      : (record.customLanguageName?.trim() || record.languageName?.trim() || null);
+  }
   if (record.overallLevel !== undefined) dto.overallLevel = record.overallLevel;
-  if (record.listeningLevel !== undefined) dto.listeningLevel = record.listeningLevel;
-  if (record.speakingLevel !== undefined) dto.speakingLevel = record.speakingLevel;
-  if (record.readingLevel !== undefined) dto.readingLevel = record.readingLevel;
-  if (record.writingLevel !== undefined) dto.writingLevel = record.writingLevel;
+  if (record.listeningLevel !== undefined && record.listeningLevel !== null) {
+    dto.listeningLevel = record.listeningLevel;
+  }
+  if (record.speakingLevel !== undefined && record.speakingLevel !== null) {
+    dto.speakingLevel = record.speakingLevel;
+  }
+  if (record.readingLevel !== undefined && record.readingLevel !== null) {
+    dto.readingLevel = record.readingLevel;
+  }
+  if (record.writingLevel !== undefined && record.writingLevel !== null) {
+    dto.writingLevel = record.writingLevel;
+  }
   return dto;
 }
 
 export function toCreateCertificateDto(
   record: Omit<CandidateLanguageCertificateRecord, "id">,
 ): CreateCandidateLanguageCertificateDto {
+  const hasMasterCertId = Boolean(record.certificateTypeId && record.certificateTypeId.trim().length > 0);
+  const customCertificateName = hasMasterCertId
+    ? null
+    : (record.customCertificateName?.trim() || record.certificateName?.trim() || null);
   return {
-    certificateTypeId: record.certificateTypeId ?? null,
-    customCertificateName: record.customCertificateName ?? null,
+    certificateTypeId: hasMasterCertId ? record.certificateTypeId!.trim() : null,
+    customCertificateName,
     level: record.level ?? null,
     overallScore: record.overallScore ?? null,
     scores: (record.scores as Record<string, unknown>) ?? null,
-    issuedDate: record.issuedDate ?? null,
-    expiryDate: record.expiryDate ?? null,
+    issuedDate: normalizeDateOnly(record.issuedDate),
+    expiryDate: normalizeDateOnly(record.expiryDate),
     issuer: record.issuer ?? null,
     credentialId: record.credentialId ?? null,
     verificationUrl: record.verificationUrl ?? null,
@@ -614,13 +744,22 @@ export function toUpdateCertificateDto(
   record: Partial<CandidateLanguageCertificateRecord>,
 ): UpdateCandidateLanguageCertificateDto {
   const dto: UpdateCandidateLanguageCertificateDto = {};
-  if (record.certificateTypeId !== undefined) dto.certificateTypeId = record.certificateTypeId;
-  if (record.customCertificateName !== undefined) dto.customCertificateName = record.customCertificateName;
+  if (
+    record.certificateTypeId !== undefined ||
+    record.customCertificateName !== undefined ||
+    record.certificateName !== undefined
+  ) {
+    const hasMasterCertId = Boolean(record.certificateTypeId && record.certificateTypeId.trim().length > 0);
+    dto.certificateTypeId = hasMasterCertId ? record.certificateTypeId!.trim() : null;
+    dto.customCertificateName = hasMasterCertId
+      ? null
+      : (record.customCertificateName?.trim() || record.certificateName?.trim() || null);
+  }
   if (record.level !== undefined) dto.level = record.level;
   if (record.overallScore !== undefined) dto.overallScore = record.overallScore;
   if (record.scores !== undefined) dto.scores = record.scores as Record<string, unknown>;
-  if (record.issuedDate !== undefined) dto.issuedDate = record.issuedDate;
-  if (record.expiryDate !== undefined) dto.expiryDate = record.expiryDate;
+  if (record.issuedDate !== undefined) dto.issuedDate = normalizeDateOnly(record.issuedDate);
+  if (record.expiryDate !== undefined) dto.expiryDate = normalizeDateOnly(record.expiryDate);
   if (record.issuer !== undefined) dto.issuer = record.issuer;
   if (record.credentialId !== undefined) dto.credentialId = record.credentialId;
   if (record.verificationUrl !== undefined) dto.verificationUrl = record.verificationUrl;
@@ -633,17 +772,20 @@ export function toPutCareerPreferenceDto(
   return {
     locationMode: record.locationMode,
     salaryType: record.salaryType,
-    salaryMin: record.salaryMin !== null && record.salaryMin !== undefined ? Number(record.salaryMin) : null,
-    salaryMax: record.salaryMax !== null && record.salaryMax !== undefined ? Number(record.salaryMax) : null,
+    salaryMin: toNullableNumber(record.salaryMin),
+    salaryMax: toNullableNumber(record.salaryMax),
     currency: record.currency || "VND",
     salaryPeriod: record.salaryPeriod || "MONTH",
     desiredCareerLevel: record.desiredCareerLevel ?? null,
     availabilityType: record.availabilityType ?? null,
-    availableFrom: record.availableFrom ?? null,
+    availableFrom: normalizeDateOnly(record.availableFrom),
     willingToRelocate: Boolean(record.willingToRelocate),
     desiredPositions: record.desiredPositions || [],
-    preferredCategoryIds: record.preferredCategories || [],
-    preferredProvinceIds: (record.preferredLocations || []).map((loc) => loc.id),
+    preferredCategoryIds: record.preferredCategoryIds ?? record.preferredCategories ?? [],
+    preferredProvinceIds:
+      record.locationMode === "NATIONWIDE"
+        ? []
+        : (record.preferredLocations || []).map((loc) => loc.id),
     preferredEmploymentTypes: record.preferredEmploymentTypes || [],
     preferredWorkplaceTypes: record.preferredWorkplaceTypes || [],
   };

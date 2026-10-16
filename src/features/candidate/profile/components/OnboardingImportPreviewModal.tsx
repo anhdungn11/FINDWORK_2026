@@ -38,7 +38,6 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
-  FileText,
   Info,
   Lock,
   ShieldCheck,
@@ -52,7 +51,6 @@ import {
   detectUnsupportedAssets,
   type PrivacyDifferenceItem,
 } from "../adapters/candidateProfileNormalizer";
-import { CANDIDATE_IMPORT_PRIVACY_DEFAULTS } from "../types/candidateApi.types";
 import formStyles from "../styles/ProfileForms.module.css";
 
 export const OnboardingImportPreviewModal = ({

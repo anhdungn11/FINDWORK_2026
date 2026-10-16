@@ -246,7 +246,11 @@ export const PrivacySettingsSection = ({
       <div className={sectionStyles.noticeBox} role="note">
         <Info size={15} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
         <div>
-          <strong>Minh bạch kỹ thuật:</strong> Hồ sơ ứng viên được khởi tạo với 5 thiết lập quyền riêng tư mặc định theo hợp đồng backend (chỉ bật gợi ý việc làm, tắt tìm kiếm công khai, ẩn email, ẩn số điện thoại và tắt tải CV). Trong giai đoạn nghiệm thu kiểm thử (ENABLE_LIVE_WRITES=false), các thay đổi cài đặt chưa được lưu vĩnh viễn vào cơ sở dữ liệu.
+          <strong>Minh bạch kỹ thuật:</strong>{" "}
+          {privacySetting?.candidateProfileId
+            ? "Đang hiển thị bản ghi quyền riêng tư của hồ sơ từ máy chủ."
+            : "Hồ sơ hiện chưa có bản ghi quyền riêng tư lưu trên cơ sở dữ liệu; giao diện đang hiển thị 5 giá trị mặc định an toàn theo hợp đồng Prisma (chỉ bật gợi ý việc làm, tắt tìm kiếm công khai, ẩn email, ẩn số điện thoại và tắt tải CV) và không tự nhận đã lưu vào DB."}{" "}
+          Trong giai đoạn nghiệm thu kiểm thử (ENABLE_LIVE_WRITES=false), các thay đổi cài đặt chưa được lưu vĩnh viễn vào cơ sở dữ liệu.
         </div>
       </div>
     </section>

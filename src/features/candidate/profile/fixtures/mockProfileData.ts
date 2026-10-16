@@ -159,7 +159,6 @@ export const MOCK_FIXTURE_FULL_PROFILE: FullCandidateProfileRecord = {
   },
 
   privacySetting: {
-    id: "priv-01",
     candidateProfileId: "test-profile-uuid-001",
     searchableProfile: false,
     showEmail: false,
@@ -263,7 +262,6 @@ export const MOCK_FIXTURE_FRESHER_PROFILE: FullCandidateProfileRecord = {
   },
 
   privacySetting: {
-    id: "priv-fresher-01",
     candidateProfileId: "test-profile-uuid-002",
     searchableProfile: false,
     showEmail: false,

@@ -136,7 +136,11 @@ export function buildGuidanceChecklist(profile?: FullCandidateProfileRecord | nu
     (profile.careerPreference.desiredPositions?.length > 0 ||
       profile.careerPreference.preferredEmploymentTypes?.length > 0)
   );
-  const hasPrivacy = Boolean(profile.privacySetting);
+  const hasPrivacy = Boolean(
+    profile.privacySetting &&
+      typeof profile.privacySetting.candidateProfileId === "string" &&
+      profile.privacySetting.candidateProfileId.trim().length > 0,
+  );
 
   return [
     {
