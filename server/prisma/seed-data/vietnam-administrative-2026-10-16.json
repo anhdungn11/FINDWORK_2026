@@ -1,0 +1,327 @@
+{
+  "version": "vn-admin-2026-10-16",
+  "asOf": "2026-10-16",
+  "previousProvinceSnapshot": "reference-snapshot.json#provinceBoundaryEffectiveDate=2025-07-01",
+  "provinceStatus": "verified-source-preparation",
+  "wardStatus": "blocked-no-complete-verified-2026-extract",
+  "sources": {
+    "decision-19-2025": {
+      "document": "19/2025/QĐ-TTg",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=214409&pageid=27160",
+      "effectiveDate": "2025-07-01"
+    },
+    "nso-current": {
+      "document": "Cục Thống kê - Địa bàn hành chính",
+      "url": "https://danhmuchanhchinh.nso.gov.vn/DiaBan1.aspx",
+      "observedAsOf": "2026-10-16"
+    },
+    "resolution-30-2026": {
+      "document": "30/2026/QH16",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=218009&pageid=27160",
+      "effectiveDate": "2026-04-30"
+    },
+    "resolution-36-2026": {
+      "document": "36/2026/QH16",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=219325&pageid=27160",
+      "effectiveDate": "2026-09-01"
+    },
+    "resolution-39-2026": {
+      "document": "39/2026/QH16",
+      "url": "https://vanban.chinhphu.vn/?classid=1&docid=219328&pageid=27160",
+      "effectiveDate": "2026-09-20"
+    },
+    "resolution-237-2026": {
+      "document": "237/NQ-UBTVQH16",
+      "url": "https://vanban.chinhphu.vn/?docid=217876&pageid=27160",
+      "effectiveDate": "2026-04-30"
+    },
+    "resolution-388-2026": {
+      "document": "388/NQ-UBTVQH16",
+      "url": "https://congbao.chinhphu.vn/cong-bao/cong-bao-so-495-ngay-28-08-2026-47434.htm",
+      "effectiveDate": "2026-09-20"
+    }
+  },
+  "provinces": [
+    {
+      "code": "01",
+      "name": "Thành phố Hà Nội",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "04",
+      "name": "Tỉnh Cao Bằng",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "08",
+      "name": "Tỉnh Tuyên Quang",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "11",
+      "name": "Tỉnh Điện Biên",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "12",
+      "name": "Tỉnh Lai Châu",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "14",
+      "name": "Tỉnh Sơn La",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "15",
+      "name": "Tỉnh Lào Cai",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "19",
+      "name": "Tỉnh Thái Nguyên",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "20",
+      "name": "Tỉnh Lạng Sơn",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "22",
+      "name": "Thành phố Quảng Ninh",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2026-09-01",
+      "legalSourceId": "resolution-36-2026",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "24",
+      "name": "Thành phố Bắc Ninh",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2026-09-20",
+      "legalSourceId": "resolution-39-2026",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "25",
+      "name": "Tỉnh Phú Thọ",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "31",
+      "name": "Thành phố Hải Phòng",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "33",
+      "name": "Tỉnh Hưng Yên",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "37",
+      "name": "Tỉnh Ninh Bình",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "38",
+      "name": "Tỉnh Thanh Hóa",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "40",
+      "name": "Tỉnh Nghệ An",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "42",
+      "name": "Tỉnh Hà Tĩnh",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "44",
+      "name": "Tỉnh Quảng Trị",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "46",
+      "name": "Thành phố Huế",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "48",
+      "name": "Thành phố Đà Nẵng",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "51",
+      "name": "Tỉnh Quảng Ngãi",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "52",
+      "name": "Tỉnh Gia Lai",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "56",
+      "name": "Tỉnh Khánh Hòa",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "66",
+      "name": "Tỉnh Đắk Lắk",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "68",
+      "name": "Tỉnh Lâm Đồng",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "75",
+      "name": "Thành phố Đồng Nai",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2026-04-30",
+      "legalSourceId": "resolution-30-2026",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "79",
+      "name": "Thành phố Hồ Chí Minh",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "80",
+      "name": "Tỉnh Tây Ninh",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "82",
+      "name": "Tỉnh Đồng Tháp",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "86",
+      "name": "Tỉnh Vĩnh Long",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "91",
+      "name": "Tỉnh An Giang",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "92",
+      "name": "Thành phố Cần Thơ",
+      "divisionType": "centrally-governed-city",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    },
+    {
+      "code": "96",
+      "name": "Tỉnh Cà Mau",
+      "divisionType": "province",
+      "effectiveDate": "2025-07-01",
+      "legalSourceId": "decision-19-2025",
+      "verifiedSourceId": "nso-current"
+    }
+  ],
+  "wardEvidence": {
+    "baseSourceId": "decision-19-2025",
+    "laterSourceIds": [
+      "resolution-237-2026",
+      "resolution-388-2026"
+    ],
+    "currentRegisterSourceId": "nso-current",
+    "missing": "A complete, dated nationwide 2026 export with ward codes, names, unit types, parent province codes, and reconciliation of all post-2025 changes has not been verified."
+  }
+}

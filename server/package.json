@@ -23,7 +23,8 @@
     "db:seed": "prisma db seed",
     "db:seed:reference": "tsx prisma/seed-reference-foundation.ts",
     "test:unit": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.unit.config.cjs",
-    "typecheck:seed:reference": "tsc --noEmit -p tsconfig.seed.json"
+    "typecheck:seed:reference": "tsc --noEmit -p tsconfig.seed.json",
+    "validate:admin:2026": "tsx prisma/seed-data/vietnam-administrative-2026.ts"
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || ^24.0.0"
