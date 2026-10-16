@@ -1,4 +1,4 @@
-/** Phase 4.3A: approved company-only bootstrap grants. No SYSTEM/JOB/APPLICATION grants. */
+/** Company-scoped bootstrap grants. Application review is limited to recruiting roles. */
 export const DEFAULT_COMPANY_ROLES = [
   {
     name: "OWNER",
@@ -14,6 +14,8 @@ export const DEFAULT_COMPANY_ROLES = [
       "company.role.manage",
       "company.audit.view",
       "company.ownership.transfer",
+      "application.view",
+      "application.review",
     ],
   },
   {
@@ -28,6 +30,8 @@ export const DEFAULT_COMPANY_ROLES = [
       "company.member.remove",
       "company.role.view",
       "company.role.manage",
+      "application.view",
+      "application.review",
     ],
   },
   {
@@ -38,9 +42,11 @@ export const DEFAULT_COMPANY_ROLES = [
       "company.member.view",
       "company.member.invite",
       "company.role.view",
+      "application.view",
+      "application.review",
     ],
   },
-  { name: "RECRUITER", isProtected: false, permissions: ["company.view"] },
+  { name: "RECRUITER", isProtected: false, permissions: ["company.view", "application.view", "application.review"] },
   { name: "HIRING_MANAGER", isProtected: false, permissions: ["company.view"] },
   { name: "VIEWER", isProtected: false, permissions: ["company.view"] },
 ] as const;

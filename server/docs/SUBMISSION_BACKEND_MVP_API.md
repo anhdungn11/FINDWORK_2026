@@ -31,8 +31,26 @@ Base path: `/api/v1`. Responses are JSON. Protected endpoints require `Authoriza
 
 Job errors: `JOB_NOT_FOUND` 404 (including another company's job), `JOB_CATEGORY_INVALID` 400, `JOB_INVALID_RANGE` 400, `JOB_VERSION_CONFLICT` 409, `JOB_STATE_CONFLICT` 409, `JOB_DEADLINE_EXPIRED` 409. Validation pipe may return its standard HTTP 400 envelope for malformed DTOs. No endpoint accepts a caller-supplied `companyId` inside the body or grants roles.
 
+## Implemented contract: builder resumes and applications
+
+Only JSON builder resumes are persisted. No file upload, object storage or uploaded CV attachment is implemented. `POST /candidate/resumes` creates a READY `Resume` and version 1 atomically. Candidate and recruiter application detail responses include the persisted builder JSON; list responses omit it.
+
+| Method / endpoint | Auth and permission | Request | Response / DB dependencies |
+| --- | --- | --- | --- |
+| `POST /candidate/resumes` | Bearer; `resume.create` OWN | `{name:string(2..180),builderContent:object}`; JSON max 128 KB | 201 Resume with version 1; existing `CandidateProfile` required. |
+| `GET /candidate/resumes` | Bearer; `resume.view` OWN | none | `{data:[Resume]}` for own nondeleted resumes, latest version metadata only. |
+| `GET /candidate/resumes/:resumeId` | Bearer; `resume.view` OWN | UUID path | Own Resume with builder content or 404. |
+| `POST /jobs/:jobId/applications` | Bearer; `application.create` OWN | `{resumeId:UUID,resumeVersionId:UUID,coverLetter?:string(max 5000)}` | 201 SUBMITTED Application with status history. Requires existing profile, owned READY BUILDER resume/version, PUBLISHED job at ACTIVE company and active category before deadline/expiry. |
+| `GET /candidate/applications` | Bearer; `application.view` OWN | `page`, `pageSize`, optional `status` | `{data,pagination}` for own applications. |
+| `GET /candidate/applications/:applicationId` | Bearer; `application.view` OWN | UUID path | Own application with builder CV content or 404. |
+| `GET /companies/:companyId/jobs/:jobId/applications` | Bearer; `application.view` COMPANY | `page`, `pageSize`, optional `status` | `{data,pagination}` for applications to an owned job. |
+| `GET /companies/:companyId/jobs/:jobId/applications/:applicationId` | Bearer; `application.view` COMPANY | UUID paths | Owned application with builder CV content or 404. |
+| `PATCH /companies/:companyId/jobs/:jobId/applications/:applicationId/status` | Bearer; `application.review` COMPANY | `{version:int>=1,status:REVIEWING\|SHORTLISTED\|INTERVIEW\|OFFERED\|REJECTED}` | Updated application, status history and audit in one transaction; 409 on stale version or invalid transition. |
+
+One application per candidate profile and job **for life**, even if withdrawn or rejected; the database unique key enforces this. Review transitions are `SUBMITTED -> REVIEWING/REJECTED -> SHORTLISTED/REJECTED -> INTERVIEW/REJECTED -> OFFERED/REJECTED`. The arrow sequence means each forward step starts from the preceding status. Existing company roles need a separately authorized permission backfill for `application.view` and `application.review`; new company roles receive the grants automatically. `APPLICATION_DUPLICATE` is 409, `APPLICATION_NOT_FOUND` is 404, `APPLICATION_VERSION_CONFLICT` and `APPLICATION_STATE_CONFLICT` are 409, `RESUME_UNAVAILABLE` is 400, and `JOB_UNAVAILABLE` is 409.
+
 ## Deferred contracts and integration limits
 
-Applications require a persisted, owned, READY `Resume` and `ResumeVersion`; no upload or builder persistence API currently creates these. A future submission contract must enforce the existing unique `(candidateProfileId,jobId)` rule and use a transaction for application/status history. Admin APIs must use system permissions and audit mutations. Neither Application nor Admin endpoint is promised by this document yet.
+Admin APIs must use system permissions and audit mutations. No Admin endpoint is promised by this document yet.
 
 Existing company profile/locations/invitations and Candidate/Reference APIs retain their current DTOs and guards. Province/Ward catalog availability is separate from this sprint. The new Job MVP does not accept job locations; province filtering and CV attachments remain out of scope until their persistence flows are implemented.
