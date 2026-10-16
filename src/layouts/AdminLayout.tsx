@@ -1,21 +1,13 @@
-import { Outlet } from "react-router-dom";
+import WorkspaceShell from "@/components/workspace/WorkspaceShell";
 
-const AdminLayout = () => {
-  return (
-    <div>
-      <header>
-        <h2>FINDWORK Admin</h2>
-      </header>
+const ITEMS = [
+  { to: "/admin", label: "Tổng quan", end: true },
+  { to: "/admin/users", label: "Người dùng" },
+  { to: "/admin/companies", label: "Doanh nghiệp" },
+  { to: "/admin/jobs", label: "Kiểm duyệt tin" },
+  { to: "/admin/system", label: "Hệ thống & Audit" },
+];
 
-      <aside>
-        <p>Admin Sidebar</p>
-      </aside>
-
-      <main>
-        <Outlet />
-      </main>
-    </div>
-  );
-};
+const AdminLayout = () => <WorkspaceShell tag="Quản trị" navLabel="Điều hướng quản trị" items={ITEMS} />;
 
 export default AdminLayout;
