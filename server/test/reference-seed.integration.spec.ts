@@ -43,6 +43,7 @@ describe("Reference seed against PostgreSQL (transaction rollback only)", () => 
       return syncReferenceFoundation(tx, REFERENCE_SNAPSHOT, "dry-run");
     });
     expect(report.mode).toBe("dry-run");
+    expect(report.provinces).toMatch(/^BLOCKED:/);
     expect(report.wards).toMatch(/^BLOCKED:/);
     expect(await targetCounts(prisma)).toEqual(before);
   });
@@ -52,16 +53,14 @@ describe("Reference seed against PostgreSQL (transaction rollback only)", () => 
     const rollback = new Error("ROLLBACK_CP8A_REFERENCE_TEST");
 
     await expect(prisma.$transaction(async (tx) => {
-      await syncReferenceFoundation(tx, REFERENCE_SNAPSHOT, "apply");
+      await syncReferenceFoundation(tx, REFERENCE_SNAPSHOT, "apply", "skills-certificates");
       const skillCode = REFERENCE_SNAPSHOT.skills[0]!.code;
       const certificateCode = REFERENCE_SNAPSHOT.certificates[0]!.code;
-      const provinceCode = REFERENCE_SNAPSHOT.provinces[0]!.code;
       const first = await Promise.all([
         tx.skill.findUniqueOrThrow({ where: { code: skillCode }, select: { id: true, updatedAt: true } }),
         tx.languageCertificateType.findUniqueOrThrow({ where: { code: certificateCode }, select: { id: true, updatedAt: true } }),
-        tx.province.findUniqueOrThrow({ where: { code: provinceCode }, select: { id: true, updatedAt: true } }),
       ]);
-      const replay = await syncReferenceFoundation(tx, REFERENCE_SNAPSHOT, "apply");
+      const replay = await syncReferenceFoundation(tx, REFERENCE_SNAPSHOT, "apply", "skills-certificates");
       expect(replay.tables.skills.create + replay.tables.skills.update).toBe(0);
       expect(replay.tables.certificates.create + replay.tables.certificates.update).toBe(0);
       expect(replay.tables.provinces.create + replay.tables.provinces.update).toBe(0);
@@ -75,12 +74,11 @@ describe("Reference seed against PostgreSQL (transaction rollback only)", () => 
           ...REFERENCE_SNAPSHOT.certificates.slice(1),
         ],
       };
-      const reorderedReport = await syncReferenceFoundation(tx, reordered, "apply");
+      const reorderedReport = await syncReferenceFoundation(tx, reordered, "apply", "skills-certificates");
       expect(reorderedReport.tables.certificates.update).toBe(0);
       const second = await Promise.all([
         tx.skill.findUniqueOrThrow({ where: { code: skillCode }, select: { id: true, updatedAt: true } }),
         tx.languageCertificateType.findUniqueOrThrow({ where: { code: certificateCode }, select: { id: true, updatedAt: true } }),
-        tx.province.findUniqueOrThrow({ where: { code: provinceCode }, select: { id: true, updatedAt: true } }),
       ]);
       expect(second).toEqual(first);
       throw rollback;
@@ -99,8 +97,8 @@ describe("Reference seed against PostgreSQL (transaction rollback only)", () => 
       ],
     };
     await expect(prisma.$transaction(async (tx) => {
-      await syncReferenceFoundation(tx, REFERENCE_SNAPSHOT, "apply");
-      await syncReferenceFoundation(tx, invalid, "apply");
+      await syncReferenceFoundation(tx, REFERENCE_SNAPSHOT, "apply", "skills-certificates");
+      await syncReferenceFoundation(tx, invalid, "apply", "skills-certificates");
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 120_000 }))
       .rejects.toThrow(/missing\/inactive category/);
     expect(await targetCounts(prisma)).toEqual(before);

@@ -52,33 +52,34 @@ describe("reference foundation snapshot", () => {
   it("dry-runs without writes, applies by code, then remains unchanged on replay", async () => {
     const db = fakeDb();
     const dry = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "dry-run");
-    expect(dry.tables).toEqual({ skills: { create: 67, update: 0, unchanged: 0 }, certificates: { create: 30, update: 0, unchanged: 0 }, provinces: { create: 34, update: 0, unchanged: 0 } });
+    expect(dry.tables).toEqual({ skills: { create: 67, update: 0, unchanged: 0 }, certificates: { create: 30, update: 0, unchanged: 0 }, provinces: { create: 0, update: 0, unchanged: 0 } });
+    expect(dry.provinces).toMatch(/^BLOCKED:/);
     expect(db.skill.upsert).not.toHaveBeenCalled();
     expect(db.languageCertificateType.upsert).not.toHaveBeenCalled();
     expect(db.province.upsert).not.toHaveBeenCalled();
-    await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply");
+    await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply", "skills-certificates");
     expect(db.skill.upsert).toHaveBeenCalledTimes(67);
     expect(db.languageCertificateType.upsert).toHaveBeenCalledTimes(30);
-    expect(db.province.upsert).toHaveBeenCalledTimes(34);
-    const replay = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply");
+    expect(db.province.upsert).not.toHaveBeenCalled();
+    const replay = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply", "skills-certificates");
     expect(replay.tables.skills.unchanged).toBe(67);
     expect(replay.tables.certificates.unchanged).toBe(30);
-    expect(replay.tables.provinces.unchanged).toBe(34);
+    expect(replay.tables.provinces.unchanged).toBe(0);
     expect(db.skill.upsert).toHaveBeenCalledTimes(67);
   });
 
   it("rejects a missing or inactive parent before writes", async () => {
     const db = fakeDb();
     db.skillCategory.findMany = async () => [];
-    await expect(syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply")).rejects.toThrow(/missing\/inactive category/);
+    await expect(syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply", "skills-certificates")).rejects.toThrow(/missing\/inactive category/);
     expect(db.skill.upsert).not.toHaveBeenCalled();
   });
 
-  it("updates an existing code without replacing its persisted ID or unrelated rows", async () => {
+  it("updates an existing active code without replacing its persisted ID or unrelated rows", async () => {
     const db = fakeDb();
-    db.stores.skills.set("javascript", { id: "existing-id", code: "javascript", name: "Old label", categoryId: "category:software-development", aliases: [], isActive: false, sortOrder: 0 });
+    db.stores.skills.set("javascript", { id: "existing-id", code: "javascript", name: "Old label", categoryId: "category:software-development", aliases: [], isActive: true, sortOrder: 0 });
     db.stores.skills.set("custom-skill", { id: "custom-id", code: "custom-skill", name: "Custom", categoryId: "category:software-development", aliases: [], isActive: true, sortOrder: 100 });
-    const report = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply");
+    const report = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply", "skills-certificates");
     expect(report.tables.skills).toEqual({ create: 66, update: 1, unchanged: 0 });
     expect(db.stores.skills.get("javascript")?.id).toBe("existing-id");
     expect(db.stores.skills.get("custom-skill")?.isActive).toBe(true);
@@ -87,7 +88,7 @@ describe("reference foundation snapshot", () => {
 
   it("treats reordered scoreFields object keys as unchanged and preserves updatedAt", async () => {
     const db = fakeDb();
-    await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply");
+    await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply", "skills-certificates");
     const code = REFERENCE_SNAPSHOT.certificates[0]!.code;
     const original = db.stores.certificates.get(code)!;
     const reordered = (original.scoreFields as Record<string, unknown>[]).map((field) =>
@@ -95,10 +96,51 @@ describe("reference foundation snapshot", () => {
     db.stores.certificates.set(code, { ...original, id: "existing-id", updatedAt: "unchanged-time", scoreFields: reordered });
     db.languageCertificateType.upsert.mockClear();
     const preview = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "dry-run");
-    const replay = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply");
+    const replay = await syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply", "skills-certificates");
     expect(preview.tables.certificates).toEqual({ create: 0, update: 0, unchanged: 30 });
     expect(replay.tables.certificates).toEqual({ create: 0, update: 0, unchanged: 30 });
     expect(db.languageCertificateType.upsert).not.toHaveBeenCalled();
     expect(db.stores.certificates.get(code)).toMatchObject({ id: "existing-id", updatedAt: "unchanged-time" });
+  });
+
+  it("blocks an unscoped apply before any write", async () => {
+    const db = fakeDb();
+    await expect(syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply"))
+      .rejects.toThrow(/Province snapshot is outdated/);
+    expect(db.skill.upsert).not.toHaveBeenCalled();
+    expect(db.languageCertificateType.upsert).not.toHaveBeenCalled();
+    expect(db.province.upsert).not.toHaveBeenCalled();
+  });
+
+  it("blocks inactive or reassigned existing codes before writing any catalog", async () => {
+    for (const conflict of [
+      { catalog: "skill", code: "javascript", categoryId: "category:software-development", isActive: false },
+      { catalog: "skill", code: "javascript", categoryId: "category:other", isActive: true },
+      { catalog: "certificate", code: REFERENCE_SNAPSHOT.certificates[0]!.code, languageId: "language:other", isActive: true },
+    ]) {
+      const db = fakeDb();
+      if (conflict.catalog === "skill") db.stores.skills.set(conflict.code, conflict);
+      else db.stores.certificates.set(conflict.code, conflict);
+      await expect(syncReferenceFoundation(db as never, REFERENCE_SNAPSHOT, "apply", "skills-certificates"))
+        .rejects.toThrow(/manual review/);
+      expect(db.skill.upsert).not.toHaveBeenCalled();
+      expect(db.languageCertificateType.upsert).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rejects non-NFC text and duplicate aliases before any write", () => {
+    const first = REFERENCE_SNAPSHOT.skills[0]!;
+    expect(() => validateReferenceSnapshot({
+      ...REFERENCE_SNAPSHOT,
+      skills: [{ ...first, name: "Ky\u0303 na\u0306ng" }, ...REFERENCE_SNAPSHOT.skills.slice(1)],
+    })).toThrow(/non-NFC/);
+    expect(() => validateReferenceSnapshot({
+      ...REFERENCE_SNAPSHOT,
+      skills: [{ ...first, aliases: ["Vue", "vue"] }, ...REFERENCE_SNAPSHOT.skills.slice(1)],
+    })).toThrow(/duplicate alias/);
+    expect(() => validateReferenceSnapshot({
+      ...REFERENCE_SNAPSHOT,
+      skills: [first, { ...REFERENCE_SNAPSHOT.skills[1]!, name: first.name.toUpperCase() }, ...REFERENCE_SNAPSHOT.skills.slice(2)],
+    })).toThrow(/duplicate normalized name/);
   });
 });
