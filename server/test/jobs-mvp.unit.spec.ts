@@ -1,0 +1,167 @@
+import { GUARDS_METADATA } from "@nestjs/common/constants";
+import { CompanyJobsController } from "../src/modules/jobs/jobs.controller";
+import { JobsService } from "../src/modules/jobs/jobs.service";
+import { REQUIRED_COMPANY_PERMISSIONS_KEY } from "../src/modules/authorization/decorators/require-company-permissions.decorator";
+import { AccessTokenGuard } from "../src/modules/auth/guards/access-token.guard";
+import { CompanyPermissionGuard } from "../src/modules/authorization/guards/company-permission.guard";
+import { CompanyRepository } from "../src/modules/company/company.repository";
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
+import { CreateJobDto, PublicJobQueryDto } from "../src/modules/jobs/dto/job.dto";
+
+const companyId = "11111111-1111-4111-8111-111111111111";
+const otherCompanyId = "22222222-2222-4222-8222-222222222222";
+const jobId = "33333333-3333-4333-8333-333333333333";
+const userId = "44444444-4444-4444-8444-444444444444";
+const categoryId = "55555555-5555-4555-8555-555555555555";
+
+const draft = (overrides: Record<string, unknown> = {}) => ({
+  id: jobId, companyId, categoryId, status: "DRAFT", version: 1,
+  experienceMinMonths: null, experienceMaxMonths: null,
+  salaryMin: null, salaryMax: null, applicationDeadline: null, expiresAt: null,
+  ...overrides,
+});
+
+function fakeDb() {
+  const tx = {
+    companyMember: { findFirst: jest.fn().mockResolvedValue({ id: "member-id" }) },
+    jobCategory: { findFirst: jest.fn().mockResolvedValue({ id: categoryId }) },
+    job: {
+      findFirst: jest.fn().mockResolvedValue(draft()),
+      create: jest.fn().mockResolvedValue({ id: jobId }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue(draft()),
+    },
+    auditLog: { create: jest.fn().mockResolvedValue({}) },
+  };
+  return {
+    tx,
+    db: {
+      $transaction: jest.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)),
+      job: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    },
+  };
+}
+
+describe("jobs MVP ownership and publication", () => {
+  it("requires both the access and company permission guards on company routes", () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, CompanyJobsController)).toEqual([AccessTokenGuard, CompanyPermissionGuard]);
+    expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyJobsController.prototype.create))
+      .toEqual(["company.update"]);
+    expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyJobsController.prototype.list))
+      .toEqual(["company.view"]);
+  });
+
+  it("fails closed when membership is absent before writing a job or audit", async () => {
+    const { tx, db } = fakeDb();
+    tx.companyMember.findFirst.mockResolvedValue(null);
+    const service = new JobsService(db as never);
+    await expect(service.create(companyId, userId, {
+      categoryId, title: "Nurse", description: "Care for patients in a clinic.",
+      employmentType: "FULL_TIME", workplaceType: "ONSITE",
+    })).rejects.toMatchObject({ status: 403 });
+    expect(tx.job.create).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("creates a DRAFT under the authenticated member and audits it", async () => {
+    const { tx, db } = fakeDb();
+    const service = new JobsService(db as never);
+    await service.create(companyId, userId, {
+      categoryId, title: "Nurse", description: "Care for patients in a clinic.",
+      employmentType: "FULL_TIME", workplaceType: "ONSITE",
+    });
+    expect(tx.companyMember.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ companyId, userId, status: "ACTIVE", removedAt: null }),
+    }));
+    expect(tx.job.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ companyId, createdByMemberId: "member-id", categoryId }),
+    }));
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "job.create", companyId, actorUserId: userId }),
+    }));
+  });
+
+  it("scopes a company job read by both job and company ID", async () => {
+    const { db } = fakeDb();
+    const service = new JobsService(db as never);
+    await expect(service.getCompany(otherCompanyId, jobId)).rejects.toMatchObject({ status: 404 });
+    expect(db.job.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: jobId, companyId: otherCompanyId } }));
+  });
+
+  it("rejects a stale version and uses a scoped compare-and-swap for edits", async () => {
+    const { tx, db } = fakeDb();
+    const service = new JobsService(db as never);
+    await expect(service.update(companyId, jobId, userId, { version: 2, title: "Updated nurse" }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(tx.job.updateMany).not.toHaveBeenCalled();
+    await service.update(companyId, jobId, userId, { version: 1, title: "Updated nurse" });
+    expect(tx.job.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: jobId, companyId, status: "DRAFT", version: 1 },
+      data: expect.objectContaining({ title: "Updated nurse", version: { increment: 1 } }),
+    }));
+  });
+
+  it("blocks expired publication and records an authorized state change", async () => {
+    const { tx, db } = fakeDb();
+    const service = new JobsService(db as never);
+    tx.job.findFirst.mockResolvedValue(draft({ applicationDeadline: new Date("2020-01-01") }));
+    await expect(service.transition(companyId, jobId, userId, 1, "publish"))
+      .rejects.toMatchObject({ status: 409 });
+    expect(tx.job.updateMany).not.toHaveBeenCalled();
+    tx.job.findFirst.mockResolvedValue(draft());
+    await service.transition(companyId, jobId, userId, 1, "publish");
+    expect(tx.job.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: jobId, companyId, version: 1, status: "DRAFT" },
+      data: expect.objectContaining({ status: "PUBLISHED", version: { increment: 1 } }),
+    }));
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "job.publish", companyId, actorUserId: userId }),
+    }));
+  });
+
+  it("enforces public availability and server-side pagination/filtering", async () => {
+    const { db } = fakeDb();
+    const service = new JobsService(db as never);
+    await service.listPublic({ page: 2, pageSize: 10, q: "nurse", categoryCode: "healthcare", employmentType: "FULL_TIME" });
+    expect(db.job.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      skip: 10, take: 10,
+      where: expect.objectContaining({
+        status: "PUBLISHED", company: { status: "ACTIVE" },
+        category: { isActive: true, code: "healthcare" },
+        title: { contains: "nurse", mode: "insensitive" },
+        employmentType: "FULL_TIME",
+      }),
+    }));
+    await expect(service.getPublic(jobId)).rejects.toMatchObject({ status: 404 });
+    expect(db.job.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: jobId, status: "PUBLISHED", company: { status: "ACTIVE" } }),
+    }));
+  });
+
+  it("discovers only the authenticated user's active company memberships", async () => {
+    const findMany = jest.fn().mockResolvedValue([{ company: { id: companyId, name: "Clinic", slug: "clinic", status: "ACTIVE", verificationStatus: "UNVERIFIED" }, roles: [{ role: { name: "OWNER" } }] }]);
+    const repo = new CompanyRepository({ companyMember: { findMany } } as never);
+    await expect(repo.listActiveWorkspace(userId)).resolves.toEqual({ data: [{
+      id: companyId, name: "Clinic", slug: "clinic", status: "ACTIVE",
+      verificationStatus: "UNVERIFIED", memberRoleNames: ["OWNER"],
+    }] });
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId, status: "ACTIVE", removedAt: null, company: { status: "ACTIVE" } },
+    }));
+  });
+
+  it("rejects malformed job inputs and unbounded public pagination", async () => {
+    const invalidJob = plainToInstance(CreateJobDto, {
+      categoryId, title: "IT", description: "Too short", employmentType: "UNKNOWN",
+      workplaceType: "ONSITE", salaryMin: "-1",
+    });
+    expect((await validate(invalidJob)).length).toBeGreaterThanOrEqual(4);
+    const invalidQuery = plainToInstance(PublicJobQueryDto, { page: "0", pageSize: "101" });
+    expect((await validate(invalidQuery)).length).toBe(2);
+  });
+});

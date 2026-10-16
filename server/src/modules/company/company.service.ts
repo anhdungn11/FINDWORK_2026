@@ -6,6 +6,10 @@ import type { CreateCompanyDto } from "./dto/create-company.dto";
 export class CompanyService {
   constructor(private readonly companyRepository: CompanyRepository) {}
 
+  listActiveWorkspace(userId: string) {
+    return this.companyRepository.listActiveWorkspace(userId);
+  }
+
   async create(actorUserId: string, dto: CreateCompanyDto) {
     try {
       return await this.companyRepository.createCompanyWithOwner({

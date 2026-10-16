@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -17,6 +17,13 @@ import { CreateCompanyDto } from "./dto/create-company.dto";
 @Controller("companies")
 export class CompanyController {
   constructor(private readonly companyService: CompanyService) {}
+
+  @ApiBearerAuth("access-token")
+  @UseGuards(AccessTokenGuard)
+  @Get("me")
+  listMyWorkspace(@CurrentAuth() auth: AuthenticatedPrincipal) {
+    return this.companyService.listActiveWorkspace(auth.userId);
+  }
 
   @ApiBearerAuth("access-token")
   @ApiCreatedResponse({ type: CompanyCreatedResponseDto })

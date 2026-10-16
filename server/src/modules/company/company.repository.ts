@@ -12,6 +12,21 @@ export interface CreateCompanyWithOwnerInput {
 export class CompanyRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async listActiveWorkspace(userId: string) {
+    const memberships = await this.prisma.companyMember.findMany({
+      where: { userId, status: "ACTIVE", removedAt: null, company: { status: "ACTIVE" } },
+      select: {
+        company: { select: { id: true, name: true, slug: true, status: true, verificationStatus: true } },
+        roles: { where: { role: { isActive: true } }, select: { role: { select: { name: true } } } },
+      },
+      orderBy: [{ joinedAt: "desc" }, { id: "desc" }],
+    });
+    return { data: memberships.map((member) => ({
+      ...member.company,
+      memberRoleNames: member.roles.map((assignment) => assignment.role.name),
+    })) };
+  }
+
   /** Single atomic transaction: company, membership, all six roles, grants, ownership, audit. */
   async createCompanyWithOwner(input: CreateCompanyWithOwnerInput) {
     return this.prisma.$transaction(async (tx) => {
