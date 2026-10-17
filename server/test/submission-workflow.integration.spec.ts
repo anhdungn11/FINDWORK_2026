@@ -21,7 +21,7 @@ describe("submission recruitment workflow E2E", () => {
   const users: string[] = [];
   const companies: string[] = [];
   let categoryId: string | undefined;
-  let databaseVerified = false;
+  let fixturePreflightPassed = false;
 
   const api = (path: string) => `/api/v1${path}`;
   const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -37,19 +37,32 @@ describe("submission recruitment workflow E2E", () => {
     await app.init();
     db = app.get(PrismaService);
     await assertSafeIntegrationDatabase(db, config);
-    databaseVerified = true;
     tokens = app.get(TokenService);
-    const required = ["CANDIDATE", "SUPPORT_ADMIN"];
-    const roles = await db.role.findMany({ where: { systemCode: { in: required }, kind: "SYSTEM", isActive: true }, select: { systemCode: true } });
-    if (roles.length !== required.length) throw new Error("Seeded candidate and support admin roles are required in findwork_test.");
+    const required = ["CANDIDATE", "SUPPORT_ADMIN", "MODERATION_ADMIN"];
+    const roles = await db.role.findMany({ where: { systemCode: { in: required }, kind: "SYSTEM", isActive: true },
+      select: { systemCode: true, permissions: { select: { dataScope: true, permission: { select: { code: true, isDeprecated: true } } } } } });
+    if (roles.length !== required.length) throw new Error("Seeded candidate, support and moderation admin roles are required in findwork_test.");
+    const requiredGrants: Record<string, Record<string, string>> = {
+      CANDIDATE: { "profile.view": "OWN", "profile.update": "OWN", "resume.view": "OWN", "resume.create": "OWN", "resume.update": "OWN", "application.create": "OWN", "application.view": "OWN" },
+      SUPPORT_ADMIN: { "user.view": "SYSTEM", "company.view": "SYSTEM", "job.view": "SYSTEM" },
+      MODERATION_ADMIN: { "job.moderate": "SYSTEM" },
+    };
+    for (const role of roles) {
+      const grants = new Set(role.permissions.filter((grant) => !grant.permission.isDeprecated)
+        .map((grant) => `${grant.permission.code}:${grant.dataScope}`));
+      if (Object.entries(requiredGrants[role.systemCode ?? ""] ?? {}).some(([code, scope]) => !grants.has(`${code}:${scope}`))) {
+        throw new Error(`Required scoped grants are missing for ${role.systemCode} in findwork_test.`);
+      }
+    }
     const codes = ["company.update", "company.view", "application.view", "application.review"];
     if (await db.permission.count({ where: { code: { in: codes }, isDeprecated: false } }) !== codes.length) {
       throw new Error("Company permission registry is incomplete in findwork_test.");
     }
+    fixturePreflightPassed = true;
   });
 
   afterAll(async () => {
-    if (!databaseVerified) { await app?.close(); return; }
+    if (!fixturePreflightPassed) { await app?.close(); return; }
     const ownedCompanies = await db.company.findMany({
       where: { slug: { startsWith: `submission-${run}-` } }, select: { id: true },
     });
@@ -117,9 +130,12 @@ describe("submission recruitment workflow E2E", () => {
     const otherCandidate = await actor("other-candidate");
     const recruiter = await actor("recruiter");
     const admin = await actor("admin");
+    const moderator = await actor("moderator");
     const expired = await actor("expired", true);
     const support = await db.role.findUniqueOrThrow({ where: { systemCode: "SUPPORT_ADMIN" }, select: { id: true } });
     await db.systemUserRole.create({ data: { userId: admin.id, roleId: support.id } });
+    const moderation = await db.role.findUniqueOrThrow({ where: { systemCode: "MODERATION_ADMIN" }, select: { id: true } });
+    await db.systemUserRole.create({ data: { userId: moderator.id, roleId: moderation.id } });
     const category = await db.jobCategory.create({ data: { code: `submission-${run}`, name: "Submission E2E", isActive: true } });
     categoryId = category.id;
     const companyId = await company(owner.token, "primary");
@@ -254,14 +270,22 @@ describe("submission recruitment workflow E2E", () => {
     await request(app.getHttpServer()).get(api("/admin/users")) .set(bearer(admin.token)).expect(200);
     await request(app.getHttpServer()).get(api("/admin/companies")) .set(bearer(admin.token)).expect(200);
     await request(app.getHttpServer()).get(api("/admin/jobs")) .set(bearer(admin.token)).expect(200);
+    await request(app.getHttpServer()).post(api(`/admin/jobs/${jobId}/close`))
+      .set(bearer(admin.token)).expect(403);
     const paused = await request(app.getHttpServer()).post(`${jobs}/${jobId}/pause`)
       .set(bearer(owner.token)).send({ version: published.body.version }).expect(200);
     await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(404);
     const reopened = await request(app.getHttpServer()).post(`${jobs}/${jobId}/publish`)
       .set(bearer(owner.token)).send({ version: paused.body.version }).expect(200);
     await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(200);
-    await request(app.getHttpServer()).post(`${jobs}/${jobId}/close`)
-      .set(bearer(owner.token)).send({ version: reopened.body.version }).expect(200);
+    const moderated = await request(app.getHttpServer()).post(api(`/admin/jobs/${jobId}/close`))
+      .set(bearer(moderator.token)).expect(200);
+    expect(moderated.body).toMatchObject({ id: jobId, status: "CLOSED", version: reopened.body.version + 1 });
+    const moderationAudit = { actorUserId: moderator.id, companyId, action: "admin.job.close", targetType: "Job", targetId: jobId };
+    expect(await db.auditLog.count({ where: moderationAudit })).toBe(1);
+    await request(app.getHttpServer()).post(api(`/admin/jobs/${jobId}/close`))
+      .set(bearer(moderator.token)).expect(409);
+    expect(await db.auditLog.count({ where: moderationAudit })).toBe(1);
     await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(404);
   });
 });
