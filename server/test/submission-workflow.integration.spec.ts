@@ -13,13 +13,15 @@ import { assertSafeIntegrationDatabase } from "./integration-safety";
 
 /** Acceptance workflow. Writes only after the strict findwork_test identity check. Never run without authorization. */
 describe("submission recruitment workflow E2E", () => {
+  jest.setTimeout(120_000);
   let app: INestApplication;
   let db: PrismaService;
   let tokens: TokenService;
-  const run = randomUUID().slice(0, 8);
+  const run = randomUUID();
   const users: string[] = [];
   const companies: string[] = [];
   let categoryId: string | undefined;
+  let databaseVerified = false;
 
   const api = (path: string) => `/api/v1${path}`;
   const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -35,6 +37,7 @@ describe("submission recruitment workflow E2E", () => {
     await app.init();
     db = app.get(PrismaService);
     await assertSafeIntegrationDatabase(db, config);
+    databaseVerified = true;
     tokens = app.get(TokenService);
     const required = ["CANDIDATE", "SUPPORT_ADMIN"];
     const roles = await db.role.findMany({ where: { systemCode: { in: required }, kind: "SYSTEM", isActive: true }, select: { systemCode: true } });
@@ -46,7 +49,11 @@ describe("submission recruitment workflow E2E", () => {
   });
 
   afterAll(async () => {
-    if (!db) { await app?.close(); return; }
+    if (!databaseVerified) { await app?.close(); return; }
+    const ownedCompanies = await db.company.findMany({
+      where: { slug: { startsWith: `submission-${run}-` } }, select: { id: true },
+    });
+    for (const company of ownedCompanies) if (!companies.includes(company.id)) companies.push(company.id);
     // Delete only IDs created by this suite, in FK order. No broad reset or seed.
     await db.applicationStatusHistory.deleteMany({ where: { application: { companyId: { in: companies } } } });
     await db.application.deleteMany({ where: { companyId: { in: companies } } });
@@ -59,12 +66,17 @@ describe("submission recruitment workflow E2E", () => {
     await db.role.deleteMany({ where: { companyId: { in: companies } } });
     await db.companyMember.deleteMany({ where: { companyId: { in: companies } } });
     await db.company.deleteMany({ where: { id: { in: companies } } });
+    await db.candidateOnboardingDraft.deleteMany({ where: { userId: { in: users } } });
+    await db.candidateCareerPreference.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
     await db.candidatePrivacySetting.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
     await db.candidateProfile.deleteMany({ where: { userId: { in: users } } });
     await db.systemUserRole.deleteMany({ where: { userId: { in: users } } });
     await db.authSession.deleteMany({ where: { userId: { in: users } } });
     await db.user.deleteMany({ where: { id: { in: users } } });
-    if (categoryId) await db.jobCategory.delete({ where: { id: categoryId } });
+    const category = categoryId ? { id: categoryId } : await db.jobCategory.findUnique({
+      where: { code: `submission-${run}` }, select: { id: true },
+    });
+    if (category) await db.jobCategory.delete({ where: { id: category.id } });
     await app.close();
   });
 
@@ -78,7 +90,7 @@ describe("submission recruitment workflow E2E", () => {
       id: sessionId, userId: id, refreshTokenHash: randomUUID(),
       expiresAt: new Date(Date.now() + (expired ? -60_000 : 3_600_000)),
     } });
-    return { id, token: await tokens.signAccessToken(id, sessionId) };
+    return { id, email, token: await tokens.signAccessToken(id, sessionId) };
   }
 
   async function company(token: string, suffix: string) {
@@ -86,6 +98,16 @@ describe("submission recruitment workflow E2E", () => {
       .set(bearer(token)).send({ name: `Submission ${suffix}`, slug: `submission-${run}-${suffix}` }).expect(201);
     companies.push(response.body.id as string);
     return response.body.id as string;
+  }
+
+  function onboardingDraft(email: string) {
+    return {
+      personal: { fullName: "Submission Candidate", email, phone: "", dateOfBirth: "", gender: "", countryCode: "VN", provinceCode: "", wardCode: "", addressLine: "", bio: "", avatarUrl: "" },
+      education: [], experience: [], skills: [], languages: [],
+      preferences: { desiredPositions: [], preferredCategoryCodes: [], locationPreference: { mode: "selected", provinceCodes: [] }, employmentTypes: [], workplaceTypes: [], salaryExpectation: { type: "range", min: null, max: null, currency: "VND", period: "month" }, desiredCareerLevel: "", availability: { type: "", availableFrom: "" }, willingToRelocate: false },
+      resume: { resumeName: "", resumeUrl: "", fileName: "", fileSize: null, mimeType: "", hasExistingResume: false, createLater: true },
+      privacy: { searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true },
+    };
   }
 
   it("runs the complete flow and rejects tenant, identity, state and admin violations", async () => {
@@ -139,9 +161,33 @@ describe("submission recruitment workflow E2E", () => {
         expect(r.body.data.some((x: { id: string }) => x.id === jobId)).toBe(true);
       });
     await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(200);
+    await request(app.getHttpServer()).get(api(`/companies/${companyId}`)).expect(200)
+      .expect((r) => {
+        expect(r.body.jobsCount).toBe(1);
+        expect(r.body.createdByUserId).toBeUndefined();
+        expect(r.body.taxCode).toBeUndefined();
+      });
+    await request(app.getHttpServer()).get(api(`/jobs?companyId=${companyId}&pageSize=10`)).expect(200)
+      .expect((r) => expect(r.body.data.map((x: { id: string }) => x.id)).toContain(jobId));
 
-    await request(app.getHttpServer()).post(api("/candidate/profile"))
-      .set(bearer(candidate.token)).send({ fullName: "Submission Candidate" }).expect(201);
+    await request(app.getHttpServer()).post(api("/candidate/resumes"))
+      .set(bearer(candidate.token)).send({ name: "Premature CV", builderContent: {} })
+      .expect(403);
+    const savedDraft = await request(app.getHttpServer()).put(api("/candidate/onboarding-draft"))
+      .set(bearer(candidate.token)).send({ version: 0, stepIndex: 6, data: onboardingDraft(candidate.email) }).expect(200);
+    expect(savedDraft.body.version).toBe(1);
+    await request(app.getHttpServer()).post(api("/candidate/profile/import-onboarding"))
+      .set(bearer(candidate.token)).send({ version: 1, confirmPrivacy: false }).expect(400);
+    const imported = await request(app.getHttpServer()).post(api("/candidate/profile/import-onboarding"))
+      .set(bearer(candidate.token)).send({ version: 1, confirmPrivacy: true }).expect(201);
+    expect(imported.body.privacySetting).toMatchObject({
+      searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false,
+    });
+    await request(app.getHttpServer()).get(api("/candidate/onboarding-draft"))
+      .set(bearer(candidate.token)).expect(200)
+      .expect((r) => expect(r.body.version).toBe(1));
+    await request(app.getHttpServer()).get(api("/candidate/profile"))
+      .set(bearer(candidate.token)).expect(200);
     await request(app.getHttpServer()).post(api("/candidate/profile"))
       .set(bearer(otherCandidate.token)).send({ fullName: "Other Candidate" }).expect(201);
     const resume = await request(app.getHttpServer()).post(api("/candidate/resumes"))
@@ -159,12 +205,29 @@ describe("submission recruitment workflow E2E", () => {
     const nextResume = await request(app.getHttpServer()).patch(api(`/candidate/resumes/${resumeId}`))
       .set(bearer(candidate.token)).send({ name: "Updated CV", builderContent: { summary: "Senior engineer" }, expectedVersionNumber: 1 }).expect(200);
     expect(nextResume.body.versions[0].versionNumber).toBe(2);
+    expect(nextResume.body.versions[0].builderSettings).toEqual({ accent: "blue" });
     await request(app.getHttpServer()).patch(api(`/candidate/resumes/${resumeId}`))
       .set(bearer(candidate.token)).send({ name: "Stale CV", builderContent: {}, expectedVersionNumber: 1 }).expect(409);
 
     const submitted = await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
       .set(bearer(candidate.token)).send({ resumeId, resumeVersionId: nextResume.body.versions[0].id }).expect(201);
     const applicationId = submitted.body.id as string;
+    await request(app.getHttpServer()).patch(api(`/candidate/resumes/${resumeId}`))
+      .set(bearer(candidate.token)).send({ name: "Latest CV", builderContent: { summary: "Principal engineer" }, expectedVersionNumber: 2 }).expect(200);
+    const renewedSessionId = randomUUID();
+    await db.authSession.create({ data: {
+      id: renewedSessionId, userId: candidate.id, refreshTokenHash: randomUUID(),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    } });
+    const renewedToken = await tokens.signAccessToken(candidate.id, renewedSessionId);
+    await request(app.getHttpServer()).get(api(`/candidate/resumes/${resumeId}`))
+      .set(bearer(renewedToken)).expect(200)
+      .expect((r) => expect(r.body.versions[0].versionNumber).toBe(3));
+    await request(app.getHttpServer()).get(api(`/candidate/applications/${applicationId}`))
+      .set(bearer(renewedToken)).expect(200).expect((r) => {
+        expect(r.body.resumeVersion.versionNumber).toBe(2);
+        expect(r.body.resumeVersion.builderContent.summary).toBe("Senior engineer");
+      });
     const historyBeforeDuplicate = await db.applicationStatusHistory.count({ where: { applicationId } });
     await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
       .set(bearer(candidate.token)).send({ resumeId, resumeVersionId: versionId }).expect(409);

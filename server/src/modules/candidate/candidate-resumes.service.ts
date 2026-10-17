@@ -49,22 +49,26 @@ export class CandidateResumesService {
         const resume = await tx.resume.findFirst({
           where: { id: resumeId, candidateProfile: { userId }, deletedAt: null },
           select: { id: true, sourceType: true, status: true,
-            versions: { orderBy: { versionNumber: "desc" }, take: 1, select: { versionNumber: true } } },
+            versions: { orderBy: { versionNumber: "desc" }, take: 1,
+              select: { versionNumber: true, templateCode: true, builderSettings: true } } },
         });
         if (!resume) throw new NotFoundException({ code: "RESUME_NOT_FOUND", message: "Resume was not found." });
         if (resume.sourceType !== "BUILDER" || resume.status !== "READY") {
           throw new ConflictException({ code: "RESUME_STATE_CONFLICT", message: "Only ready builder resumes can be updated." });
         }
-        if (resume.versions[0]?.versionNumber !== dto.expectedVersionNumber) {
+        const latest = resume.versions[0];
+        if (latest?.versionNumber !== dto.expectedVersionNumber) {
           throw new ConflictException({ code: "RESUME_VERSION_CONFLICT", message: "Resume version is stale." });
         }
+        this.validateContent(dto.builderContent,
+          (dto.builderSettings ?? latest.builderSettings ?? undefined) as Record<string, unknown> | undefined);
         // The unique (resumeId, versionNumber) key is the final concurrent writer guard.
         // A failed insert rolls back the name update and any other transaction writes.
         await tx.resumeVersion.create({ data: {
           resumeId, versionNumber: dto.expectedVersionNumber + 1,
           builderContent: dto.builderContent as Prisma.InputJsonObject,
-          templateCode: dto.templateCode,
-          builderSettings: dto.builderSettings as Prisma.InputJsonObject | undefined,
+          templateCode: dto.templateCode ?? latest.templateCode,
+          builderSettings: (dto.builderSettings ?? latest.builderSettings ?? undefined) as Prisma.InputJsonObject | undefined,
         } });
         await tx.resume.update({ where: { id: resumeId }, data: { name: dto.name } });
         return tx.resume.findUniqueOrThrow({ where: { id: resumeId }, select: resumeSelect });

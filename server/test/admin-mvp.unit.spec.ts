@@ -30,6 +30,17 @@ describe("platform admin MVP security", () => {
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.audits)).toEqual(["audit.view"]);
   });
 
+  it("does not accept a company-scoped ADMIN grant for the platform dashboard", () => {
+    const { db } = fakeDb();
+    const controller = new AdminController(new AdminService(db as never));
+    expect(() => controller.dashboard({ authorization: { permissions: {
+      "user.view": { scope: "SYSTEM" },
+      "company.view": { scope: "COMPANY" },
+      "job.view": { scope: "SYSTEM" },
+    } } } as never)).toThrow(expect.objectContaining({ status: 403 }));
+    expect(db.user.count).not.toHaveBeenCalled();
+  });
+
   it("does not select password hashes in user listing and pages on server", async () => {
     const { db } = fakeDb();
     await new AdminService(db as never).users({ page: 2, pageSize: 10, q: "example" });
