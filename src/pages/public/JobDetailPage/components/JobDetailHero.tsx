@@ -1,6 +1,10 @@
 import {
   Link,
+  useLocation,
+  useNavigate,
 } from "react-router-dom";
+import { useAuthStore } from "@/store/authStore";
+import { useSavedJobs } from "@/features/candidate/savedJobs/useSavedJobs";
 
 import type {
   JobDetailRecord,
@@ -16,13 +20,41 @@ import {
 
 import actionStyles from "../styles/JobDetailHeroActions.module.css";
 import styles from "../styles/JobDetailHero.module.css";
+
 interface JobDetailHeroProps {
   job: JobDetailRecord;
+  isMock?: boolean;
 }
 
 const JobDetailHero = ({
   job,
+  isMock,
 }: JobDetailHeroProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const user = useAuthStore((state) => state.user);
+  const { isSaved, toggleSave } = useSavedJobs();
+
+  const saved = isSaved(job.id);
+  const isMockJob = isMock ?? (typeof job.id === "number");
+
+  const handleToggleSave = () => {
+    if (!user) {
+      navigate(`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`);
+      return;
+    }
+    toggleSave({
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      salary: job.salary,
+      workplace: job.workplace,
+      type: job.type,
+      isMock: isMockJob,
+    });
+  };
+
   return (
     <section className={styles.hero}>
       <div className="container">
@@ -35,6 +67,12 @@ const JobDetailHero = ({
           Việc làm
         </Link>
 
+        {isMockJob && (
+          <aside className={styles.demoNotice} role="note">
+            <strong>Bản tin mẫu (Demo):</strong> Đây là tin tuyển dụng mẫu dùng để kiểm thử giao diện. Chức năng nộp hồ sơ thực tế chỉ khả dụng với các tin tuyển dụng được đăng từ hệ thống Backend.
+          </aside>
+        )}
+
         <div className={styles.heroCard}>
           <div className={styles.heroMain}>
             <div className={styles.companyLogo}>
@@ -46,7 +84,12 @@ const JobDetailHero = ({
                 {job.category}
               </span>
 
-              <h1>{job.title}</h1>
+              <h1>
+                {job.title}
+                {isMockJob && (
+                  <span className={styles.mockBadge}>Bản tin mẫu</span>
+                )}
+              </h1>
 
               <p className={styles.company}>
                 {job.company}
@@ -69,14 +112,18 @@ const JobDetailHero = ({
           <div className={actionStyles.heroActions}>
             <button
               type="button"
-              className={actionStyles.saveButton}
+              className={`${actionStyles.saveButton} ${saved ? actionStyles.savedActive : ""}`}
+              onClick={handleToggleSave}
+              aria-pressed={saved}
+              aria-label={saved ? "Bỏ lưu việc làm này" : "Lưu việc làm này"}
+              title={saved ? "Bỏ lưu việc làm" : "Lưu việc làm vào danh sách"}
             >
               <BookmarkIcon />
 
-              Lưu
+              {saved ? "Đã lưu" : "Lưu"}
             </button>
 
-            =<Link
+            <Link
               to={`/jobs/${job.id}/apply`}
               className={actionStyles.applyButton}
             >

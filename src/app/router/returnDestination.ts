@@ -24,7 +24,8 @@ export const getReturnDestination = (requested: unknown): string => {
       path.includes("/../") || path.endsWith("/.") || path.endsWith("/..")) return FALLBACK;
 
   if (path === "/candidate" || path === "/candidate/profile" ||
-      path === "/candidate/onboarding" || path === "/cv" ||
+      path === "/candidate/onboarding" || path === "/candidate/saved-jobs" ||
+      path === "/candidate/applications" || path === "/cv" ||
       path === "/cv/create") return requested;
 
   const cvMatch = /^\/cv\/([^/]+)\/(edit|preview)$/.exec(path);

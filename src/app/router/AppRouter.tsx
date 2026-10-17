@@ -34,6 +34,8 @@ const CompanyInvitationAcceptPage = lazy(() => import("@/pages/company/CompanyIn
 const CandidateDashboardPage = lazy(() => import("@/pages/candidate/CandidateDashboardPage"));
 const CandidateOnboardingPage = lazy(() => import("@/pages/candidate/CandidateOnboardingPage"));
 const CandidateProfilePage = lazy(() => import("@/pages/candidate/CandidateProfilePage"));
+const CandidateSavedJobsPage = lazy(() => import("@/pages/candidate/CandidateSavedJobsPage"));
+const CandidateApplicationsPage = lazy(() => import("@/pages/candidate/CandidateApplicationsPage"));
 const CvCenterPage = lazy(() => import("@/pages/candidate/CvCenterPage"));
 const JobApplicationPage = lazy(() => import("@/pages/candidate/JobApplicationPage"));
 const ResumeBuilderPage = lazy(() => import("@/pages/candidate/ResumeBuilderPage"));
@@ -172,6 +174,16 @@ const AppRouter = () => {
               <Route
                 path="onboarding"
                 element={<CandidateOnboardingPage />}
+              />
+
+              <Route
+                path="saved-jobs"
+                element={<CandidateSavedJobsPage />}
+              />
+
+              <Route
+                path="applications"
+                element={<CandidateApplicationsPage />}
               />
             </Route>
           </Route>

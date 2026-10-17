@@ -155,3 +155,257 @@
     font-size: 28px;
   }
 }
+
+.formCard {
+  padding: 32px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sectionSubtitle {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.resumeOptionList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.resumeOptionItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 160ms ease;
+  background: #ffffff;
+}
+
+.resumeOptionItem:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.resumeOptionSelected {
+  border-color: #2563eb;
+  background: #f0f7ff;
+}
+
+.resumeRadio {
+  margin-top: 3px;
+  cursor: pointer;
+}
+
+.resumeInfo {
+  flex: 1;
+}
+
+.resumeName {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.resumeMeta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #0f172a;
+  resize: vertical;
+  min-height: 140px;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+
+.textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.charCounter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.reviewGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 28px;
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.reviewRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reviewLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.reviewValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: pre-line;
+}
+
+.buttonRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.submitBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 24px;
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid #2563eb;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.secondaryBtn:hover {
+  background: #f1f5f9;
+}
+
+.bannerNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.bannerWarning {
+  background-color: #fffbeb;
+  border: 1px solid #fef3c7;
+  color: #92400e;
+}
+
+.bannerInfo {
+  background-color: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1e40af;
+}
+
+.bannerError {
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #991b1b;
+}
+
+.successCard {
+  text-align: center;
+  padding: 48px 32px;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+}
+
+.successIcon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  background: #dcfce7;
+  color: #16a34a;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.successTitle {
+  margin: 0 0 10px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.successDesc {
+  font-size: 15px;
+  color: #64748b;
+  margin: 0 0 24px;
+}

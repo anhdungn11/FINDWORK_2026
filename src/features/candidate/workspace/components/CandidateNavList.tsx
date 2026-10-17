@@ -1,12 +1,15 @@
 import { NavLink } from "react-router-dom";
 import {
   ArrowUpRight,
+  Bookmark,
   Briefcase,
   FileText,
   Layers,
   LayoutDashboard,
+  Send,
   User,
 } from "lucide-react";
+import { useSavedJobs } from "@/features/candidate/savedJobs/useSavedJobs";
 import type { WorkspaceNavItem } from "../types/workspace.types";
 import styles from "../styles/CandidateWorkspace.module.css";
 
@@ -61,6 +64,27 @@ interface CandidateNavListProps {
 }
 
 export const CandidateNavList = ({ onNavigate }: CandidateNavListProps) => {
+  const { savedCount } = useSavedJobs();
+
+  const activityNavItems: WorkspaceNavItem[] = [
+    {
+      id: "saved-jobs",
+      label: "Việc làm đã lưu",
+      to: "/candidate/saved-jobs",
+      icon: Bookmark,
+      badge: savedCount > 0 ? String(savedCount) : undefined,
+      badgeType: "neutral",
+      ariaLabel: `Việc làm đã lưu${savedCount > 0 ? `: ${savedCount} tin` : ""}`,
+    },
+    {
+      id: "applications",
+      label: "Lịch sử ứng tuyển",
+      to: "/candidate/applications",
+      icon: Send,
+      ariaLabel: "Lịch sử các đơn đã nộp",
+    },
+  ];
+
   const renderItem = (item: WorkspaceNavItem) => {
     const Icon = item.icon;
     return (
@@ -105,6 +129,11 @@ export const CandidateNavList = ({ onNavigate }: CandidateNavListProps) => {
       <div className={styles.navGroup}>
         <span className={styles.navGroupLabel}>Không gian làm việc</span>
         {PRIMARY_NAV_ITEMS.map(renderItem)}
+      </div>
+
+      <div className={styles.navGroup}>
+        <span className={styles.navGroupLabel}>Hoạt động tìm việc</span>
+        {activityNavItems.map(renderItem)}
       </div>
 
       <div className={styles.navGroup}>

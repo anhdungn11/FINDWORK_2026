@@ -70,6 +70,23 @@
   color: var(--color-primary);
 }
 
+.saveButtonActive {
+  color: #ef4444;
+}
+
+.mockBadge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: var(--font-weight-medium, 500);
+  background-color: var(--color-surface-soft, #f1f5f9);
+  color: var(--color-text-muted, #64748b);
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 4px;
+}
+
+
 .meta {
   margin-top: 18px;
 
