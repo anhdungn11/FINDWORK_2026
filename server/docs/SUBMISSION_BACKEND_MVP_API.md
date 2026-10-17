@@ -66,6 +66,67 @@ Onboarding continuity: `PUT /candidate/onboarding-draft` saves a private version
 
 One application per candidate profile and job **for life**, even if withdrawn or rejected; the database unique key enforces this. Review transitions are `SUBMITTED -> REVIEWING/REJECTED -> SHORTLISTED/REJECTED -> INTERVIEW/REJECTED -> OFFERED/REJECTED`. The arrow sequence means each forward step starts from the preceding status. Existing company roles need a separately authorized permission backfill for `application.view` and `application.review`; new company roles receive the grants automatically. `APPLICATION_DUPLICATE` is 409, `APPLICATION_NOT_FOUND` is 404, `APPLICATION_VERSION_CONFLICT` and `APPLICATION_STATE_CONFLICT` are 409, `RESUME_UNAVAILABLE` is 400, and `JOB_UNAVAILABLE` is 409.
 
+### Candidate Saved Jobs and application handoff (2026-10-17)
+
+Saved Jobs code is implemented but requires the **unapplied** additive migration `20261017100000_candidate_saved_jobs`. All four routes require a Bearer token, active session/account, and `saved_job.manage` at `OWN` scope. That grant belongs to the `CANDIDATE` system role provisioned during real CandidateProfile creation; an account without it receives 403. Every query is scoped to the authenticated profile. No caller-supplied candidate ID is accepted.
+
+| Method / endpoint | Request | Success | Errors |
+| --- | --- | --- | --- |
+| `POST /candidate/saved-jobs` | `{jobId:UUID}` | 201 `SavedJobItem`; only a currently public, published job can be added. | 400 `VALIDATION_ERROR` for bad UUID; 404 `JOB_NOT_FOUND` or `CANDIDATE_PROFILE_NOT_FOUND`; 409 `SAVED_JOB_DUPLICATE`; 401/403 auth/permission. |
+| `GET /candidate/saved-jobs` | `page` 1..1,000,000, `pageSize` 1..100; defaults 1/20 | 200 `{data:SavedJobItem[],pagination:{page,pageSize,total,totalPages}}`, newest saved first. | 400 invalid page; 404 `CANDIDATE_PROFILE_NOT_FOUND`; 401/403. |
+| `GET /candidate/saved-jobs/:jobId/status` | UUID path | 200 `{jobId,saved:boolean,isAvailable:boolean}`. | 400 invalid UUID; 404 missing profile; 401/403. |
+| `DELETE /candidate/saved-jobs/:jobId` | UUID path | 204, empty body. | 400 invalid UUID; 404 `SAVED_JOB_NOT_FOUND` for absent or another candidate's bookmark, or `CANDIDATE_PROFILE_NOT_FOUND`; 401/403. |
+
+`SavedJobItem` is `{id:UUID,jobId:UUID,savedAt:ISO8601,isAvailable:boolean,job:PublicSavedJob|null}`. `PublicSavedJob` has the same field selection as `GET /jobs/:jobId`: `id,companyId,categoryId,title,description,employmentType,workplaceType,experienceMinMonths,experienceMaxMonths,salaryMin,salaryMax,currency,salaryPeriod,salaryNegotiable,showSalary,status,publishedAt,applicationDeadline,expiresAt,version,createdAt,updatedAt,company:{id,name,slug},category:{id,code,name}`. Decimal salary fields serialize as strings or null. If a saved job becomes paused/closed/expired, its company is suspended, or its category is inactive, the bookmark remains but `isAvailable=false` and `job=null`; no unpublished details leak. Deleting a Job cascades its bookmarks, so it disappears from the list. The database unique key `(candidateProfileId,jobId)` prevents races and duplicates.
+
+Examples use illustrative UUIDs and no credentials:
+
+```http
+POST /api/v1/candidate/saved-jobs
+Content-Type: application/json
+
+{"jobId":"33333333-3333-4333-8333-333333333333"}
+```
+
+```json
+{"id":"77777777-7777-4777-8777-777777777777","jobId":"33333333-3333-4333-8333-333333333333","savedAt":"2026-10-17T09:00:00.000Z","isAvailable":true,"job":{"id":"33333333-3333-4333-8333-333333333333","companyId":"11111111-1111-4111-8111-111111111111","categoryId":"22222222-2222-4222-8222-222222222222","title":"Backend Engineer","description":"Build recruiting services.","employmentType":"FULL_TIME","workplaceType":"REMOTE","experienceMinMonths":null,"experienceMaxMonths":null,"salaryMin":null,"salaryMax":null,"currency":"VND","salaryPeriod":"MONTH","salaryNegotiable":false,"showSalary":false,"status":"PUBLISHED","publishedAt":"2026-10-17T08:00:00.000Z","applicationDeadline":null,"expiresAt":null,"version":2,"createdAt":"2026-10-17T07:00:00.000Z","updatedAt":"2026-10-17T08:00:00.000Z","company":{"id":"11111111-1111-4111-8111-111111111111","name":"Example Company","slug":"example-company"},"category":{"id":"22222222-2222-4222-8222-222222222222","code":"technology","name":"Technology"}}}
+```
+
+`GET /api/v1/candidate/saved-jobs?page=1&pageSize=20` returns `{data:SavedJobItem[],pagination}`. For a closed job, an exact list response is:
+
+```json
+{"data":[{"id":"77777777-7777-4777-8777-777777777777","jobId":"33333333-3333-4333-8333-333333333333","savedAt":"2026-10-17T09:00:00.000Z","isAvailable":false,"job":null}],"pagination":{"page":1,"pageSize":20,"total":1,"totalPages":1}}
+```
+
+`GET /api/v1/candidate/saved-jobs/33333333-3333-4333-8333-333333333333/status` returns `{"jobId":"33333333-3333-4333-8333-333333333333","saved":true,"isAvailable":true}` while available. `DELETE` on that UUID returns HTTP 204 without JSON.
+
+Applying uses the **existing** application API. The browser must use the UUID returned by `GET /jobs`, then create/get an owned builder Resume and use one of its `versions[].id` values:
+
+```http
+POST /api/v1/jobs/33333333-3333-4333-8333-333333333333/applications
+Content-Type: application/json
+
+{"resumeId":"55555555-5555-4555-8555-555555555555","resumeVersionId":"66666666-6666-4666-8666-666666666666","coverLetter":"I would like to apply."}
+```
+
+This route requires Bearer auth and `application.create` at `OWN` scope. It returns HTTP 201 with `status:"SUBMITTED"`, `version:1`, the immutable `resumeVersionId`, candidate contact snapshots, `jobSnapshot`, timestamps and a job summary. An illustrative complete application response is:
+
+```json
+{"id":"88888888-8888-4888-8888-888888888888","companyId":"11111111-1111-4111-8111-111111111111","jobId":"33333333-3333-4333-8333-333333333333","status":"SUBMITTED","version":1,"resumeId":"55555555-5555-4555-8555-555555555555","resumeVersionId":"66666666-6666-4666-8666-666666666666","fullNameSnapshot":"Example Candidate","emailSnapshot":"candidate@example.invalid","phoneSnapshot":null,"coverLetter":"I would like to apply.","jobSnapshot":{"id":"33333333-3333-4333-8333-333333333333","title":"Backend Engineer","categoryId":"22222222-2222-4222-8222-222222222222","publishedAt":"2026-10-17T08:00:00.000Z"},"submittedAt":"2026-10-17T09:05:00.000Z","createdAt":"2026-10-17T09:05:00.000Z","updatedAt":"2026-10-17T09:05:00.000Z","job":{"id":"33333333-3333-4333-8333-333333333333","title":"Backend Engineer","status":"PUBLISHED","company":{"id":"11111111-1111-4111-8111-111111111111","name":"Example Company","slug":"example-company"}}}
+```
+
+`GET /api/v1/candidate/applications?page=1&pageSize=20&status=SUBMITTED` requires `application.view` at `OWN` scope. A one-item history response is:
+
+```json
+{"data":[{"id":"88888888-8888-4888-8888-888888888888","companyId":"11111111-1111-4111-8111-111111111111","jobId":"33333333-3333-4333-8333-333333333333","status":"SUBMITTED","version":1,"resumeId":"55555555-5555-4555-8555-555555555555","resumeVersionId":"66666666-6666-4666-8666-666666666666","fullNameSnapshot":"Example Candidate","emailSnapshot":"candidate@example.invalid","phoneSnapshot":null,"coverLetter":"I would like to apply.","jobSnapshot":{"id":"33333333-3333-4333-8333-333333333333","title":"Backend Engineer","categoryId":"22222222-2222-4222-8222-222222222222","publishedAt":"2026-10-17T08:00:00.000Z"},"submittedAt":"2026-10-17T09:05:00.000Z","createdAt":"2026-10-17T09:05:00.000Z","updatedAt":"2026-10-17T09:05:00.000Z","job":{"id":"33333333-3333-4333-8333-333333333333","title":"Backend Engineer","status":"PUBLISHED","company":{"id":"11111111-1111-4111-8111-111111111111","name":"Example Company","slug":"example-company"}}}],"pagination":{"page":1,"pageSize":20,"total":1,"totalPages":1}}
+```
+
+`GET /candidate/applications/:applicationId` additionally returns `resumeVersion:{id,versionNumber,templateCode,builderContent,builderSettings}`. History filters and pagination use the same bounds as Saved Jobs. `JOB_UNAVAILABLE` is 409 for an unpublished/closed/expired job, `CANDIDATE_PROFILE_NOT_FOUND` is 404, `RESUME_UNAVAILABLE` is 400 for a version outside the caller's READY BUILDER resume, and `APPLICATION_DUPLICATE` is 409. Database uniqueness enforces one application per candidate/job, and submission writes the SUBMITTED status and its history in one transaction. Recruiter review transitions remain `SUBMITTED → REVIEWING → SHORTLISTED → INTERVIEW → OFFERED`, with `REJECTED` from nonterminal stages; candidate history reflects review updates.
+
+Frontend `JobId` in the mock job feature is currently a **number**, and its save button has no persistence call. All real Backend job IDs are UUID strings. The current in-memory `applicationPrototypeService` has `details` and `answers`; the submit DTO accepts only `resumeId`, `resumeVersionId`, and optional `coverLetter`. Screening answer persistence tables exist but no submit/validation API accepts `answers`; file attachments are unsupported. Antigravity should map only supported fields and leave screening/attachment UI disabled until their API contract is implemented. Do not send mock numeric IDs or unsupported properties: the global validation pipe rejects them with 400.
+
+Minimal follow-up for screening questions: add company-scoped question management to the existing Jobs module, expose active questions on public job detail, then add a validated `answers` collection to the existing submit DTO and create `ApplicationAnswer` rows in its current transaction after checking required questions, type, options and same-job ownership. Attachments need a separate, authorized upload/storage lifecycle and malware/size checks; the existing builder `resumeVersionId` path is the supported submission path now. No second application API is needed.
+
 ## Implemented contract: platform administration
 
 All routes below require Bearer authentication and the named **SYSTEM-scope** permission. A company role cannot call them. List responses use `{data,pagination}` with `page` 1..1,000,000 and `pageSize` 1..100. No list selects password hashes. Audit listing deliberately excludes stored `beforeData`, `afterData` and `metadata` because earlier records could contain sensitive payloads.

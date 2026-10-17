@@ -313,6 +313,7 @@ model CandidateProfile {
   privacySetting   CandidatePrivacySetting?
   resumes          Resume[]
   applications     Application[]
+  savedJobs        SavedJob[]
 
   @@index([provinceId])
   @@index([wardId])
@@ -766,6 +767,7 @@ model Job {
   skills             JobSkill[]
   screeningQuestions ScreeningQuestion[]
   applications       Application[]
+  savedByCandidates  SavedJob[]
 
   @@unique([companyId, id])
   @@index([companyId, status, publishedAt])
@@ -773,6 +775,20 @@ model Job {
   @@index([status, publishedAt])
   @@index([status, applicationDeadline])
   @@index([expiresAt])
+}
+
+model SavedJob {
+  id                 String   @id @default(uuid()) @db.Uuid
+  candidateProfileId String   @db.Uuid
+  jobId              String   @db.Uuid
+  savedAt            DateTime @default(now()) @db.Timestamptz(6)
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  job              Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateProfileId, jobId])
+  @@index([candidateProfileId, savedAt, id])
+  @@index([jobId])
 }
 
 model JobLocation {

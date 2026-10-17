@@ -8,11 +8,13 @@ import { CandidateOnboardingDraftService } from "./candidate-onboarding-draft.se
 import { CandidateOnboardingImportService } from "./candidate-onboarding-import.service";
 import { CandidateResumesController } from "./candidate-resumes.controller";
 import { CandidateResumesService } from "./candidate-resumes.service";
+import { CandidateSavedJobsController } from "./candidate-saved-jobs.controller";
+import { CandidateSavedJobsService } from "./candidate-saved-jobs.service";
 
 @Module({
   imports: [AuthModule, AuthorizationModule],
-  controllers: [CandidateController, CandidateResumesController],
-  providers: [CandidateRepository, CandidateService, CandidateOnboardingDraftService, CandidateOnboardingImportService, CandidateResumesService],
+  controllers: [CandidateController, CandidateResumesController, CandidateSavedJobsController],
+  providers: [CandidateRepository, CandidateService, CandidateOnboardingDraftService, CandidateOnboardingImportService, CandidateResumesService, CandidateSavedJobsService],
   exports: [CandidateService],
 })
 export class CandidateModule {}

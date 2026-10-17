@@ -7,12 +7,12 @@ const { Client } = require("pg");
 const root = path.resolve(__dirname, "..");
 const envPath = path.join(root, ".env.test");
 const expectedRoles = {
-  CANDIDATE: { "profile.view": "OWN", "profile.update": "OWN", "resume.view": "OWN", "resume.create": "OWN", "resume.update": "OWN", "application.create": "OWN", "application.view": "OWN" },
+  CANDIDATE: { "profile.view": "OWN", "profile.update": "OWN", "resume.view": "OWN", "resume.create": "OWN", "resume.update": "OWN", "saved_job.manage": "OWN", "application.create": "OWN", "application.view": "OWN" },
   SUPPORT_ADMIN: { "user.view": "SYSTEM", "company.view": "SYSTEM", "job.view": "SYSTEM" },
   MODERATION_ADMIN: { "job.moderate": "SYSTEM" },
 };
 const companyPermissions = ["company.view", "company.update", "application.view", "application.review"];
-const requiredTables = ["_prisma_migrations", "User", "AuthSession", "Company", "CompanyMember", "Role", "RolePermission", "Permission", "SystemUserRole", "JobCategory", "Job", "CandidateOnboardingDraft", "CandidateProfile", "Resume", "ResumeVersion", "Application", "ApplicationStatusHistory", "AuditLog"];
+const requiredTables = ["_prisma_migrations", "User", "AuthSession", "Company", "CompanyMember", "Role", "RolePermission", "Permission", "SystemUserRole", "JobCategory", "Job", "SavedJob", "CandidateOnboardingDraft", "CandidateProfile", "Resume", "ResumeVersion", "Application", "ApplicationStatusHistory", "AuditLog"];
 
 function fail(reason) { throw new Error(reason); }
 

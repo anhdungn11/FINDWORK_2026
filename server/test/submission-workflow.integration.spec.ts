@@ -43,7 +43,7 @@ describe("submission recruitment workflow E2E", () => {
       select: { systemCode: true, permissions: { select: { dataScope: true, permission: { select: { code: true, isDeprecated: true } } } } } });
     if (roles.length !== required.length) throw new Error("Seeded candidate, support and moderation admin roles are required in findwork_test.");
     const requiredGrants: Record<string, Record<string, string>> = {
-      CANDIDATE: { "profile.view": "OWN", "profile.update": "OWN", "resume.view": "OWN", "resume.create": "OWN", "resume.update": "OWN", "application.create": "OWN", "application.view": "OWN" },
+      CANDIDATE: { "profile.view": "OWN", "profile.update": "OWN", "resume.view": "OWN", "resume.create": "OWN", "resume.update": "OWN", "saved_job.manage": "OWN", "application.create": "OWN", "application.view": "OWN" },
       SUPPORT_ADMIN: { "user.view": "SYSTEM", "company.view": "SYSTEM", "job.view": "SYSTEM" },
       MODERATION_ADMIN: { "job.moderate": "SYSTEM" },
     };
@@ -58,6 +58,7 @@ describe("submission recruitment workflow E2E", () => {
     if (await db.permission.count({ where: { code: { in: codes }, isDeprecated: false } }) !== codes.length) {
       throw new Error("Company permission registry is incomplete in findwork_test.");
     }
+    await db.savedJob.count({ where: { id: run } }); // Verify the additive migration before fixtures.
     fixturePreflightPassed = true;
   });
 
@@ -70,6 +71,7 @@ describe("submission recruitment workflow E2E", () => {
     // Delete only IDs created by this suite, in FK order. No broad reset or seed.
     await db.applicationStatusHistory.deleteMany({ where: { application: { companyId: { in: companies } } } });
     await db.application.deleteMany({ where: { companyId: { in: companies } } });
+    await db.savedJob.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
     await db.resumeVersion.deleteMany({ where: { resume: { candidateProfile: { userId: { in: users } } } } });
     await db.resume.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
     await db.job.deleteMany({ where: { companyId: { in: companies } } });
@@ -206,6 +208,23 @@ describe("submission recruitment workflow E2E", () => {
       .set(bearer(candidate.token)).expect(200);
     await request(app.getHttpServer()).post(api("/candidate/profile"))
       .set(bearer(otherCandidate.token)).send({ fullName: "Other Candidate" }).expect(201);
+    const savedJob = await request(app.getHttpServer()).post(api("/candidate/saved-jobs"))
+      .set(bearer(candidate.token)).send({ jobId }).expect(201);
+    expect(savedJob.body).toMatchObject({ jobId, isAvailable: true, job: { id: jobId } });
+    await request(app.getHttpServer()).get(api(`/candidate/saved-jobs/${jobId}/status`))
+      .set(bearer(candidate.token)).expect(200).expect((r) => expect(r.body.saved).toBe(true));
+    await request(app.getHttpServer()).get(api("/candidate/saved-jobs?page=1&pageSize=10"))
+      .set(bearer(candidate.token)).expect(200)
+      .expect((r) => expect(r.body.data.map((x: { jobId: string }) => x.jobId)).toContain(jobId));
+    await request(app.getHttpServer()).post(api("/candidate/saved-jobs"))
+      .set(bearer(candidate.token)).send({ jobId }).expect(409);
+    await request(app.getHttpServer()).get(api(`/candidate/saved-jobs/${jobId}/status`))
+      .set(bearer(otherCandidate.token)).expect(200).expect((r) => expect(r.body.saved).toBe(false));
+    await request(app.getHttpServer()).delete(api(`/candidate/saved-jobs/${jobId}`))
+      .set(bearer(otherCandidate.token)).expect(404);
+    await request(app.getHttpServer()).post(api("/candidate/saved-jobs"))
+      .set(bearer(candidate.token)).send({ jobId: "not-a-uuid" }).expect(400);
+    await request(app.getHttpServer()).get(api("/candidate/saved-jobs")).expect(401);
     const resume = await request(app.getHttpServer()).post(api("/candidate/resumes"))
       .set(bearer(candidate.token)).send({
         name: "Submission CV", builderContent: { summary: "Engineer" },
@@ -275,6 +294,12 @@ describe("submission recruitment workflow E2E", () => {
     const paused = await request(app.getHttpServer()).post(`${jobs}/${jobId}/pause`)
       .set(bearer(owner.token)).send({ version: published.body.version }).expect(200);
     await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(404);
+    await request(app.getHttpServer()).post(api("/candidate/saved-jobs"))
+      .set(bearer(otherCandidate.token)).send({ jobId }).expect(404);
+    await request(app.getHttpServer()).get(api("/candidate/saved-jobs"))
+      .set(bearer(candidate.token)).expect(200)
+      .expect((r) => expect(r.body.data.find((x: { jobId: string }) => x.jobId === jobId))
+        .toMatchObject({ isAvailable: false, job: null }));
     const reopened = await request(app.getHttpServer()).post(`${jobs}/${jobId}/publish`)
       .set(bearer(owner.token)).send({ version: paused.body.version }).expect(200);
     await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(200);
@@ -287,5 +312,11 @@ describe("submission recruitment workflow E2E", () => {
       .set(bearer(moderator.token)).expect(409);
     expect(await db.auditLog.count({ where: moderationAudit })).toBe(1);
     await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(404);
+    await request(app.getHttpServer()).post(api("/candidate/saved-jobs"))
+      .set(bearer(otherCandidate.token)).send({ jobId }).expect(404);
+    await request(app.getHttpServer()).delete(api(`/candidate/saved-jobs/${jobId}`))
+      .set(bearer(candidate.token)).expect(204);
+    await request(app.getHttpServer()).get(api(`/candidate/saved-jobs/${jobId}/status`))
+      .set(bearer(candidate.token)).expect(200).expect((r) => expect(r.body.saved).toBe(false));
   });
 });
