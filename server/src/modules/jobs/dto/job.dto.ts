@@ -11,6 +11,10 @@ export const SALARY_PERIODS = ["HOUR", "DAY", "WEEK", "MONTH", "YEAR"] as const;
 export const JOB_STATUSES = ["DRAFT", "PUBLISHED", "PAUSED", "CLOSED", "EXPIRED", "ARCHIVED"] as const;
 
 const trim = ({ value }: { value: unknown }) => typeof value === "string" ? value.trim() : value;
+// Browser job forms send integer salaries as JSON numbers. Convert only values that
+// JavaScript can represent exactly; decimal strings retain their original precision.
+const salary = ({ value }: { value: unknown }) =>
+  typeof value === "number" && Number.isSafeInteger(value) ? String(value) : value;
 const present = (_: unknown, value: unknown) => value !== undefined;
 const nonNull = (_: unknown, value: unknown) => value !== undefined && value !== null;
 
@@ -27,9 +31,9 @@ export class CreateJobDto {
   experienceMaxMonths?: number;
 
   // Strings preserve PostgreSQL decimal precision through JSON and Prisma.
-  @ApiPropertyOptional({ nullable: true, type: String }) @ValidateIf(nonNull)
+  @ApiPropertyOptional({ nullable: true, type: String }) @Transform(salary) @ValidateIf(nonNull)
   @Matches(/^\d{1,17}(?:\.\d{1,2})?$/) salaryMin?: string | null;
-  @ApiPropertyOptional({ nullable: true, type: String }) @ValidateIf(nonNull)
+  @ApiPropertyOptional({ nullable: true, type: String }) @Transform(salary) @ValidateIf(nonNull)
   @Matches(/^\d{1,17}(?:\.\d{1,2})?$/) salaryMax?: string | null;
 
   @ApiPropertyOptional() @ValidateIf(present) @Matches(/^[A-Z]{3}$/) currency?: string;

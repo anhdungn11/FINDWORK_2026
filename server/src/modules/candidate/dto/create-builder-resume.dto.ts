@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { IsObject, IsString, MaxLength, MinLength } from "class-validator";
+import { IsInt, IsObject, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 
 export class CreateBuilderResumeDto {
   @Transform(({ value }: { value: unknown }) => typeof value === "string" ? value.trim() : value)
@@ -8,4 +8,15 @@ export class CreateBuilderResumeDto {
 
   @IsObject()
   builderContent!: Record<string, unknown>;
+
+  @IsOptional() @IsString() @MaxLength(80)
+  templateCode?: string;
+
+  @IsOptional() @IsObject()
+  builderSettings?: Record<string, unknown>;
+}
+
+export class UpdateBuilderResumeDto extends CreateBuilderResumeDto {
+  @IsInt() @Min(1)
+  expectedVersionNumber!: number;
 }

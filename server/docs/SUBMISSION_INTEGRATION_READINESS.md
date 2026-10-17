@@ -1,0 +1,36 @@
+# Submission integration readiness — 2026-10-17
+
+Source: read-only inspection of `D:/DACSN/Find-Work-Submission/src` and this Backend at `b712982` plus the changes in this sprint. “API ready” means code and unit checks; live PostgreSQL acceptance is still pending.
+
+| Frontend feature | Backend endpoint | Readiness | Blocker or mapping |
+| --- | --- | --- | --- |
+| Login/session, candidate profile | `/auth/*`, `/candidate/*` | API ready | Bearer access token, active session and account. Candidate profile creation provisions the `CANDIDATE` OWN role. |
+| Company workspace/profile/locations/invitations | `GET /companies/me`, `/companies/:id/profile`, `/companies/:id/locations`, `/companies/:id/invitations` | API ready | Active membership required; `memberRoleNames` is informational, permissions come from active grants. |
+| Company draft/create/edit/publish/pause/close | `POST/GET/PATCH /companies/:id/jobs`, `POST /companies/:id/jobs/:jobId/{publish,pause,close}` | API ready; UI gated | `VITE_ENABLE_WORKSPACE_WRITES=true` required by Frontend. Job form's numeric salary is now accepted as a safe integer. Frontend does not currently expose resume from PAUSED even though `publish` permits it. |
+| Public job search/detail | `GET /jobs`, `GET /jobs/:jobId`, `GET /reference/job-categories` | API ready | Frontend query and `{data,pagination}` normalizer match. Published active-company jobs only; no province filter or job locations yet. |
+| Resume builder/list/versions | `POST/GET /candidate/resumes`, `GET/PATCH /candidate/resumes/:id` | Backend API ready; Frontend unwired | Frontend `resumeService` still uses sessionStorage and lowercase `builder/ready`; Backend returns uppercase enums and `versions[]`, while UI expects `currentVersion`. Frontend must map `content/settings/templateCode` to `builderContent/builderSettings/templateCode` and send `expectedVersionNumber`. Uploaded PDF is unsupported. |
+| Candidate apply/history/status | `POST /jobs/:id/applications`, `GET /candidate/applications`, `GET /candidate/applications/:id` | Backend API ready; Frontend unwired | Frontend `applicationPrototypeService` stores lowercase `submitted` in memory and has local `details/answers`; Backend requires persisted owned `resumeId` and `resumeVersionId` and returns uppercase status. One application per candidate/job. |
+| Recruiter applicant list/detail/review | `GET /companies/:id/jobs/:jobId/applications`, `GET .../:applicationId`, `PATCH .../:applicationId/status` | API ready; grants pending for old companies | `application.view` and `application.review` COMPANY grants required. Applicant snapshot and builder JSON are restricted to the company. UI has no wired recruiter adapter. |
+| Admin dashboard/users/companies/jobs/moderation/audit | `/admin/*` | Backend API ready; Frontend placeholders | Requires explicit SYSTEM grants. `SUPPORT_ADMIN` can read dashboard/lists; verification/moderation roles have narrower writes. `user.update`, `user.disable`, `audit.view` have no default role. Admin pages are placeholders. |
+
+## Contract details for Antigravity
+
+- Lists of jobs/applications/admin records return `{data,pagination:{page,pageSize,total,totalPages}}`; `page` starts at 1, `pageSize` is capped at 100. Resume and company workspace lists return `{data}` without pagination.
+- Resume create returns `versions[0].id` for application submission. Resume update appends immutable version N+1 with compare-and-swap via `expectedVersionNumber`; previous applications retain the version originally submitted.
+- Review states are `SUBMITTED → REVIEWING → SHORTLISTED → INTERVIEW → OFFERED` with `REJECTED` permitted from each nonterminal step. Frontend lowercase states require a deliberate mapping. Each review writes history and audit in one transaction.
+- Protected endpoints require Bearer access token; missing/expired session is 401, missing permission 403, hidden cross-tenant resource 404 where a scoped query is reached, duplicate/stale state 409, and DTO failure 400. Error body is `{code,message,details?,traceId,path,timestamp}`. Frontend `ApiFailure` can classify by HTTP status and read `code`; validation details live in `details`, rather than `message[]`.
+
+## Permission bootstrap plan — no database changes performed
+
+1. Read-only inventory on the intended environment: check `Permission` for `application.view`/`application.review`, `Role` for active COMPANY roles, `RolePermission` for COMPANY grants, `CompanyMemberRole` for actual assignments, `SystemUserRole` for explicitly designated admins, and active `CompanyMember` records. Compare each company's `OWNER`, `ADMIN`, `HR_MANAGER`, and `RECRUITER` role to `DEFAULT_COMPANY_ROLES`. Include direct ALLOW/DENY overrides in the review.
+2. Prepare a reviewed, idempotent transaction scoped to approved company IDs and those four role names. Insert missing `RolePermission` rows for `application.view` and `application.review` at `COMPANY` scope using `ON CONFLICT ("roleId","permissionId") DO NOTHING`. Do not add grants to `HIRING_MANAGER` or `VIEWER`; do not alter `CompanyMemberRole` assignments or direct DENY overrides. Abort if a permission is absent/deprecated or a role is mismatched/inactive. Record affected role IDs and row counts, then verify permission resolution for one approved member per role.
+3. Provision system admins separately: an authorized operator identifies the exact user IDs and role codes. Assign only approved `SUPPORT_ADMIN`, `VERIFICATION_ADMIN`, or `MODERATION_ADMIN` roles through `SystemUserRole`; use explicit, separately approved SYSTEM grants for `user.update`, `user.disable`, or `audit.view` when needed. Never infer admin status from company ownership or normal registration.
+4. Request approval before executing any grant, seed, migration, or fixture write. No such operation has been executed in this sprint.
+
+## Controlled E2E preparation
+
+`server/test/submission-workflow.integration.spec.ts` uses the real Nest app, guards, API routes, and PostgreSQL. It first calls `assertSafeIntegrationDatabase` and accepts only local `findwork_test/public` on port 5432. Fixtures use unique IDs and a unique category/company slug; cleanup targets only recorded IDs. The suite covers company draft/publish/pause/reopen/close, public listing/detail, candidate profile/resume/version/apply/status, recruiter review, admin reads, cross-tenant/identity access, duplicate application, missing/expired auth, stale versions, and no extra status-history row on a failed duplicate. It assumes the isolated test database already has the current schema and permission/role registry. The suite has **not been executed** because it writes PostgreSQL and needs explicit authorization.
+
+## Performance evidence and limits
+
+Jobs and applications use bounded server-side pagination and existing company/status/date or candidate/status indexes. The relevant service queries select explicit fields; list endpoints omit builder content. No database timing, `EXPLAIN ANALYZE`, or live load measurement was performed, so no throughput or latency improvement is claimed. Title substring search may need measurement before any new text index is justified.

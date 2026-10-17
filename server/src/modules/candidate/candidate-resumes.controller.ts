@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Req, UseGuards, ForbiddenException } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards, ForbiddenException } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
@@ -6,9 +6,9 @@ import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
 import { PermissionGuard, type AuthorizedRequest } from "../authorization/guards/permission.guard";
 import { CandidateResumesService } from "./candidate-resumes.service";
-import { CreateBuilderResumeDto } from "./dto/create-builder-resume.dto";
+import { CreateBuilderResumeDto, UpdateBuilderResumeDto } from "./dto/create-builder-resume.dto";
 
-function requireOwn(req: AuthorizedRequest, permission: "resume.create" | "resume.view"): void {
+function requireOwn(req: AuthorizedRequest, permission: "resume.create" | "resume.view" | "resume.update"): void {
   if (req.authorization?.permissions[permission]?.scope !== "OWN") {
     throw new ForbiddenException({ code: "AUTHORIZATION_OWN_SCOPE_REQUIRED", message: "Own-scope permission is required." });
   }
@@ -27,6 +27,15 @@ export class CandidateResumesController {
   create(@CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: AuthorizedRequest, @Body() dto: CreateBuilderResumeDto) {
     requireOwn(req, "resume.create");
     return this.resumes.create(auth.userId, dto);
+  }
+
+  @Patch(":resumeId")
+  @ApiOperation({ summary: "Save the next version of an owned builder resume" })
+  @RequirePermissions("resume.update")
+  update(@CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: AuthorizedRequest,
+    @Param("resumeId", ParseUUIDPipe) resumeId: string, @Body() dto: UpdateBuilderResumeDto) {
+    requireOwn(req, "resume.update");
+    return this.resumes.update(auth.userId, resumeId, dto);
   }
 
   @Get()

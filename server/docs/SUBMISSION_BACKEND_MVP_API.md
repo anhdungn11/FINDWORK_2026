@@ -37,9 +37,10 @@ Only JSON builder resumes are persisted. No file upload, object storage or uploa
 
 | Method / endpoint | Auth and permission | Request | Response / DB dependencies |
 | --- | --- | --- | --- |
-| `POST /candidate/resumes` | Bearer; `resume.create` OWN | `{name:string(2..180),builderContent:object}`; JSON max 128 KB | 201 Resume with version 1; existing `CandidateProfile` required. |
+| `POST /candidate/resumes` | Bearer; `resume.create` OWN | `{name:string(2..180),builderContent:object,templateCode?:string(max 80),builderSettings?:object}`; combined JSON max 128 KB | 201 Resume with version 1; existing `CandidateProfile` required. |
 | `GET /candidate/resumes` | Bearer; `resume.view` OWN | none | `{data:[Resume]}` for own nondeleted resumes, latest version metadata only. |
 | `GET /candidate/resumes/:resumeId` | Bearer; `resume.view` OWN | UUID path | Own Resume with builder content or 404. |
+| `PATCH /candidate/resumes/:resumeId` | Bearer; `resume.update` OWN | `{name:string(2..180),builderContent:object,expectedVersionNumber:int>=1,templateCode?:string(max 80),builderSettings?:object}`; combined JSON max 128 KB | Own READY BUILDER resume, appends version N+1 and updates name atomically; returns Resume with versions newest first. 404 for another candidate's resume, 409 on stale version or invalid state. |
 | `POST /jobs/:jobId/applications` | Bearer; `application.create` OWN | `{resumeId:UUID,resumeVersionId:UUID,coverLetter?:string(max 5000)}` | 201 SUBMITTED Application with status history. Requires existing profile, owned READY BUILDER resume/version, PUBLISHED job at ACTIVE company and active category before deadline/expiry. |
 | `GET /candidate/applications` | Bearer; `application.view` OWN | `page`, `pageSize`, optional `status` | `{data,pagination}` for own applications. |
 | `GET /candidate/applications/:applicationId` | Bearer; `application.view` OWN | UUID path | Own application with builder CV content or 404. |
@@ -71,3 +72,7 @@ Admin mutations return 404 (`USER_NOT_FOUND`, `COMPANY_NOT_FOUND`, `JOB_NOT_FOUN
 ## Integration limits and deployment dependencies
 
 Existing company profile/locations/invitations and Candidate/Reference APIs retain their current DTOs and guards. Province/Ward catalog availability is separate from this sprint. The new Job MVP does not accept job locations; province filtering, screening question answers and uploaded CV attachments remain out of scope until their persistence flows are implemented. Existing companies need a separately approved grant backfill for `application.view`/`application.review`; no database writes were made during this sprint.
+
+## 2026-10-17 compatibility correction
+
+`salaryMin` and `salaryMax` on Job create/update accept either a decimal string matching `^\d{1,17}(?:\.\d{1,2})?$` or a JSON safe integer. The Frontend form sends integer numbers. The Backend converts safe integers to decimal strings before Prisma; unsafe/fractional JSON numbers fail validation. The new builder resume update route requires the caller's latest `expectedVersionNumber`; the database unique `(resumeId, versionNumber)` key rejects concurrent writes. API errors use `{code,message,details?,traceId,path,timestamp}`; malformed DTOs use HTTP 400 with `code: VALIDATION_ERROR` and `details`.

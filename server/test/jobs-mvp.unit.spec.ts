@@ -164,4 +164,17 @@ describe("jobs MVP ownership and publication", () => {
     const invalidQuery = plainToInstance(PublicJobQueryDto, { page: "0", pageSize: "101" });
     expect((await validate(invalidQuery)).length).toBe(2);
   });
+
+  it("accepts exact JSON integer salaries from the frontend and rejects unsafe numbers", async () => {
+    const base = {
+      categoryId, title: "Senior nurse", description: "Care for patients in a clinic.",
+      employmentType: "FULL_TIME", workplaceType: "ONSITE",
+    };
+    const accepted = plainToInstance(CreateJobDto, { ...base, salaryMin: 10000000, salaryMax: "20000000.50" });
+    expect(await validate(accepted)).toEqual([]);
+    expect(accepted.salaryMin).toBe("10000000");
+    expect(accepted.salaryMax).toBe("20000000.50");
+    const unsafe = plainToInstance(CreateJobDto, { ...base, salaryMin: Number.MAX_SAFE_INTEGER + 1 });
+    expect((await validate(unsafe)).map((error) => error.property)).toContain("salaryMin");
+  });
 });

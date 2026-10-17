@@ -11,7 +11,7 @@ const applicationSelect = {
 } as const;
 const applicationDetailSelect = {
   ...applicationSelect,
-  resumeVersion: { select: { id: true, versionNumber: true, builderContent: true } },
+  resumeVersion: { select: { id: true, versionNumber: true, templateCode: true, builderContent: true, builderSettings: true } },
 } as const;
 
 function missing(): NotFoundException {

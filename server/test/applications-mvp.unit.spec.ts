@@ -97,8 +97,17 @@ describe("applications MVP security", () => {
 
   it("persists builder content under the authenticated candidate profile", async () => {
     const { tx, db } = fakeDb();
-    await new CandidateResumesService(db as never).create(userId, { name: "Clinical CV", builderContent: { summary: "Nurse" } });
+    await new CandidateResumesService(db as never).create(userId, {
+      name: "Clinical CV", builderContent: { summary: "Nurse" },
+      templateCode: "classic", builderSettings: { accent: "blue" },
+    });
     expect(tx.candidateProfile.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { userId } }));
-    expect(tx.resume.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ candidateProfileId: "profile", sourceType: "BUILDER", status: "READY", versions: { create: { versionNumber: 1, builderContent: { summary: "Nurse" } } } }) }));
+    expect(tx.resume.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      candidateProfileId: "profile", sourceType: "BUILDER", status: "READY",
+      versions: { create: {
+        versionNumber: 1, builderContent: { summary: "Nurse" },
+        templateCode: "classic", builderSettings: { accent: "blue" },
+      } },
+    }) }));
   });
 });
