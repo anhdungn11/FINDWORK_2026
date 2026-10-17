@@ -63,7 +63,14 @@ const EmployerDashboardPage = () => {
           <p style={{ marginTop: 12 }}><Link className={ui.link} to="/employer/jobs">Quản lý tin →</Link></p>
         </Card>
         <Card title="Ứng viên ứng tuyển">
-          <UnavailableState title="Chưa có dữ liệu ứng tuyển" text="Backend chưa cung cấp API đơn ứng tuyển nên hệ thống không hiển thị số liệu ứng viên." />
+          <p style={{ margin: "0 0 8px", color: "var(--color-text-secondary)" }}>
+            Theo dõi hồ sơ ứng viên ứng tuyển vào các vị trí đang mở của doanh nghiệp.
+          </p>
+          <p style={{ marginTop: 12 }}>
+            <Link className={ui.link} to="/employer/applicants">
+              Quản lý hồ sơ ứng viên →
+            </Link>
+          </p>
         </Card>
       </div>
     </>

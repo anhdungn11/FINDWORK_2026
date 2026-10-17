@@ -7,10 +7,12 @@ import {
   normalizePaged,
   normalizeMyCompany,
   normalizeCompanyProfile,
+  normalizeCompanyApplication,
   formatSalary,
 } from "../apiTypes";
 import { validateJobForm, formToPayload, EMPTY_JOB_FORM } from "../jobForm";
-import { availableTransitions, canEditJob } from "../companyWorkspaceApi";
+import { availableTransitions, availableReviewTransitions, canEditJob } from "../companyWorkspaceApi";
+import { normalizeAdminUser, normalizeAdminCompany, normalizeAdminJob, normalizeAdminAudit } from "../adminApi";
 
 describe("accessPolicy", () => {
   it("recognizes system admin roles accurately", () => {
@@ -18,6 +20,9 @@ describe("accessPolicy", () => {
     assert.equal(isAdminRole("SYSTEM_ADMIN"), true);
     assert.equal(isAdminRole("SUPER_ADMIN"), true);
     assert.equal(isAdminRole("PLATFORM_ADMIN"), true);
+    assert.equal(isAdminRole("SUPPORT_ADMIN"), true);
+    assert.equal(isAdminRole("VERIFICATION_ADMIN"), true);
+    assert.equal(isAdminRole("MODERATION_ADMIN"), true);
     assert.equal(isAdminRole("candidate"), false);
     assert.equal(isAdminRole("EMPLOYER"), false);
     assert.equal(isAdminRole(null), false);
@@ -223,5 +228,88 @@ describe("job lifecycle transitions", () => {
     assert.equal(canEditJob("PUBLISHED"), false);
     assert.equal(canEditJob("PAUSED"), false);
     assert.equal(canEditJob("CLOSED"), false);
+  });
+
+  it("determines valid application review transitions per backend contract", () => {
+    assert.deepEqual(availableReviewTransitions("SUBMITTED"), ["REVIEWING", "REJECTED"]);
+    assert.deepEqual(availableReviewTransitions("REVIEWING"), ["SHORTLISTED", "REJECTED"]);
+    assert.deepEqual(availableReviewTransitions("SHORTLISTED"), ["INTERVIEW", "REJECTED"]);
+    assert.deepEqual(availableReviewTransitions("INTERVIEW"), ["OFFERED", "REJECTED"]);
+    assert.deepEqual(availableReviewTransitions("OFFERED"), []);
+    assert.deepEqual(availableReviewTransitions("REJECTED"), []);
+    assert.deepEqual(availableReviewTransitions("WITHDRAWN"), []);
+  });
+});
+
+describe("applications and admin normalizers", () => {
+  it("normalizes company application correctly", () => {
+    const raw = {
+      id: "app-uuid-1",
+      companyId: "comp-uuid-1",
+      jobId: "job-uuid-1",
+      status: "SUBMITTED",
+      version: 1,
+      resumeId: "res-uuid-1",
+      resumeVersionId: "rv-uuid-1",
+      fullNameSnapshot: "Nguyễn Văn A",
+      emailSnapshot: "nguyenvana@example.com",
+      phoneSnapshot: "0901234567",
+      coverLetter: "Kính gửi nhà tuyển dụng...",
+      submittedAt: "2026-10-17T00:00:00Z",
+      createdAt: "2026-10-17T00:00:00Z",
+      updatedAt: "2026-10-17T00:00:00Z",
+      job: { id: "job-uuid-1", title: "Frontend Engineer", status: "PUBLISHED" },
+      resumeVersion: { id: "rv-uuid-1", versionNumber: 1, builderContent: { summary: "Hi" } },
+    };
+    const app = normalizeCompanyApplication(raw);
+    assert.equal(app.id, "app-uuid-1");
+    assert.equal(app.fullNameSnapshot, "Nguyễn Văn A");
+    assert.equal(app.status, "SUBMITTED");
+    assert.equal(app.version, 1);
+    assert.equal(app.job?.title, "Frontend Engineer");
+    assert.equal(app.resumeVersion?.versionNumber, 1);
+  });
+
+  it("normalizes admin user, company, job, and audit records", () => {
+    const user = normalizeAdminUser({
+      id: "u-1",
+      email: "admin@findwork.vn",
+      status: "ACTIVE",
+      emailVerifiedAt: "2026-10-01T00:00:00Z",
+    });
+    assert.equal(user.id, "u-1");
+    assert.equal(user.email, "admin@findwork.vn");
+    assert.equal(user.status, "ACTIVE");
+
+    const comp = normalizeAdminCompany({
+      id: "c-1",
+      name: "Tập đoàn X",
+      slug: "tap-doan-x",
+      status: "ACTIVE",
+      verificationStatus: "VERIFIED",
+    });
+    assert.equal(comp.name, "Tập đoàn X");
+    assert.equal(comp.verificationStatus, "VERIFIED");
+
+    const job = normalizeAdminJob({
+      id: "j-1",
+      companyId: "c-1",
+      categoryId: "cat-1",
+      title: "Backend Go Engineer",
+      status: "PUBLISHED",
+      version: 3,
+    });
+    assert.equal(job.title, "Backend Go Engineer");
+    assert.equal(job.version, 3);
+
+    const audit = normalizeAdminAudit({
+      id: "aud-1",
+      action: "admin.company.verify",
+      targetType: "Company",
+      targetId: "c-1",
+      actorUserId: "u-1",
+    });
+    assert.equal(audit.action, "admin.company.verify");
+    assert.equal(audit.targetType, "Company");
   });
 });

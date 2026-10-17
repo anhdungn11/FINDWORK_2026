@@ -17,4 +17,18 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes("node_modules")) {
+            if (id.includes("lucide-react")) return "lucide";
+            if (id.includes("react-router-dom") || id.includes("react-dom") || id.includes("react/")) return "vendor";
+            if (id.includes("zustand") || id.includes("axios")) return "state";
+            return "deps";
+          }
+        },
+      },
+    },
+  },
 });

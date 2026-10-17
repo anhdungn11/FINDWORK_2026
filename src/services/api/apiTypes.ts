@@ -95,6 +95,38 @@ export interface CompanyLocationDto {
   isHeadquarters: boolean;
 }
 
+export type ApplicationReviewStatus = "REVIEWING" | "SHORTLISTED" | "INTERVIEW" | "OFFERED" | "REJECTED";
+export type ApplicationStatus = "SUBMITTED" | ApplicationReviewStatus | "WITHDRAWN";
+
+export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
+  SUBMITTED: "Đã nộp",
+  REVIEWING: "Đang xem xét",
+  SHORTLISTED: "Đạt sơ tuyển",
+  INTERVIEW: "Phỏng vấn",
+  OFFERED: "Đã gửi offer",
+  REJECTED: "Đã từ chối",
+  WITHDRAWN: "Đã rút đơn",
+};
+
+export interface CompanyApplicationDto {
+  id: string;
+  companyId: string;
+  jobId: string;
+  status: ApplicationStatus;
+  version: number;
+  resumeId: string;
+  resumeVersionId: string;
+  fullNameSnapshot: string | null;
+  emailSnapshot: string | null;
+  phoneSnapshot: string | null;
+  coverLetter: string | null;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  job?: { id: string; title: string; status: string; company?: { id: string; name: string; slug: string } };
+  resumeVersion?: { id: string; versionNumber: number; builderContent: unknown };
+}
+
 type Raw = Record<string, unknown>;
 const obj = (v: unknown): Raw => (v && typeof v === "object" ? (v as Raw) : {});
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
@@ -187,6 +219,40 @@ export function normalizeLocation(value: unknown): CompanyLocationDto {
     wardName: str(obj(r.ward).name) ?? str(r.wardName),
     countryCode: str(r.countryCode),
     isHeadquarters: r.isHeadquarters === true,
+  };
+}
+
+export function normalizeCompanyApplication(value: unknown): CompanyApplicationDto {
+  const r = unwrapData(value);
+  const j = obj(r.job);
+  const jComp = obj(j.company);
+  const rv = obj(r.resumeVersion);
+  return {
+    id: str(r.id) ?? "",
+    companyId: str(r.companyId) ?? "",
+    jobId: str(r.jobId) ?? "",
+    status: (str(r.status) as ApplicationStatus) ?? "SUBMITTED",
+    version: num(r.version) ?? 1,
+    resumeId: str(r.resumeId) ?? "",
+    resumeVersionId: str(r.resumeVersionId) ?? "",
+    fullNameSnapshot: str(r.fullNameSnapshot),
+    emailSnapshot: str(r.emailSnapshot),
+    phoneSnapshot: str(r.phoneSnapshot),
+    coverLetter: str(r.coverLetter),
+    submittedAt: str(r.submittedAt),
+    createdAt: str(r.createdAt) ?? "",
+    updatedAt: str(r.updatedAt) ?? "",
+    job: j.id ? {
+      id: str(j.id) ?? "",
+      title: str(j.title) ?? "",
+      status: str(j.status) ?? "",
+      company: jComp.id ? { id: str(jComp.id) ?? "", name: str(jComp.name) ?? "", slug: str(jComp.slug) ?? "" } : undefined,
+    } : undefined,
+    resumeVersion: rv.id ? {
+      id: str(rv.id) ?? "",
+      versionNumber: num(rv.versionNumber) ?? 1,
+      builderContent: rv.builderContent,
+    } : undefined,
   };
 }
 

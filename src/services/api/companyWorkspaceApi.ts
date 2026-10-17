@@ -3,9 +3,10 @@ import { isWorkspaceWritesEnabled } from "../../config/featureFlags";
 import { toApiFailure, writeBlockedFailure } from "./apiFailure";
 import {
   normalizeCompanyProfile, normalizeJob, normalizeLocation, normalizeMyCompany, normalizePaged,
-  unwrapData,
+  normalizeCompanyApplication, unwrapData,
   type CompanyLocationDto, type CompanyProfileDto, type EmploymentType, type JobDto,
   type MyCompanyDto, type Paged, type SalaryPeriod, type WorkplaceType,
+  type CompanyApplicationDto, type ApplicationReviewStatus,
 } from "./apiTypes";
 
 export interface JobInput {
@@ -86,6 +87,65 @@ export const companyWorkspaceApi = {
     guardWrite(`${action} tin tuyển dụng`);
     return run(async () => normalizeJob(unwrapData((await apiClient.post(`/companies/${companyId}/jobs/${jobId}/${action}`, { version })).data)));
   },
+
+  listJobApplications: (
+    companyId: string,
+    jobId: string,
+    params: { page?: number; pageSize?: number; status?: string },
+    signal?: AbortSignal,
+  ): Promise<Paged<CompanyApplicationDto>> =>
+    run(async () => {
+      const query: Record<string, string | number> = {};
+      if (params.page && params.page > 1) query.page = params.page;
+      if (params.pageSize) query.pageSize = params.pageSize;
+      if (params.status) query.status = params.status;
+      return normalizePaged(
+        (await apiClient.get(`/companies/${companyId}/jobs/${jobId}/applications`, { params: query, signal })).data,
+        normalizeCompanyApplication,
+      );
+    }),
+
+  getApplication: (companyId: string, jobId: string, applicationId: string, signal?: AbortSignal): Promise<CompanyApplicationDto> =>
+    run(async () =>
+      normalizeCompanyApplication(
+        unwrapData((await apiClient.get(`/companies/${companyId}/jobs/${jobId}/applications/${applicationId}`, { signal })).data),
+      ),
+    ),
+
+  reviewApplication: (
+    companyId: string,
+    jobId: string,
+    applicationId: string,
+    version: number,
+    status: ApplicationReviewStatus,
+  ): Promise<CompanyApplicationDto> => {
+    guardWrite("cập nhật trạng thái ứng viên");
+    return run(async () =>
+      normalizeCompanyApplication(
+        unwrapData(
+          (await apiClient.patch(`/companies/${companyId}/jobs/${jobId}/applications/${applicationId}/status`, {
+            version,
+            status,
+          })).data,
+        ),
+      ),
+    );
+  },
+};
+
+/**
+ * Các trạng thái chuyển tiếp ứng viên hợp lệ theo hợp đồng Backend:
+ * SUBMITTED -> REVIEWING / REJECTED
+ * REVIEWING -> SHORTLISTED / REJECTED
+ * SHORTLISTED -> INTERVIEW / REJECTED
+ * INTERVIEW -> OFFERED / REJECTED
+ */
+export const availableReviewTransitions = (status: string | null): ApplicationReviewStatus[] => {
+  if (status === "SUBMITTED") return ["REVIEWING", "REJECTED"];
+  if (status === "REVIEWING") return ["SHORTLISTED", "REJECTED"];
+  if (status === "SHORTLISTED") return ["INTERVIEW", "REJECTED"];
+  if (status === "INTERVIEW") return ["OFFERED", "REJECTED"];
+  return [];
 };
 
 /** Chuyển trạng thái hợp lệ theo hợp đồng: DRAFT→PUBLISHED, PUBLISHED→PAUSED, PUBLISHED/PAUSED→CLOSED. */
