@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
@@ -12,6 +13,7 @@ import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { CompanyService } from "./company.service";
 import { CompanyCreatedResponseDto } from "./dto/company-created-response.dto";
 import { CreateCompanyDto } from "./dto/create-company.dto";
+import { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
 
 @ApiTags("Companies")
 @Controller("companies")
@@ -23,6 +25,18 @@ export class CompanyController {
   @Get("me")
   listMyWorkspace(@CurrentAuth() auth: AuthenticatedPrincipal) {
     return this.companyService.listActiveWorkspace(auth.userId);
+  }
+
+  @Get()
+  @ApiOperation({ summary: "Discover active companies with a public profile only" })
+  listPublic(@Query() query: PublicCompanyQueryDto) {
+    return this.companyService.listPublic(query);
+  }
+
+  @Get(":companyId")
+  @ApiOperation({ summary: "Read an active company's public profile" })
+  getPublic(@Param("companyId", ParseUUIDPipe) companyId: string) {
+    return this.companyService.getPublic(companyId);
   }
 
   @ApiBearerAuth("access-token")

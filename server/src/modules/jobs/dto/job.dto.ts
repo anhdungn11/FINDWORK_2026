@@ -66,6 +66,8 @@ export class CompanyJobQueryDto extends JobPageQueryDto {
 export class PublicJobQueryDto extends JobPageQueryDto {
   @ApiPropertyOptional() @Transform(trim) @ValidateIf(present) @IsString() @MinLength(1) @MaxLength(100)
   q?: string;
+  @ApiPropertyOptional({ format: "uuid" }) @ValidateIf(present) @IsUUID("4")
+  companyId?: string;
   @ApiPropertyOptional() @ValidateIf(present) @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   categoryCode?: string;
   @ApiPropertyOptional({ enum: EMPLOYMENT_TYPES }) @ValidateIf(present) @IsIn(EMPLOYMENT_TYPES)

@@ -16,6 +16,20 @@ Base path: `/api/v1`. Responses are JSON. Protected endpoints require `Authoriza
 
 ## Implemented contract: company workspace and jobs
 
+### Public company discovery (2026-10-17)
+
+`Company` has no public/private flag. Public discovery includes only `ACTIVE` companies, matching the existing public Job visibility rule. `isVerified` is true only for `VERIFIED`; an active unverified company is not labeled verified. Public responses never select legal name, tax code, creator/member identities, invitations, audit, internal asset keys or full street addresses.
+
+| Method / endpoint | Auth | Query / response |
+| --- | --- | --- |
+| `GET /companies` | Public | `page` 1..1,000,000 (default 1), `pageSize` 1..100 (default 20), optional `q` (trimmed, case-insensitive name substring, max 100), `industryCode` (exact), `provinceId` (UUID, any company location), `verifiedOnly=true\|false`. Returns `{data:PublicCompany[],pagination:{page,pageSize,total,totalPages}}`, sorted by name then ID. |
+| `GET /companies/:companyId` | Public | UUID path; returns `PublicCompany` or 404 `PUBLIC_COMPANY_NOT_FOUND` for absent/inactive company. |
+| `GET /jobs?companyId=:companyId` | Public | UUID filter on existing published Job search; combines with existing `q`, `categoryCode`, employment/workplace filters and pagination. |
+
+`PublicCompany` is `{id,name,slug,description,website,employeeSizeRange,foundedYear,isVerified,industry,headquarters,jobsCount}`. `industry` is `{id,code,name}` or null; `headquarters` is `{countryCode,province:{id,code,name}|null,ward:{id,code,name}|null}` or null. `jobsCount` counts only currently available published Jobs of the active company. Empty results have `totalPages:0`. Query validation uses HTTP 400 `VALIDATION_ERROR`.
+
+Example without credentials: `GET /api/v1/companies?q=software&page=1&pageSize=20&verifiedOnly=true`, then `GET /api/v1/jobs?companyId=<company UUID>&page=1&pageSize=20`. The Backend uses UUID company IDs; the current Frontend company mock uses numeric IDs and must map routes when integrated.
+
 | Method / endpoint | Auth and permission | Request | Response / DB dependencies |
 | --- | --- | --- | --- |
 | `GET /companies/me` | Bearer; ACTIVE account | none | `{data:[{id,name,slug,status,verificationStatus,memberRoleNames}]}` from active `CompanyMember` records only. |

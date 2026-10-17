@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from "@nestjs/common";
 import { CompanyRepository } from "./company.repository";
 import type { CreateCompanyDto } from "./dto/create-company.dto";
+import type { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
 
 @Injectable()
 export class CompanyService {
@@ -8,6 +9,14 @@ export class CompanyService {
 
   listActiveWorkspace(userId: string) {
     return this.companyRepository.listActiveWorkspace(userId);
+  }
+
+  listPublic(query: PublicCompanyQueryDto) {
+    return this.companyRepository.listPublic(query);
+  }
+
+  getPublic(companyId: string) {
+    return this.companyRepository.getPublic(companyId);
   }
 
   async create(actorUserId: string, dto: CreateCompanyDto) {

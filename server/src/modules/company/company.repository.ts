@@ -1,6 +1,32 @@
-import { Injectable, InternalServerErrorException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
+import { publicJobVisibility } from "../jobs/public-job-visibility";
 import { DEFAULT_COMPANY_PERMISSION_CODES, DEFAULT_COMPANY_ROLES } from "./company-roles";
+import type { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
+
+function publicCompanySelect(now: Date) {
+  return {
+    id: true, name: true, slug: true, description: true, website: true,
+    employeeSizeRange: true, foundedYear: true, verificationStatus: true,
+    industry: { select: { id: true, code: true, name: true } },
+    locations: { where: { isHeadquarters: true }, orderBy: { id: "asc" as const }, take: 1,
+      select: { countryCode: true, province: { select: { id: true, code: true, name: true } },
+        ward: { select: { id: true, code: true, name: true } } } },
+    _count: { select: { jobs: { where: publicJobVisibility(now) } } },
+  } as const;
+}
+
+type PublicCompanyRow = Prisma.CompanyGetPayload<{ select: ReturnType<typeof publicCompanySelect> }>;
+function publicCompany(row: PublicCompanyRow) {
+  return {
+    id: row.id, name: row.name, slug: row.slug, description: row.description,
+    website: row.website, employeeSizeRange: row.employeeSizeRange,
+    foundedYear: row.foundedYear, isVerified: row.verificationStatus === "VERIFIED",
+    industry: row.industry, headquarters: row.locations[0] ?? null,
+    jobsCount: row._count.jobs,
+  };
+}
 
 export interface CreateCompanyWithOwnerInput {
   actorUserId: string;
@@ -11,6 +37,35 @@ export interface CreateCompanyWithOwnerInput {
 @Injectable()
 export class CompanyRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async listPublic(query: PublicCompanyQueryDto) {
+    const now = new Date();
+    const where: Prisma.CompanyWhereInput = {
+      status: "ACTIVE",
+      ...(query.q && { name: { contains: query.q, mode: "insensitive" } }),
+      ...(query.industryCode && { industry: { code: query.industryCode } }),
+      ...(query.provinceId && { locations: { some: { provinceId: query.provinceId } } }),
+      ...(query.verifiedOnly && { verificationStatus: "VERIFIED" }),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.company.findMany({ where, select: publicCompanySelect(now),
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
+      this.prisma.company.count({ where }),
+    ]);
+    return { data: rows.map(publicCompany), pagination: {
+      page: query.page, pageSize: query.pageSize, total,
+      totalPages: Math.ceil(total / query.pageSize),
+    } };
+  }
+
+  async getPublic(companyId: string) {
+    const row = await this.prisma.company.findFirst({
+      where: { id: companyId, status: "ACTIVE" }, select: publicCompanySelect(new Date()),
+    });
+    if (!row) throw new NotFoundException({ code: "PUBLIC_COMPANY_NOT_FOUND", message: "Company was not found." });
+    return publicCompany(row);
+  }
 
   async listActiveWorkspace(userId: string) {
     const memberships = await this.prisma.companyMember.findMany({

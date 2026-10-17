@@ -7,6 +7,7 @@ import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import type {
   CompanyJobQueryDto, CreateJobDto, PublicJobQueryDto, UpdateJobDto,
 } from "./dto/job.dto";
+import { publicJobVisibility } from "./public-job-visibility";
 
 const jobSelect = {
   id: true, companyId: true, categoryId: true, title: true, description: true,
@@ -175,15 +176,10 @@ export class JobsService {
   }
 
   private publicWhere(query?: PublicJobQueryDto): Prisma.JobWhereInput {
-    const now = new Date();
     return {
-      status: "PUBLISHED", company: { status: "ACTIVE" }, category: { isActive: true },
-      publishedAt: { lte: now },
-      AND: [
-        { OR: [{ applicationDeadline: null }, { applicationDeadline: { gt: now } }] },
-        { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-      ],
+      ...publicJobVisibility(new Date()), company: { status: "ACTIVE" },
       ...(query?.q && { title: { contains: query.q, mode: "insensitive" } }),
+      ...(query?.companyId && { companyId: query.companyId }),
       ...(query?.categoryCode && { category: { isActive: true, code: query.categoryCode } }),
       ...(query?.employmentType && { employmentType: query.employmentType }),
       ...(query?.workplaceType && { workplaceType: query.workplaceType }),
