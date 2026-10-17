@@ -13,6 +13,7 @@ import {
 import { validateJobForm, formToPayload, EMPTY_JOB_FORM } from "../jobForm";
 import { availableTransitions, availableReviewTransitions, canEditJob } from "../companyWorkspaceApi";
 import { normalizeAdminUser, normalizeAdminCompany, normalizeAdminJob, normalizeAdminAudit } from "../adminApi";
+import { normalizeBackendResume } from "../../../features/resume/services/resumeService";
 
 describe("accessPolicy", () => {
   it("recognizes system admin roles accurately", () => {
@@ -311,5 +312,38 @@ describe("applications and admin normalizers", () => {
     });
     assert.equal(audit.action, "admin.company.verify");
     assert.equal(audit.targetType, "Company");
+  });
+
+  it("normalizes backend resume DTO with versions, templateCode, and builderSettings", () => {
+    const rawDto = {
+      id: "res-uuid-10",
+      name: "CV Kỹ sư Phần mềm",
+      sourceType: "BUILDER" as const,
+      status: "READY" as const,
+      isDefault: true,
+      createdAt: "2026-10-17T08:00:00Z",
+      updatedAt: "2026-10-17T09:00:00Z",
+      versions: [
+        {
+          id: "rv-uuid-2",
+          versionNumber: 2,
+          templateCode: "modern",
+          builderContent: { fullName: "Nguyễn Văn B", email: "b@test.vn" },
+          builderSettings: { accentColor: "blue", fontFamily: "sans" },
+          createdAt: "2026-10-17T09:00:00Z",
+        },
+      ],
+    };
+
+    const resume = normalizeBackendResume(rawDto);
+    assert.equal(resume.id, "res-uuid-10");
+    assert.equal(resume.name, "CV Kỹ sư Phần mềm");
+    assert.equal(resume.sourceType, "builder");
+    assert.equal(resume.status, "ready");
+    assert.equal(resume.isDefault, true);
+    assert.equal(resume.currentVersion.versionNumber, 2);
+    assert.equal(resume.currentVersion.templateCode, "modern");
+    assert.equal(resume.currentVersion.builderSettings?.accentColor, "blue");
+    assert.equal(resume.currentVersion.builderContent?.fullName, "Nguyễn Văn B");
   });
 });
