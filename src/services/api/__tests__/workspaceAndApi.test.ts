@@ -8,8 +8,11 @@ import {
   normalizeMyCompany,
   normalizeCompanyProfile,
   normalizeCompanyApplication,
+  normalizePublicCompany,
   formatSalary,
 } from "../apiTypes";
+import { buildJobQueryParams, buildCompanyQueryParams } from "../publicApi";
+import { parseCompanyId } from "../../../app/router/companyId";
 import { validateJobForm, formToPayload, EMPTY_JOB_FORM } from "../jobForm";
 import { availableTransitions, availableReviewTransitions, canEditJob } from "../companyWorkspaceApi";
 import { normalizeAdminUser, normalizeAdminCompany, normalizeAdminJob, normalizeAdminAudit } from "../adminApi";
@@ -345,5 +348,112 @@ describe("applications and admin normalizers", () => {
     assert.equal(resume.currentVersion.templateCode, "modern");
     assert.equal(resume.currentVersion.builderSettings?.accentColor, "blue");
     assert.equal(resume.currentVersion.builderContent?.fullName, "Nguyễn Văn B");
+  });
+});
+
+describe("Public Company DTO and query normalizers", () => {
+  it("normalizes backend PublicCompanyDto accurately with nested relations and verification status", () => {
+    const raw = {
+      id: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      name: "Tập đoàn Công nghệ Sao Khuê",
+      slug: "sao-khue-tech",
+      description: "Chuyên phát triển giải pháp phần mềm doanh nghiệp và điện toán đám mây.",
+      website: "https://saokhue.example.vn",
+      employeeSizeRange: "100-499",
+      foundedYear: 2015,
+      verificationStatus: "VERIFIED",
+      industry: { id: "ind-1", code: "IT", name: "Công nghệ thông tin" },
+      headquarters: {
+        countryCode: "VNM",
+        province: { id: "p-1", code: "79", name: "Thành phố Hồ Chí Minh" },
+        ward: { id: "w-1", code: "26734", name: "Phường Bến Nghé" },
+      },
+      jobsCount: 15,
+    };
+
+    const company = normalizePublicCompany(raw);
+    assert.equal(company.id, "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d");
+    assert.equal(company.name, "Tập đoàn Công nghệ Sao Khuê");
+    assert.equal(company.slug, "sao-khue-tech");
+    assert.equal(company.isVerified, true);
+    assert.equal(company.industry?.code, "IT");
+    assert.equal(company.industry?.name, "Công nghệ thông tin");
+    assert.equal(company.headquarters?.province?.name, "Thành phố Hồ Chí Minh");
+    assert.equal(company.headquarters?.ward?.name, "Phường Bến Nghé");
+    assert.equal(company.jobsCount, 15);
+  });
+
+  it("handles null/missing properties and raw locations fallback safely without throwing", () => {
+    const minimal = {
+      id: "comp-min-1",
+      name: "Công ty TNHH Khởi Nghiệp",
+      locations: [
+        {
+          countryCode: "VNM",
+          province: { id: "p-2", code: "01", name: "Hà Nội" },
+        },
+      ],
+      _count: { jobs: 3 },
+    };
+
+    const company = normalizePublicCompany(minimal);
+    assert.equal(company.id, "comp-min-1");
+    assert.equal(company.name, "Công ty TNHH Khởi Nghiệp");
+    assert.equal(company.isVerified, false);
+    assert.equal(company.industry, null);
+    assert.equal(company.headquarters?.province?.name, "Hà Nội");
+    assert.equal(company.jobsCount, 3);
+    assert.equal(company.description, null);
+    assert.equal(company.website, null);
+  });
+
+  it("builds company query params properly omitting defaults and empty strings", () => {
+    const params = buildCompanyQueryParams({
+      page: 1, // should be omitted
+      pageSize: 20,
+      q: "  tech  ", // should be trimmed
+      industryCode: "IT",
+      verifiedOnly: true,
+    });
+    assert.equal(params.page, undefined);
+    assert.equal(params.pageSize, 20);
+    assert.equal(params.q, "tech");
+    assert.equal(params.industryCode, "IT");
+    assert.equal(params.verifiedOnly, true);
+
+    const emptyParams = buildCompanyQueryParams({
+      page: 2,
+      q: "   ",
+      verifiedOnly: false,
+    });
+    assert.equal(emptyParams.page, 2);
+    assert.equal(emptyParams.q, undefined);
+    assert.equal(emptyParams.verifiedOnly, undefined);
+  });
+
+  it("builds job query params with companyId filter", () => {
+    const params = buildJobQueryParams({
+      companyId: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      page: 2,
+      pageSize: 10,
+    });
+    assert.equal(params.companyId, "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d");
+    assert.equal(params.page, 2);
+    assert.equal(params.pageSize, 10);
+  });
+});
+
+describe("companyId router parsing", () => {
+  it("distinguishes mock integer IDs from backend UUIDs and rejects invalid formats", () => {
+    assert.deepEqual(parseCompanyId("1"), { kind: "mock", id: 1 });
+    assert.deepEqual(parseCompanyId("42"), { kind: "mock", id: 42 });
+    assert.deepEqual(parseCompanyId("9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"), {
+      kind: "backend",
+      id: "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    });
+
+    for (const invalid of [undefined, "", "0", "-1", "abc", "1.5", "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6z"]) {
+      assert.deepEqual(parseCompanyId(invalid), { kind: "invalid" });
+    }
   });
 });

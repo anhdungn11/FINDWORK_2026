@@ -1,13 +1,14 @@
 export interface CompanyDetailRecord {
-  id: number;
+  id: string | number;
   name: string;
   industry: string;
   location: string;
   jobsCount: number;
   description: string;
   size: string;
-  foundedYear: number;
+  foundedYear: number | string;
   website: string;
-  logo: string;
-  cover: string;
+  logo?: string | null;
+  cover?: string | null;
+  isVerified?: boolean;
 }

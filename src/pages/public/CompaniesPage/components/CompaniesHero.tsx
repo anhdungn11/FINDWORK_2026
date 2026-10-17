@@ -13,6 +13,9 @@ interface CompaniesHeroProps {
   companyCount: number;
   totalJobs: number;
 
+  verifiedOnly?: boolean;
+  onVerifiedOnlyChange?: (value: boolean) => void;
+
   onKeywordChange: (
     value: string,
   ) => void;
@@ -34,6 +37,8 @@ const CompaniesHero = ({
   locationOptions,
   companyCount,
   totalJobs,
+  verifiedOnly,
+  onVerifiedOnlyChange,
   onKeywordChange,
   onIndustryChange,
   onLocationChange,
@@ -87,6 +92,21 @@ const CompaniesHero = ({
           <span>
             {totalJobs} cơ hội việc làm
           </span>
+
+          {onVerifiedOnlyChange && (
+            <>
+              <span className={styles.metaDot} />
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={verifiedOnly === true}
+                  onChange={(e) => onVerifiedOnlyChange(e.target.checked)}
+                  style={{ accentColor: "var(--color-primary)", cursor: "pointer" }}
+                />
+                Chỉ doanh nghiệp đã xác thực
+              </label>
+            </>
+          )}
         </div>
       </div>
     </section>

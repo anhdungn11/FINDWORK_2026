@@ -95,6 +95,33 @@ export interface CompanyLocationDto {
   isHeadquarters: boolean;
 }
 
+export interface PublicCompanyDto {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  website: string | null;
+  employeeSizeRange: string | null;
+  foundedYear: number | null;
+  isVerified: boolean;
+  industry: { id: string; code: string; name: string } | null;
+  headquarters: {
+    countryCode: string | null;
+    province: { id: string; code: string; name: string } | null;
+    ward: { id: string; code: string; name: string } | null;
+  } | null;
+  jobsCount: number;
+}
+
+export interface PublicCompanyQuery {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  industryCode?: string;
+  provinceId?: string;
+  verifiedOnly?: boolean;
+}
+
 export type ApplicationReviewStatus = "REVIEWING" | "SHORTLISTED" | "INTERVIEW" | "OFFERED" | "REJECTED";
 export type ApplicationStatus = "SUBMITTED" | ApplicationReviewStatus | "WITHDRAWN";
 
@@ -219,6 +246,52 @@ export function normalizeLocation(value: unknown): CompanyLocationDto {
     wardName: str(obj(r.ward).name) ?? str(r.wardName),
     countryCode: str(r.countryCode),
     isHeadquarters: r.isHeadquarters === true,
+  };
+}
+
+export function normalizePublicCompany(value: unknown): PublicCompanyDto {
+  const r = unwrapData(value);
+  const ind = r.industry && typeof r.industry === "object" ? (r.industry as Record<string, unknown>) : null;
+  const hq = r.headquarters && typeof r.headquarters === "object" ? (r.headquarters as Record<string, unknown>) : null;
+  const loc0 = Array.isArray(r.locations) && r.locations[0] && typeof r.locations[0] === "object"
+    ? (r.locations[0] as Record<string, unknown>)
+    : null;
+  const effectiveHq = hq ?? loc0;
+  const prov = effectiveHq && effectiveHq.province && typeof effectiveHq.province === "object"
+    ? (effectiveHq.province as Record<string, unknown>)
+    : null;
+  const ward = effectiveHq && effectiveHq.ward && typeof effectiveHq.ward === "object"
+    ? (effectiveHq.ward as Record<string, unknown>)
+    : null;
+
+  return {
+    id: str(r.id) ?? "",
+    name: str(r.name) ?? "",
+    slug: str(r.slug) ?? "",
+    description: str(r.description),
+    website: str(r.website),
+    employeeSizeRange: str(r.employeeSizeRange),
+    foundedYear: num(r.foundedYear),
+    isVerified: r.isVerified === true || r.verificationStatus === "VERIFIED",
+    industry: ind && str(ind.id) ? {
+      id: str(ind.id) ?? "",
+      code: str(ind.code) ?? "",
+      name: str(ind.name) ?? "",
+    } : null,
+    headquarters: effectiveHq ? {
+      countryCode: str(effectiveHq.countryCode),
+      province: prov && (str(prov.id) || str(prov.name)) ? {
+        id: str(prov.id) ?? "",
+        code: str(prov.code) ?? "",
+        name: str(prov.name) ?? "",
+      } : null,
+      ward: ward && (str(ward.id) || str(ward.name)) ? {
+        id: str(ward.id) ?? "",
+        code: str(ward.code) ?? "",
+        name: str(ward.name) ?? "",
+      } : null,
+    } : null,
+    jobsCount: num(r.jobsCount) ?? (typeof r._count === "object" && r._count !== null && "jobs" in r._count ? num((r._count as Record<string, unknown>).jobs) ?? 0 : 0),
   };
 }
 
