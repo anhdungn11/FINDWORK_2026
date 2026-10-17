@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
+import { isLiveWritesEnabled } from "@/features/candidate/profile/config/candidateIntegrationConfig";
 import { savedJobsService } from "./savedJobsService";
 import type { SavedJobItem } from "./types";
 
@@ -20,6 +21,12 @@ export const useSavedJobs = () => {
     const unsubscribe = savedJobsService.onSavedJobsChanged(refresh);
     return unsubscribe;
   }, [refresh]);
+
+  useEffect(() => {
+    if (userId && isLiveWritesEnabled()) {
+      void savedJobsService.syncFromBackend(userId);
+    }
+  }, [userId]);
 
   const isSaved = useCallback(
     (jobId: string | number) => savedJobsService.isSaved(userId, jobId),

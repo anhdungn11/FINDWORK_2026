@@ -8,4 +8,6 @@ export interface SavedJobItem {
   type?: string;
   savedAt: string;
   isMock?: boolean;
+  isAvailable?: boolean;
+  jobId?: string;
 }
