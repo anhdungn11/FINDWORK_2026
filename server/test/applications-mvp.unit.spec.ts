@@ -22,6 +22,8 @@ function fakeDb() {
     job: { findFirst: jest.fn().mockResolvedValue({ id: jobId, companyId, title: "Nurse", categoryId: "category", publishedAt: new Date() }) },
     candidateProfile: { findUnique: jest.fn().mockResolvedValue({ id: "profile", fullName: "Candidate", phone: null, user: { email: "candidate@example.com" } }) },
     resumeVersion: { findFirst: jest.fn().mockResolvedValue({ id: versionId }) },
+    screeningQuestion: { findMany: jest.fn().mockResolvedValue([]) },
+    applicationAnswer: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
     application: {
       create: jest.fn().mockResolvedValue({ id: applicationId }),
       findUniqueOrThrow: jest.fn().mockResolvedValue({ id: applicationId }),
@@ -56,6 +58,7 @@ describe("applications MVP security", () => {
     expect(tx.job.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: jobId, status: "PUBLISHED", company: { status: "ACTIVE" } }) }));
     expect(tx.resumeVersion.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: versionId, resumeId, resume: expect.objectContaining({ candidateProfileId: "profile", status: "READY", sourceType: "BUILDER" }) }) }));
     expect(tx.application.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ companyId, jobId, status: "SUBMITTED", candidateProfileId: "profile", statusHistory: { create: { toStatus: "SUBMITTED", changedByUserId: userId } } }) }));
+    expect(tx.applicationAnswer.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects unavailable resumes before creating an application", async () => {

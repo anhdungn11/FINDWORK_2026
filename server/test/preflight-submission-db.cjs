@@ -5,19 +5,23 @@ const dotenv = require("dotenv");
 const { Client } = require("pg");
 
 const root = path.resolve(__dirname, "..");
-const envPath = path.join(root, ".env.test");
+const envArg = process.argv.indexOf("--env-file");
+const envPath = envArg === -1 ? path.join(root, ".env.test") : path.resolve(process.argv[envArg + 1] || "");
 const expectedRoles = {
   CANDIDATE: { "profile.view": "OWN", "profile.update": "OWN", "resume.view": "OWN", "resume.create": "OWN", "resume.update": "OWN", "saved_job.manage": "OWN", "application.create": "OWN", "application.view": "OWN" },
   SUPPORT_ADMIN: { "user.view": "SYSTEM", "company.view": "SYSTEM", "job.view": "SYSTEM" },
   MODERATION_ADMIN: { "job.moderate": "SYSTEM" },
 };
 const companyPermissions = ["company.view", "company.update", "application.view", "application.review"];
-const requiredTables = ["_prisma_migrations", "User", "AuthSession", "Company", "CompanyMember", "Role", "RolePermission", "Permission", "SystemUserRole", "JobCategory", "Job", "SavedJob", "CandidateOnboardingDraft", "CandidateProfile", "Resume", "ResumeVersion", "Application", "ApplicationStatusHistory", "AuditLog"];
+const requiredTables = ["_prisma_migrations", "User", "AuthSession", "Company", "CompanyMember", "Role", "RolePermission", "Permission", "SystemUserRole", "JobCategory", "Job", "SavedJob", "ScreeningQuestion", "CandidateOnboardingDraft", "CandidateProfile", "Resume", "ResumeVersion", "Application", "ApplicationAnswer", "ApplicationStatusHistory", "AuditLog"];
 
 function fail(reason) { throw new Error(reason); }
 
 async function main() {
-  if (!fs.existsSync(envPath)) fail("BLOCKED: server/.env.test is missing; no database connection was attempted.");
+  if (envArg !== -1 && (!process.argv[envArg + 1] || process.argv.length !== envArg + 2)) {
+    fail("BLOCKED: --env-file requires exactly one path.");
+  }
+  if (!fs.existsSync(envPath)) fail("BLOCKED: test environment file is missing; no database connection was attempted.");
   const env = dotenv.parse(fs.readFileSync(envPath));
   if (env.NODE_ENV !== "test") fail("BLOCKED: .env.test must set NODE_ENV=test.");
   if (env.API_PREFIX !== "api/v1") fail("BLOCKED: .env.test must set API_PREFIX=api/v1 for this suite.");
@@ -45,33 +49,46 @@ async function main() {
       fail("BLOCKED: connected database identity is not local findwork_test/public:5432.");
     }
     console.log("PASS: connected database is local findwork_test/public:5432 (read-only session).");
+    const issues = [];
     const foundTables = new Set((await client.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1)", [requiredTables])).rows.map((row) => row.table_name));
     const missingTables = requiredTables.filter((name) => !foundTables.has(name));
-    if (missingTables.length) fail(`BLOCKED: missing tables: ${missingTables.join(", ")}.`);
+    if (missingTables.length) issues.push(`missing tables: ${missingTables.join(", ")}`);
+    const enumRows = (await client.query(`
+      SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+      WHERE t.typname = 'ScreeningQuestionType' AND e.enumlabel = 'MULTI_SELECT'
+    `)).rows;
+    if (enumRows.length !== 1) issues.push("MULTI_SELECT enum migration is not applied");
     const migrationDir = path.join(root, "prisma", "migrations");
     const migrationNames = fs.readdirSync(migrationDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
-    const migrationRows = (await client.query('SELECT migration_name, finished_at, rolled_back_at FROM "_prisma_migrations"')).rows;
-    const applied = new Set(migrationRows.filter((row) => row.finished_at && !row.rolled_back_at).map((row) => row.migration_name));
-    const pending = migrationNames.filter((name) => !applied.has(name));
-    if (pending.length || migrationRows.some((row) => !row.finished_at && !row.rolled_back_at)) {
-      fail(`BLOCKED: test schema migrations are incomplete (${pending.length} local migrations pending).`);
+    if (foundTables.has("_prisma_migrations")) {
+      const migrationRows = (await client.query('SELECT migration_name, finished_at, rolled_back_at FROM "_prisma_migrations"')).rows;
+      const applied = new Set(migrationRows.filter((row) => row.finished_at && !row.rolled_back_at).map((row) => row.migration_name));
+      const pending = migrationNames.filter((name) => !applied.has(name));
+      if (pending.length || migrationRows.some((row) => !row.finished_at && !row.rolled_back_at)) {
+        issues.push(`test schema migrations are incomplete: ${pending.join(", ") || "an unfinished migration"}`);
+      }
     }
     const codes = [...new Set([...companyPermissions, ...Object.values(expectedRoles).flatMap((grants) => Object.keys(grants))])];
-    const permissionRows = (await client.query('SELECT code FROM "Permission" WHERE code = ANY($1) AND "isDeprecated" = false', [codes])).rows;
-    const presentCodes = new Set(permissionRows.map((row) => row.code));
-    const missingCodes = codes.filter((code) => !presentCodes.has(code));
-    if (missingCodes.length) fail(`BLOCKED: missing active permission codes: ${missingCodes.join(", ")}.`);
-    const grants = (await client.query(`
+    if (foundTables.has("Permission")) {
+      const permissionRows = (await client.query('SELECT code FROM "Permission" WHERE code = ANY($1) AND "isDeprecated" = false', [codes])).rows;
+      const presentCodes = new Set(permissionRows.map((row) => row.code));
+      const missingCodes = codes.filter((code) => !presentCodes.has(code));
+      if (missingCodes.length) issues.push(`missing active permission codes: ${missingCodes.join(", ")}`);
+    }
+    if (foundTables.has("Role") && foundTables.has("RolePermission") && foundTables.has("Permission")) {
+      const grants = (await client.query(`
       SELECT r."systemCode", p.code, rp."dataScope"
       FROM "Role" r JOIN "RolePermission" rp ON rp."roleId" = r.id
       JOIN "Permission" p ON p.id = rp."permissionId"
       WHERE r.kind = 'SYSTEM' AND r."isActive" = true
         AND r."systemCode" = ANY($1) AND p."isDeprecated" = false
-    `, [Object.keys(expectedRoles)])).rows;
-    const grantSet = new Set(grants.map((row) => `${row.systemCode}:${row.code}:${row.dataScope}`));
-    const missingGrants = Object.entries(expectedRoles).flatMap(([role, permissions]) =>
-      Object.entries(permissions).filter(([code, scope]) => !grantSet.has(`${role}:${code}:${scope}`)).map(([code]) => `${role}:${code}`));
-    if (missingGrants.length) fail(`BLOCKED: missing scoped system grants: ${missingGrants.join(", ")}.`);
+      `, [Object.keys(expectedRoles)])).rows;
+      const grantSet = new Set(grants.map((row) => `${row.systemCode}:${row.code}:${row.dataScope}`));
+      const missingGrants = Object.entries(expectedRoles).flatMap(([role, permissions]) =>
+        Object.entries(permissions).filter(([code, scope]) => !grantSet.has(`${role}:${code}:${scope}`)).map(([code]) => `${role}:${code}`));
+      if (missingGrants.length) issues.push(`missing scoped system grants: ${missingGrants.join(", ")}`);
+    }
+    if (issues.length) fail(`BLOCKED: ${issues.join("; ")}.`);
     console.log(`PASS: ${requiredTables.length} required tables, ${migrationNames.length} migrations, permission registry and scoped system roles are ready.`);
     console.log("READY: read-only preflight passed; E2E still requires explicit authorization.");
   } finally {

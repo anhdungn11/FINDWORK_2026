@@ -7,8 +7,10 @@ import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import type {
   CompanyJobQueryDto, CreateJobDto, PublicJobQueryDto, UpdateJobDto,
 } from "./dto/job.dto";
-import { jobSelect } from "./job-select";
+import type { ReplaceScreeningQuestionsDto } from "./dto/screening-question.dto";
+import { applicantQuestionSelect, jobSelect } from "./job-select";
 import { publicJobVisibility } from "./public-job-visibility";
+import { normalizeScreeningQuestions } from "./screening-question.rules";
 
 type JobRow = Prisma.JobGetPayload<{ select: typeof jobSelect }>;
 type JobChanges = Partial<CreateJobDto>;
@@ -103,6 +105,48 @@ export class JobsService {
     return job;
   }
 
+  async listScreeningQuestions(companyId: string, jobId: string) {
+    const job = await this.db.job.findFirst({ where: { id: jobId, companyId }, select: { id: true, version: true } });
+    if (!job) throw notFound();
+    const questions = await this.db.screeningQuestion.findMany({
+      where: { jobId, isActive: true }, select: applicantQuestionSelect,
+      orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+    });
+    return { jobId, version: job.version, questions };
+  }
+
+  async replaceScreeningQuestions(companyId: string, jobId: string, userId: string, dto: ReplaceScreeningQuestionsDto) {
+    const questions = normalizeScreeningQuestions(dto.questions);
+    return this.db.$transaction(async (tx) => {
+      await this.requireActor(tx, companyId, userId);
+      const job = await tx.job.findFirst({ where: { id: jobId, companyId }, select: { status: true, version: true } });
+      if (!job) throw notFound();
+      if (job.status !== "DRAFT" && job.status !== "PAUSED") {
+        throw conflict("SCREENING_JOB_STATE_CONFLICT", "Pause the job before changing screening questions.");
+      }
+      if (job.version !== dto.version) throw conflict("JOB_VERSION_CONFLICT", "Job version is stale.");
+      const changed = await tx.job.updateMany({
+        where: { id: jobId, companyId, status: job.status, version: dto.version },
+        data: { version: { increment: 1 } },
+      });
+      if (changed.count !== 1) throw conflict("JOB_VERSION_CONFLICT", "Job changed during screening question update.");
+      await tx.screeningQuestion.updateMany({ where: { jobId, isActive: true }, data: { isActive: false } });
+      if (questions.length) {
+        await tx.screeningQuestion.createMany({ data: questions.map((question) => ({
+          jobId, type: question.type, label: question.label, isRequired: question.isRequired,
+          displayOrder: question.displayOrder, options: question.options,
+        })) });
+      }
+      await tx.auditLog.create({ data: {
+        actorUserId: userId, companyId, action: "job.screening_questions.replace", targetType: "Job", targetId: jobId,
+        metadata: { fromVersion: dto.version, count: questions.length },
+      } });
+      const active = await tx.screeningQuestion.findMany({ where: { jobId, isActive: true },
+        select: applicantQuestionSelect, orderBy: [{ displayOrder: "asc" }, { id: "asc" }] });
+      return { jobId, version: dto.version + 1, questions: active };
+    });
+  }
+
   async update(companyId: string, jobId: string, userId: string, dto: UpdateJobDto) {
     const { version, ...changes } = dto;
     if (Object.keys(changes).length === 0) throw badRequest("JOB_UPDATE_EMPTY", "At least one job field is required.");
@@ -186,7 +230,12 @@ export class JobsService {
   }
 
   async getPublic(jobId: string) {
-    const job = await this.db.job.findFirst({ where: { id: jobId, ...this.publicWhere() }, select: jobSelect });
+    const job = await this.db.job.findFirst({ where: { id: jobId, ...this.publicWhere() },
+      select: { ...jobSelect, screeningQuestions: {
+        where: { isActive: true }, select: applicantQuestionSelect,
+        orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+      } },
+    });
     if (!job) throw notFound();
     return job;
   }

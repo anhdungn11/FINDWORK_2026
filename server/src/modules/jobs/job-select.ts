@@ -9,3 +9,8 @@ export const jobSelect = {
   company: { select: { id: true, name: true, slug: true } },
   category: { select: { id: true, code: true, name: true } },
 } as const;
+
+export const applicantQuestionSelect = {
+  id: true, type: true, label: true, isRequired: true,
+  displayOrder: true, options: true,
+} as const;

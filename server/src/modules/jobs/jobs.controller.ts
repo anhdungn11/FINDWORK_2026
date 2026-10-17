@@ -1,6 +1,6 @@
 import {
   Body, Controller, ForbiddenException, Get, HttpCode, Param,
-  ParseUUIDPipe, Patch, Post, Query, Req, UseGuards,
+  ParseUUIDPipe, Patch, Post, Put, Query, Req, UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
@@ -9,6 +9,7 @@ import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
 import { CompanyPermissionGuard, type CompanyAuthorizedRequest } from "../authorization/guards/company-permission.guard";
 import { CompanyJobQueryDto, CreateJobDto, JobVersionDto, PublicJobQueryDto, UpdateJobDto } from "./dto/job.dto";
+import { ReplaceScreeningQuestionsDto } from "./dto/screening-question.dto";
 import { JobsService } from "./jobs.service";
 
 function requireCompanyScope(req: CompanyAuthorizedRequest, code: "company.view" | "company.update"): void {
@@ -49,6 +50,25 @@ export class CompanyJobsController {
     @Req() req: CompanyAuthorizedRequest) {
     requireCompanyScope(req, "company.view");
     return this.jobs.getCompany(companyId, jobId);
+  }
+
+  @Get(":jobId/screening-questions")
+  @ApiOperation({ summary: "List the active screening questions of an owned job" })
+  @RequireCompanyPermissions("company.view")
+  questions(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
+    @Req() req: CompanyAuthorizedRequest) {
+    requireCompanyScope(req, "company.view");
+    return this.jobs.listScreeningQuestions(companyId, jobId);
+  }
+
+  @Put(":jobId/screening-questions")
+  @ApiOperation({ summary: "Replace screening questions on a draft or paused owned job" })
+  @RequireCompanyPermissions("company.update")
+  replaceQuestions(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
+    @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
+    @Body() dto: ReplaceScreeningQuestionsDto) {
+    requireCompanyScope(req, "company.update");
+    return this.jobs.replaceScreeningQuestions(companyId, jobId, auth.userId, dto);
   }
 
   @Patch(":jobId")

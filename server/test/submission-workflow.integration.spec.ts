@@ -59,6 +59,7 @@ describe("submission recruitment workflow E2E", () => {
       throw new Error("Company permission registry is incomplete in findwork_test.");
     }
     await db.savedJob.count({ where: { id: run } }); // Verify the additive migration before fixtures.
+    await db.$queryRaw`SELECT 'MULTI_SELECT'::"ScreeningQuestionType"`; // Verify the enum migration.
     fixturePreflightPassed = true;
   });
 
@@ -70,10 +71,12 @@ describe("submission recruitment workflow E2E", () => {
     for (const company of ownedCompanies) if (!companies.includes(company.id)) companies.push(company.id);
     // Delete only IDs created by this suite, in FK order. No broad reset or seed.
     await db.applicationStatusHistory.deleteMany({ where: { application: { companyId: { in: companies } } } });
+    await db.applicationAnswer.deleteMany({ where: { application: { companyId: { in: companies } } } });
     await db.application.deleteMany({ where: { companyId: { in: companies } } });
     await db.savedJob.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
     await db.resumeVersion.deleteMany({ where: { resume: { candidateProfile: { userId: { in: users } } } } });
     await db.resume.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
+    await db.screeningQuestion.deleteMany({ where: { job: { companyId: { in: companies } } } });
     await db.job.deleteMany({ where: { companyId: { in: companies } } });
     await db.auditLog.deleteMany({ where: { companyId: { in: companies } } });
     await db.companyMemberRole.deleteMany({ where: { companyId: { in: companies } } });
@@ -168,8 +171,26 @@ describe("submission recruitment workflow E2E", () => {
       .set(bearer(otherOwner.token)).send({ version: 1, title: "Stolen job" }).expect(404);
     await request(app.getHttpServer()).post(api(`/companies/${otherCompanyId}/jobs/${jobId}/publish`))
       .set(bearer(otherOwner.token)).send({ version: 1 }).expect(404);
+    const questionRoute = `${jobs}/${jobId}/screening-questions`;
+    const questionDraft = { version: draft.body.version, questions: [
+      { type: "TEXT", label: "Years of experience?", isRequired: true, displayOrder: 0 },
+      { type: "TEXTAREA", label: "Describe a relevant project.", isRequired: false, displayOrder: 1 },
+      { type: "SELECT", label: "Work model?", isRequired: true, displayOrder: 2, options: ["Remote", "Office"] },
+      { type: "MULTI_SELECT", label: "Core skills?", isRequired: true, displayOrder: 3, options: ["Node", "SQL"] },
+      { type: "YES_NO", label: "Available soon?", isRequired: true, displayOrder: 4 },
+    ] };
+    await request(app.getHttpServer()).put(questionRoute)
+      .set(bearer(candidate.token)).send(questionDraft).expect(403);
+    await request(app.getHttpServer()).put(api(`/companies/${otherCompanyId}/jobs/${jobId}/screening-questions`))
+      .set(bearer(otherOwner.token)).send(questionDraft).expect(404);
+    const configured = await request(app.getHttpServer()).put(questionRoute)
+      .set(bearer(owner.token)).send(questionDraft).expect(200);
+    expect(configured.body.questions).toHaveLength(5);
+    await request(app.getHttpServer()).get(questionRoute).set(bearer(owner.token)).expect(200)
+      .expect((r) => expect(r.body.questions).toHaveLength(5));
+    const questionIds = Object.fromEntries(configured.body.questions.map((question: { type: string; id: string }) => [question.type, question.id]));
     const published = await request(app.getHttpServer()).post(`${jobs}/${jobId}/publish`)
-      .set(bearer(owner.token)).send({ version: draft.body.version }).expect(200);
+      .set(bearer(owner.token)).send({ version: configured.body.version }).expect(200);
     expect(published.body.status).toBe("PUBLISHED");
     await request(app.getHttpServer()).post(`${jobs}/${jobId}/pause`)
       .set(bearer(owner.token)).send({ version: draft.body.version }).expect(409);
@@ -178,7 +199,9 @@ describe("submission recruitment workflow E2E", () => {
         expect(r.body.pagination.pageSize).toBe(1);
         expect(r.body.data.some((x: { id: string }) => x.id === jobId)).toBe(true);
       });
-    await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(200);
+    await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(200)
+      .expect((r) => expect(r.body.screeningQuestions.map((question: { id: string }) => question.id))
+        .toContain(questionIds.MULTI_SELECT));
     await request(app.getHttpServer()).get(api(`/companies/${companyId}`)).expect(200)
       .expect((r) => {
         expect(r.body.jobsCount).toBe(1);
@@ -244,9 +267,26 @@ describe("submission recruitment workflow E2E", () => {
     await request(app.getHttpServer()).patch(api(`/candidate/resumes/${resumeId}`))
       .set(bearer(candidate.token)).send({ name: "Stale CV", builderContent: {}, expectedVersionNumber: 1 }).expect(409);
 
+    const screeningAnswers = [
+      { questionId: questionIds.TEXT, answer: "Five years" },
+      { questionId: questionIds.TEXTAREA, answer: "Built a recruiting service." },
+      { questionId: questionIds.SELECT, answer: "Remote" },
+      { questionId: questionIds.MULTI_SELECT, answer: ["Node", "SQL"] },
+      { questionId: questionIds.YES_NO, answer: false },
+    ];
+    const submission = { resumeId, resumeVersionId: nextResume.body.versions[0].id, answers: screeningAnswers };
+    await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
+      .set(bearer(candidate.token)).send({ ...submission, answers: screeningAnswers.slice(1) }).expect(400);
+    await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
+      .set(bearer(candidate.token)).send({ ...submission, answers: screeningAnswers.map((answer) =>
+        answer.questionId === questionIds.SELECT ? { ...answer, answer: "Unlisted" } : answer) }).expect(400);
+    await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
+      .set(bearer(candidate.token)).send({ ...submission, answers: [...screeningAnswers, { questionId: randomUUID(), answer: "foreign" }] }).expect(400);
+    expect(await db.application.count({ where: { jobId, candidateProfile: { userId: candidate.id } } })).toBe(0);
     const submitted = await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
-      .set(bearer(candidate.token)).send({ resumeId, resumeVersionId: nextResume.body.versions[0].id }).expect(201);
+      .set(bearer(candidate.token)).send(submission).expect(201);
     const applicationId = submitted.body.id as string;
+    expect(await db.applicationAnswer.count({ where: { applicationId } })).toBe(5);
     await request(app.getHttpServer()).patch(api(`/candidate/resumes/${resumeId}`))
       .set(bearer(candidate.token)).send({ name: "Latest CV", builderContent: { summary: "Principal engineer" }, expectedVersionNumber: 2 }).expect(200);
     const renewedSessionId = randomUUID();
@@ -262,6 +302,7 @@ describe("submission recruitment workflow E2E", () => {
       .set(bearer(renewedToken)).expect(200).expect((r) => {
         expect(r.body.resumeVersion.versionNumber).toBe(2);
         expect(r.body.resumeVersion.builderContent.summary).toBe("Senior engineer");
+        expect(r.body.answers).toHaveLength(5);
       });
     const historyBeforeDuplicate = await db.applicationStatusHistory.count({ where: { applicationId } });
     await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
@@ -273,7 +314,10 @@ describe("submission recruitment workflow E2E", () => {
     await request(app.getHttpServer()).get(applications).set(bearer(recruiter.token))
       .expect(200).expect((r) => expect(r.body.data.some((x: { id: string }) => x.id === applicationId)).toBe(true));
     await request(app.getHttpServer()).get(`${applications}/${applicationId}`)
-      .set(bearer(recruiter.token)).expect(200);
+      .set(bearer(recruiter.token)).expect(200)
+      .expect((r) => expect(r.body.answers.find((answer: { screeningQuestionId: string }) =>
+        answer.screeningQuestionId === questionIds.MULTI_SELECT))
+        .toMatchObject({ answerValue: ["Node", "SQL"], questionSnapshot: { label: "Core skills?" } }));
     await request(app.getHttpServer()).get(api(`/companies/${otherCompanyId}/jobs/${jobId}/applications/${applicationId}`))
       .set(bearer(otherOwner.token)).expect(404);
     const reviewed = await request(app.getHttpServer()).patch(`${applications}/${applicationId}/status`)
@@ -300,9 +344,23 @@ describe("submission recruitment workflow E2E", () => {
       .set(bearer(candidate.token)).expect(200)
       .expect((r) => expect(r.body.data.find((x: { jobId: string }) => x.jobId === jobId))
         .toMatchObject({ isAvailable: false, job: null }));
+    const replaced = await request(app.getHttpServer()).put(questionRoute)
+      .set(bearer(owner.token)).send({ version: paused.body.version, questions: [] }).expect(200);
+    expect(replaced.body.questions).toEqual([]);
     const reopened = await request(app.getHttpServer()).post(`${jobs}/${jobId}/publish`)
-      .set(bearer(owner.token)).send({ version: paused.body.version }).expect(200);
-    await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(200);
+      .set(bearer(owner.token)).send({ version: replaced.body.version }).expect(200);
+    await request(app.getHttpServer()).get(api(`/jobs/${jobId}`)).expect(200)
+      .expect((r) => expect(r.body.screeningQuestions).toEqual([]));
+    await request(app.getHttpServer()).get(`${applications}/${applicationId}`)
+      .set(bearer(recruiter.token)).expect(200)
+      .expect((r) => expect(r.body.answers.find((answer: { screeningQuestionId: string }) =>
+        answer.screeningQuestionId === questionIds.MULTI_SELECT))
+        .toMatchObject({ answerValue: ["Node", "SQL"], questionSnapshot: { label: "Core skills?" } }));
+    const plainResume = await request(app.getHttpServer()).post(api("/candidate/resumes"))
+      .set(bearer(otherCandidate.token)).send({ name: "Plain CV", builderContent: { summary: "Analyst" } }).expect(201);
+    const plainApplication = await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
+      .set(bearer(otherCandidate.token)).send({ resumeId: plainResume.body.id, resumeVersionId: plainResume.body.versions[0].id }).expect(201);
+    expect(await db.applicationAnswer.count({ where: { applicationId: plainApplication.body.id } })).toBe(0);
     const moderated = await request(app.getHttpServer()).post(api(`/admin/jobs/${jobId}/close`))
       .set(bearer(moderator.token)).expect(200);
     expect(moderated.body).toMatchObject({ id: jobId, status: "CLOSED", version: reopened.body.version + 1 });

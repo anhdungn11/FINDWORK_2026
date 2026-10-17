@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import type { ApplicationPageQueryDto, ReviewApplicationDto, SubmitApplicationDto } from "./dto/application.dto";
+import { validateScreeningAnswers } from "./screening-answers";
 
 const applicationSelect = {
   id: true, companyId: true, jobId: true, status: true, version: true, resumeId: true,
@@ -12,6 +13,8 @@ const applicationSelect = {
 const applicationDetailSelect = {
   ...applicationSelect,
   resumeVersion: { select: { id: true, versionNumber: true, templateCode: true, builderContent: true, builderSettings: true } },
+  answers: { select: { id: true, screeningQuestionId: true, questionSnapshot: true, answerValue: true, createdAt: true },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }] as Prisma.ApplicationAnswerOrderByWithRelationInput[] },
 } as const;
 
 function missing(): NotFoundException {
@@ -63,6 +66,12 @@ export class ApplicationsService {
           select: { id: true },
         });
         if (!version) throw new BadRequestException({ code: "RESUME_UNAVAILABLE", message: "An owned, ready builder resume version is required." });
+        const questions = await tx.screeningQuestion.findMany({
+          where: { jobId, isActive: true },
+          select: { id: true, type: true, label: true, isRequired: true, displayOrder: true, options: true },
+          orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
+        });
+        const answers = validateScreeningAnswers(questions, dto.answers);
         const application = await tx.application.create({
           data: {
             candidateProfileId: profile.id, companyId: job.companyId, jobId,
@@ -74,6 +83,13 @@ export class ApplicationsService {
           },
           select: { id: true },
         });
+        if (answers.length) {
+          await tx.applicationAnswer.createMany({ data: answers.map((answer) => ({
+            jobId, applicationId: application.id, screeningQuestionId: answer.screeningQuestionId,
+            questionSnapshot: answer.questionSnapshot as Prisma.InputJsonValue,
+            answerValue: answer.answerValue as Prisma.InputJsonValue,
+          })) });
+        }
         return tx.application.findUniqueOrThrow({ where: { id: application.id }, select: applicationSelect });
       });
     } catch (error) {

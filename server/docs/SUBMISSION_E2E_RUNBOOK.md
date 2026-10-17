@@ -1,12 +1,12 @@
 # Controlled submission E2E run
 
-Status as of 2026-10-17: **blocked before connection** because `server/.env.test` is absent. No PostgreSQL-writing E2E has been run.
+Status as of 2026-10-17: **blocked for writing acceptance**. This worktree has no `server/.env.test`. A read-only preflight using the existing `D:\DACSN\Find-Work\server\.env.test` verified actual local `findwork_test/public:5432` without printing credentials. It found `SavedJob` missing and the `MULTI_SELECT` enum unapplied. No PostgreSQL-writing E2E has been run.
 
 ## Preconditions
 
-1. Provide a dedicated PostgreSQL database named `findwork_test` on loopback port 5432, schema `public`, with a test-only login. Keep `findwork_dev` separate. The test account must be able to create and delete its own fixtures. Do not use a production or development connection string.
-2. Create `server/.env.test` from `.env.test.example`, replace the placeholder password and both distinct secrets, and retain `NODE_ENV=test`, `API_PREFIX=api/v1`, and the exact `findwork_test?schema=public` target. `.env.test` is ignored by Git.
-3. The test database must already have the repository's Prisma migrations applied, including `20261017100000_candidate_saved_jobs`, and the active permission registry plus scoped `CANDIDATE`, `SUPPORT_ADMIN`, and `MODERATION_ADMIN` system roles. `CANDIDATE` must have `saved_job.manage` at `OWN` scope. Provisioning requires separate authorization; this runbook does not apply migrations, seed, or grant permissions. New company role grants are created by the API. Existing company roles need the separately reviewed [permission bootstrap plan](SUBMISSION_INTEGRATION_READINESS.md#permission-bootstrap-plan--no-database-changes-performed).
+1. Reuse the existing dedicated `findwork_test` database on loopback port 5432, schema `public`, with its test-only login. The read-only preflight already confirmed the actual database identity. Keep `findwork_dev` separate; do not recreate either database.
+2. `D:\DACSN\Find-Work\server\.env.test` has `NODE_ENV=test` and targets the verified local database. An authorized operator may reuse this existing configuration in the current worktree after checking its secrets are still appropriate and `.env.test` remains Git-ignored. Alternatively fill `.env.test.example` with the same isolated target and new distinct secrets. Never copy a development URL.
+3. Apply the repository's pending Prisma migrations to **findwork_test only** after separate authorization: `20261017100000_candidate_saved_jobs`, then `20261017110000_screening_multi_select`. The active permission registry must include scoped `CANDIDATE`, `SUPPORT_ADMIN`, and `MODERATION_ADMIN` system roles; `CANDIDATE` needs `saved_job.manage` at `OWN` scope. This runbook does not apply migrations, seed, or grant permissions. New company role grants are created by the API. Existing company roles need the separately reviewed [permission bootstrap plan](SUBMISSION_INTEGRATION_READINESS.md#permission-bootstrap-plan--no-database-changes-performed).
 4. The suite creates only test users and roles assigned to those users; it never grants system roles to existing users. It uses `app.init()` without binding a port and does not restart the backend on port 3000.
 
 ## Read-only preflight (safe to run before E2E authorization)
@@ -17,7 +17,13 @@ From `D:\DACSN\Find-Work-Submission-Backend-MVP\server` in PowerShell:
 node .\test\preflight-submission-db.cjs
 ```
 
-The preflight reads only `server/.env.test`, checks the URL before connecting, opens a read-only PostgreSQL session, verifies the actual database/address/port/schema, required tables and applied migrations, and checks active permission codes and scoped role grants. It prints no URL, username, password, or tokens. A failure exits with code 2. Passing this check is required before asking for authorization to execute the writing suite.
+Until the current worktree has `.env.test`, the same read-only check can use the verified previous configuration without copying it:
+
+```powershell
+node .\test\preflight-submission-db.cjs --env-file D:\DACSN\Find-Work\server\.env.test
+```
+
+The preflight reads only the named test environment file (default `server/.env.test`), checks the URL before connecting, opens a read-only PostgreSQL session, verifies the actual database/address/port/schema, required tables, `MULTI_SELECT` enum and applied migrations, and checks active permission codes and scoped role grants. It prints no URL, username, password, or tokens. A failure exits nonzero. Passing this check is required before asking for authorization to execute the writing suite.
 
 ## Exact acceptance command — run only after explicit authorization
 
@@ -31,6 +37,6 @@ Do not use `npm test` for this gate: the default Jest configuration may select o
 
 ## Expected acceptance coverage
 
-The one workflow covers company creation, draft and publish, public job/company discovery, candidate save/list/check/unsave with closed-job redaction, onboarding draft/import with consent, resume version continuity and stale update rejection, application and recruiter review, candidate status read, support admin listing and moderation admin job closure with audit. It checks cross-company and cross-candidate isolation, invalid resume ownership, duplicate saved jobs/application without extra status history, missing/expired auth, forbidden admin access, job/resume/application version conflicts, and a rejected moderation transition without an extra audit entry.
+The one workflow covers company creation, screening question configuration and publication, public job/company/question discovery, Candidate save/list/check/unsave with closed-job redaction, onboarding draft/import with consent, ResumeVersion, application with all five question types, recruiter answer review/status, candidate history, support admin listing and moderation admin job closure with audit. It checks cross-company and cross-candidate isolation, invalid resume ownership, duplicate saved jobs/application, missing/invalid/foreign answers without a partial application, missing/expired auth, forbidden admin access, job/resume/application version conflicts, historical answer stability after question replacement, and no answers required after clearing questions. This suite remains unexecuted until separately authorized.
 
 Current evidence is static inspection and unit/build gates only. HTTP/E2E acceptance remains unverified until the authorized command completes against the isolated database.

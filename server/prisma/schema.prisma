@@ -184,6 +184,7 @@ enum ScreeningQuestionType {
   TEXTAREA
   YES_NO
   SELECT
+  MULTI_SELECT
 }
 
 enum InterviewType {
