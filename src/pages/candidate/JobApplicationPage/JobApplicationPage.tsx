@@ -287,6 +287,7 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
     () => (initialDraft?.screeningAnswers as Record<string, ScreeningAnswerValue>) ?? {}
   );
   const [profileExists, setProfileExists] = useState<boolean | null>(null);
+  const [hasOnboardingDraft, setHasOnboardingDraft] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -344,10 +345,15 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
         setJob(jobDto);
 
         const hasProfile = bootstrap?.profile?.state === "exists";
+        const hasDraft = bootstrap?.draft?.state === "exists";
         setProfileExists(hasProfile);
+        setHasOnboardingDraft(hasDraft);
 
         setResumes(resumeList);
         if (resumeList.length > 0) {
+          const eligibleResumes = resumeList.filter(
+            (r) => r.sourceType === "builder" && r.status === "ready"
+          );
           const createdCvId = searchParams.get("createdCvId");
           if (createdCvId && resumeList.some((r) => r.id === createdCvId)) {
             const newlyCreated = resumeList.find((r) => r.id === createdCvId)!;
@@ -357,13 +363,18 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
             nextParams.delete("createdCvId");
             setSearchParams(nextParams, { replace: true });
           } else {
-            // Ưu tiên giữ lại resume đã chọn trong draft nếu còn tồn tại
+            // Ưu tiên giữ lại resume đã chọn trong draft nếu còn tồn tại và hợp lệ
             const draftResume = resumeList.find((r) => r.id === selectedResumeId);
-            if (draftResume) {
+            if (draftResume && draftResume.sourceType === "builder" && draftResume.status === "ready") {
               setSelectedResumeId(draftResume.id);
               setSelectedVersionId(draftResume.currentVersion.id);
             } else {
-              const defaultResume = resumeList.find((r) => r.isDefault) ?? resumeList[0];
+              // Ưu tiên default resume nếu eligible, hoặc bản eligible đầu tiên, hoặc fallback resumeList[0]
+              const defaultResume =
+                eligibleResumes.find((r) => r.isDefault) ??
+                eligibleResumes[0] ??
+                resumeList.find((r) => r.isDefault) ??
+                resumeList[0];
               setSelectedResumeId(defaultResume.id);
               setSelectedVersionId(defaultResume.currentVersion.id);
             }
@@ -391,7 +402,12 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
     }
   }, [selectedResume, prefillFromResume]);
 
+  const isSelectedResumeEligible = Boolean(
+    selectedResume && selectedResume.sourceType === "builder" && selectedResume.status === "ready"
+  );
+
   const handleSelectResume = (r: Resume) => {
+    if (r.sourceType !== "builder" || r.status !== "ready") return;
     setSelectedResumeId(r.id);
     setSelectedVersionId(r.currentVersion.id);
   };
@@ -416,11 +432,16 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
   }, [job?.screeningQuestions]);
 
   const handleSubmit = async () => {
+    if (submitting) return;
     if (!isLiveWritesEnabled()) {
       return;
     }
     if (!selectedResumeId || !selectedVersionId) {
       setError("Vui lòng chọn một bản CV để ứng tuyển.");
+      return;
+    }
+    if (!isSelectedResumeEligible) {
+      setError("Bản CV đã chọn không hợp lệ. Vui lòng chọn CV trực tuyến tạo từ CV Builder ở trạng thái sẵn sàng.");
       return;
     }
     if (!canContinueDetails) {
@@ -472,12 +493,20 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
       const apiErr = err as { status?: number; code?: string; message?: string };
       if (apiErr.status === 409 || apiErr.code === "APPLICATION_DUPLICATE") {
         setError("Bạn đã nộp đơn ứng tuyển cho vị trí này trước đó. Không thể gửi trùng lặp.");
-      } else if (apiErr.status === 404 && apiErr.code === "CANDIDATE_PROFILE_NOT_FOUND") {
-        setError("Không tìm thấy hồ sơ ứng viên. Vui lòng hoàn thành hồ sơ cá nhân trước khi ứng tuyển.");
+      } else if (apiErr.code === "JOB_UNAVAILABLE" || (apiErr.status === 409 && apiErr.message?.includes("Job"))) {
+        setError("Vị trí tuyển dụng này hiện không còn nhận hồ sơ ứng tuyển (đã đóng, tạm dừng hoặc hết hạn).");
+      } else if (apiErr.status === 404 && (apiErr.code === "CANDIDATE_PROFILE_NOT_FOUND" || apiErr.code === "NOT_FOUND")) {
+        setError("Không tìm thấy hồ sơ ứng viên hợp lệ trên hệ thống. Vui lòng hoàn tất hồ sơ cá nhân trước khi ứng tuyển.");
       } else if (apiErr.code === "RESUME_UNAVAILABLE") {
-        setError("Bản CV đã chọn không hợp lệ hoặc không thuộc quyền sở hữu của bạn.");
+        setError("Bản CV đã chọn không hợp lệ, chưa ở trạng thái sẵn sàng hoặc không thuộc quyền sở hữu của bạn.");
+      } else if (apiErr.code === "SCREENING_REQUIRED_ANSWER_MISSING") {
+        setError("Vui lòng trả lời đầy đủ các câu hỏi sàng lọc bắt buộc của nhà tuyển dụng.");
+      } else if (apiErr.status === 401) {
+        setError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.");
+      } else if (apiErr.status === 403) {
+        setError("Tài khoản của bạn không có quyền nộp đơn cho vị trí này.");
       } else {
-        setError(apiErr.message || "Gửi đơn ứng tuyển thất bại. Vui lòng thử lại.");
+        setError(apiErr.message || "Gửi đơn ứng tuyển thất bại. Vui lòng thử lại sau.");
       }
     } finally {
       setSubmitting(false);
@@ -529,13 +558,20 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
             <div className={`${styles.bannerNotice} ${styles.bannerWarning}`}>
               <strong>Yêu cầu hoàn tất Hồ sơ Ứng viên:</strong>
               <span>
-                Theo quy định của hệ thống FINDWORK, bạn cần có Hồ sơ Ứng viên hợp lệ trước khi gửi đơn ứng tuyển vào doanh nghiệp.
+                {hasOnboardingDraft
+                  ? "Hệ thống phát hiện tài khoản của bạn đã có bản nháp từ Onboarding. Vui lòng hoàn tất và kích hoạt hồ sơ ứng viên trước khi nộp đơn ứng tuyển."
+                  : "Theo quy định của hệ thống FINDWORK, bạn cần có Hồ sơ Ứng viên hợp lệ trước khi gửi đơn ứng tuyển vào doanh nghiệp."}
               </span>
             </div>
             <div className={styles.buttonRow}>
               <Link to="/candidate/onboarding" className={styles.submitBtn}>
-                Tạo hồ sơ ứng viên ngay
+                {hasOnboardingDraft ? "Tiếp tục hoàn thiện hồ sơ" : "Tạo hồ sơ ứng viên ngay"}
               </Link>
+              {hasOnboardingDraft && (
+                <Link to="/candidate/profile" className={styles.secondaryBtn}>
+                  Xem hồ sơ cá nhân
+                </Link>
+              )}
               <Link to={`/jobs/${jobId}`} className={styles.secondaryBtn}>
                 Quay lại việc làm
               </Link>
@@ -673,30 +709,60 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
                 <div className={styles.resumeOptionList}>
                   {resumes.map((r) => {
                     const isSelected = r.id === selectedResumeId;
+                    const isEligible = r.sourceType === "builder" && r.status === "ready";
                     return (
                       <label
                         key={r.id}
                         className={`${styles.resumeOptionItem} ${isSelected ? styles.resumeOptionSelected : ""}`}
+                        style={!isEligible ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
                       >
                         <input
                           type="radio"
                           name="selectedResume"
                           className={styles.resumeRadio}
                           checked={isSelected}
+                          disabled={!isEligible}
                           onChange={() => handleSelectResume(r)}
                         />
                         <div className={styles.resumeInfo}>
-                          <div className={styles.resumeName}>{r.name}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span className={styles.resumeName}>{r.name}</span>
+                            {r.isDefault && (
+                              <span style={{ fontSize: 11, background: "#dbeafe", color: "#1e40af", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+                                Mặc định
+                              </span>
+                            )}
+                            {isEligible ? (
+                              <span style={{ fontSize: 11, background: "#dcfce7", color: "#166534", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+                                Sẵn sàng ứng tuyển
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: 11, background: "#fee2e2", color: "#991b1b", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+                                {r.sourceType !== "builder" ? "Chưa hỗ trợ tệp tải lên" : "Chưa hoàn tất"}
+                              </span>
+                            )}
+                          </div>
                           <div className={styles.resumeMeta}>
                             <span>Loại: {r.sourceType === "builder" ? "Tạo trực tuyến (CV Builder)" : "File PDF tải lên"}</span>
                             <span>Phiên bản: v{r.currentVersion.versionNumber}</span>
                             <span>Cập nhật: {new Date(r.updatedAt).toLocaleDateString("vi-VN")}</span>
                           </div>
+                          {!isEligible && (
+                            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#b91c1c" }}>
+                              Hệ thống hiện yêu cầu CV tạo từ CV Builder ở trạng thái sẵn sàng để nộp trực tuyến kèm thông tin phiên bản.
+                            </p>
+                          )}
                         </div>
                       </label>
                     );
                   })}
                 </div>
+
+                {!resumes.some((r) => r.sourceType === "builder" && r.status === "ready") && (
+                  <div className={`${styles.bannerNotice} ${styles.bannerWarning}`} style={{ marginTop: 12 }}>
+                    <strong>Lưu ý:</strong> Tài khoản của bạn chưa có bản CV nào tạo trực tuyến (CV Builder) ở trạng thái sẵn sàng. Vui lòng bấm <strong>"+ Tạo CV mới"</strong> để tạo CV trước khi ứng tuyển.
+                  </div>
+                )}
 
                 <div className={styles.buttonRow}>
                   <Link to={`/jobs/${jobId}`} className={styles.secondaryBtn}>
@@ -705,7 +771,7 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
                   <button
                     type="button"
                     className={styles.submitBtn}
-                    disabled={!selectedResumeId}
+                    disabled={!selectedResumeId || !isSelectedResumeEligible}
                     onClick={() => setStep("details")}
                   >
                     Tiếp tục: Thông tin & Thư giới thiệu →

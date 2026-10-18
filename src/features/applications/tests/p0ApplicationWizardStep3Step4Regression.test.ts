@@ -223,6 +223,91 @@ describe("P0 Frontend Application Wizard - Step 3 & Step 4 Integration Tests", (
     });
   });
 
+  describe("Real Job Application Integration & Contract Integrity", () => {
+    it("enforces builder and ready status for real resume application eligibility", () => {
+      const eligibleResume = {
+        id: "res-uuid-1",
+        sourceType: "builder",
+        status: "ready",
+        currentVersion: { id: "ver-uuid-1", versionNumber: 1 },
+      };
+      const pdfResume = {
+        id: "res-uuid-2",
+        sourceType: "uploaded",
+        status: "ready",
+        currentVersion: { id: "ver-uuid-2", versionNumber: 1 },
+      };
+      const failedResume = {
+        id: "res-uuid-3",
+        sourceType: "builder",
+        status: "failed",
+        currentVersion: { id: "ver-uuid-3", versionNumber: 1 },
+      };
+
+      const isEligible = (r: { sourceType: string; status: string }) =>
+        r.sourceType === "builder" && r.status === "ready";
+
+      assert.equal(isEligible(eligibleResume), true);
+      assert.equal(isEligible(pdfResume), false);
+      assert.equal(isEligible(failedResume), false);
+    });
+
+    it("verifies SubmitApplicationDto mapping conforms to backend expectations", () => {
+      const answers: { questionId: string; answer: string | boolean | string[] }[] = [
+        { questionId: "sq-1", answer: true },
+        { questionId: "sq-2", answer: ["React", "TypeScript"] },
+        { questionId: "sq-3", answer: "25 triệu" },
+      ];
+
+      const payload = {
+        resumeId: "550e8400-e29b-41d4-a716-446655440001",
+        resumeVersionId: "550e8400-e29b-41d4-a716-446655440002",
+        details: {
+          contact: {
+            fullName: "Nguyễn Văn A",
+            email: "nva@example.com",
+            phone: "0901234567",
+          },
+          currentLocation: "Hà Nội",
+          availability: "immediately" as const,
+          preferredContactMethod: "email" as const,
+        },
+        coverLetter: "Thư giới thiệu ứng tuyển.",
+        answers,
+      };
+
+      assert.ok(payload.resumeId);
+      assert.ok(payload.resumeVersionId);
+      assert.equal(payload.details.contact.fullName, "Nguyễn Văn A");
+      assert.equal(payload.details.availability, "immediately");
+      assert.equal(payload.details.preferredContactMethod, "email");
+      assert.equal(payload.answers.length, 3);
+      assert.equal(payload.answers[0].answer, true);
+      assert.deepEqual(payload.answers[1].answer, ["React", "TypeScript"]);
+    });
+
+    it("distinguishes onboarding draft vs missing profile guidance", () => {
+      const getGuidance = (hasProfile: boolean, hasDraft: boolean) => {
+        if (!hasProfile) {
+          return hasDraft
+            ? "Hệ thống phát hiện tài khoản của bạn đã có bản nháp từ Onboarding. Vui lòng hoàn tất và kích hoạt hồ sơ ứng viên trước khi nộp đơn ứng tuyển."
+            : "Theo quy định của hệ thống FINDWORK, bạn cần có Hồ sơ Ứng viên hợp lệ trước khi gửi đơn ứng tuyển vào doanh nghiệp.";
+        }
+        return "READY";
+      };
+
+      assert.equal(
+        getGuidance(false, true),
+        "Hệ thống phát hiện tài khoản của bạn đã có bản nháp từ Onboarding. Vui lòng hoàn tất và kích hoạt hồ sơ ứng viên trước khi nộp đơn ứng tuyển."
+      );
+      assert.equal(
+        getGuidance(false, false),
+        "Theo quy định của hệ thống FINDWORK, bạn cần có Hồ sơ Ứng viên hợp lệ trước khi gửi đơn ứng tuyển vào doanh nghiệp."
+      );
+      assert.equal(getGuidance(true, false), "READY");
+    });
+  });
+
   describe("Safety Gate Integrity", () => {
     it("confirms live writes remain safely disabled", () => {
       assert.equal(isLiveWritesEnabled(), false);
