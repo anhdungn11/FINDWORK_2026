@@ -21,6 +21,17 @@ export const SALARY_PERIOD_LABEL: Record<SalaryPeriod, string> = {
   HOUR: "giờ", DAY: "ngày", WEEK: "tuần", MONTH: "tháng", YEAR: "năm",
 };
 
+export type ScreeningQuestionType = "TEXT" | "TEXTAREA" | "YES_NO" | "SELECT" | "MULTI_SELECT";
+
+export interface ScreeningQuestionDto {
+  id: string;
+  type: ScreeningQuestionType;
+  label: string;
+  isRequired: boolean;
+  displayOrder: number;
+  options: string[] | null;
+}
+
 export interface JobDto {
   id: string;
   companyId: string | null;
@@ -44,6 +55,7 @@ export interface JobDto {
   publishedAt: string | null;
   applicationDeadline: string | null;
   version: number | null;
+  screeningQuestions?: ScreeningQuestionDto[];
 }
 
 export interface Pagination {
@@ -163,6 +175,30 @@ const num = (v: unknown): number | null => {
   return null;
 };
 
+export function normalizeScreeningQuestions(raw: unknown): ScreeningQuestionDto[] {
+  if (!Array.isArray(raw)) return [];
+  const validTypes: readonly ScreeningQuestionType[] = ["TEXT", "TEXTAREA", "YES_NO", "SELECT", "MULTI_SELECT"];
+  return raw
+    .filter((q): q is Record<string, unknown> => typeof q === "object" && q !== null)
+    .map((q) => {
+      const rawType = typeof q.type === "string" ? q.type.toUpperCase() : "TEXT";
+      const type = validTypes.includes(rawType as ScreeningQuestionType)
+        ? (rawType as ScreeningQuestionType)
+        : "TEXT";
+      return {
+        id: str(q.id) ?? "",
+        type,
+        label: str(q.label) ?? "",
+        isRequired: q.isRequired === true,
+        displayOrder: num(q.displayOrder) ?? 0,
+        options: Array.isArray(q.options)
+          ? q.options.filter((opt): opt is string => typeof opt === "string")
+          : null,
+      };
+    })
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+}
+
 export function normalizeJob(value: unknown): JobDto {
   const r = obj(value);
   const company = obj(r.company);
@@ -190,6 +226,7 @@ export function normalizeJob(value: unknown): JobDto {
     publishedAt: str(r.publishedAt),
     applicationDeadline: str(r.applicationDeadline),
     version: num(r.version),
+    screeningQuestions: normalizeScreeningQuestions(r.screeningQuestions),
   };
 }
 

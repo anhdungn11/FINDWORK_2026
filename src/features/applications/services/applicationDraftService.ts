@@ -26,6 +26,8 @@ export interface ApplicationDraftDetails {
   coverLetter: string;
 }
 
+export type ScreeningAnswerValue = string | boolean | string[];
+
 export interface ApplicationDraftData {
   version: 1;
   jobId: string | number;
@@ -34,7 +36,7 @@ export interface ApplicationDraftData {
   selectedResumeId: string;
   selectedResumeVersionId?: string;
   details: ApplicationDraftDetails;
-  screeningAnswers: Record<string, string>;
+  screeningAnswers: Record<string, ScreeningAnswerValue>;
   savedAt: string;
 }
 
@@ -100,7 +102,10 @@ export const applicationDraftService = {
         screeningAnswers: isObject(parsed.screeningAnswers)
           ? Object.fromEntries(
               Object.entries(parsed.screeningAnswers).filter(
-                (entry): entry is [string, string] => typeof entry[1] === "string"
+                (entry): entry is [string, ScreeningAnswerValue] =>
+                  typeof entry[1] === "string" ||
+                  typeof entry[1] === "boolean" ||
+                  (Array.isArray(entry[1]) && entry[1].every((item) => typeof item === "string"))
               )
             )
           : {},

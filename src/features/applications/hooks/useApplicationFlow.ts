@@ -23,6 +23,7 @@ import { useAuthStore } from "@/store/authStore";
 
 import type {
   ApplicationStep,
+  ScreeningAnswerValue,
 } from "@/features/applications/types/application.types";
 
 interface UseApplicationFlowOptions {
@@ -87,8 +88,8 @@ export const useApplicationFlow = ({
   const [
     screeningAnswers,
     setScreeningAnswers,
-  ] = useState<Record<string, string>>(
-    () => initialDraft?.screeningAnswers ?? {},
+  ] = useState<Record<string, ScreeningAnswerValue>>(
+    () => (initialDraft?.screeningAnswers as Record<string, ScreeningAnswerValue>) ?? {},
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -208,7 +209,7 @@ export const useApplicationFlow = ({
   );
 
   const updateScreeningAnswer = useCallback(
-    (questionId: string, answer: string) => {
+    (questionId: string, answer: ScreeningAnswerValue) => {
       setScreeningAnswers((current) => ({
         ...current,
         [questionId]: answer,

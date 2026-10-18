@@ -10,6 +10,8 @@ import ApplicationStepper from "@/features/applications/components/ApplicationSt
 import ResumeSelectionStep from "@/features/applications/components/ResumeSelectionStep";
 import { useApplicationFlow } from "@/features/applications/hooks/useApplicationFlow";
 import ApplicationDetailsStep from "@/features/applications/components/ApplicationDetailsStep/ApplicationDetailsStep";
+import ApplicationQuestionsStep from "@/features/applications/components/ApplicationQuestionsStep";
+import ApplicationReviewStep from "@/features/applications/components/ApplicationReviewStep";
 import { parseJobId } from "@/app/router/jobId";
 import { publicApi } from "@/services/api/publicApi";
 import { candidateProfileService } from "@/features/candidate/profile/services/candidateProfileService";
@@ -17,6 +19,12 @@ import { resumeService } from "@/features/resume/services/resumeService";
 import { candidateApplicationApi } from "@/services/api/candidateApplicationApi";
 import { isLiveWritesEnabled } from "@/features/candidate/profile/config/candidateIntegrationConfig";
 import { applicationDraftService } from "@/features/applications/services/applicationDraftService";
+import { useApplicationDetails, createInitialDetails } from "@/features/applications/hooks/useApplicationDetails";
+import {
+    validateScreeningQuestions,
+    type ScreeningQuestionItem,
+} from "@/features/applications/utils/applicationValidation";
+import type { ScreeningAnswerValue, ApplicationStep } from "@/features/applications/types/application.types";
 import {
     EMPLOYMENT_TYPE_LABEL,
     WORKPLACE_TYPE_LABEL,
@@ -28,6 +36,46 @@ import type { Resume } from "@/features/resume/types/resume.types";
 import { useAuthStore } from "@/store/authStore";
 
 import styles from "./JobApplicationPage.module.css";
+
+const DEMO_SCREENING_QUESTIONS: ScreeningQuestionItem[] = [
+    {
+        id: "salary_expect",
+        type: "TEXT",
+        label: "Mức lương mong đợi của bạn (triệu VNĐ/tháng)",
+        isRequired: true,
+    },
+    {
+        id: "experience_yes_no",
+        type: "YES_NO",
+        label: "Bạn đã có kinh nghiệm làm việc thực tế với vị trí này chưa?",
+        isRequired: true,
+    },
+    {
+        id: "start_availability",
+        type: "SELECT",
+        label: "Thời gian bạn có thể bắt đầu làm việc nếu được tiếp nhận?",
+        isRequired: true,
+        options: ["Đi làm ngay", "Sau 1 tuần", "Sau 2 tuần", "Sau 1 tháng", "Thương lượng"],
+    },
+    {
+        id: "skills_strengths",
+        type: "MULTI_SELECT",
+        label: "Kỹ năng hoặc thế mạnh nổi bật của bạn phù hợp với công việc?",
+        isRequired: false,
+        options: [
+            "Giao tiếp & Làm việc nhóm",
+            "Tư duy giải quyết vấn đề",
+            "Ngoại ngữ chuyên ngành",
+            "Quản lý thời gian & Tiến độ",
+        ],
+    },
+    {
+        id: "experience_brief",
+        type: "TEXTAREA",
+        label: "Mô tả ngắn gọn kinh nghiệm hoặc dự án tiêu biểu gần nhất của bạn",
+        isRequired: false,
+    },
+];
 
 const JobApplicationPage = () => {
     const { id } = useParams();
@@ -128,7 +176,7 @@ const MockJobApplicationPage = ({ jobId }: { jobId: number }) => {
                         {" • "}
                         {application.job.location}
                     </p>
-                    <p role="status">Đây là bản xem trước. Chức năng gửi đơn ứng tuyển chưa được kết nối; Chưa có đơn ứng tuyển nào được gửi.</p>
+                    <p role="status">Chưa hỗ trợ gửi đơn ứng tuyển cho bản tin mẫu. Đây là bản xem trước; Chưa có đơn ứng tuyển nào được gửi.</p>
                 </header>
 
                 <ApplicationStepper
@@ -171,172 +219,34 @@ const MockJobApplicationPage = ({ jobId }: { jobId: number }) => {
                         )}
 
                         {application.currentStep === "questions" && (
-                            <div className={styles.formCard}>
-                                <div className={`${styles.bannerNotice} ${styles.bannerInfo}`} style={{ marginBottom: 20 }}>
-                                    <strong>Ví dụ câu hỏi sàng lọc (Demo):</strong> Dưới đây là các câu hỏi mẫu để bạn trải nghiệm quy trình sàng lọc trước khi nộp hồ sơ. Dữ liệu này được lưu an toàn trong phiên làm việc qua F5.
-                                </div>
-
-                                <h2 className={styles.sectionTitle}>Bước 3: Câu hỏi sàng lọc của nhà tuyển dụng</h2>
-                                <p className={styles.sectionSubtitle}>
-                                    Vui lòng trả lời các câu hỏi ngắn sau để nhà tuyển dụng đánh giá mức độ phù hợp.
-                                </p>
-
-                                <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 24 }}>
-                                    <div>
-                                        <label htmlFor="demo-q1" className={styles.reviewLabel}>
-                                            1. Mức lương mong đợi của bạn (triệu VNĐ/tháng)
-                                        </label>
-                                        <input
-                                            id="demo-q1"
-                                            type="text"
-                                            className={styles.textarea}
-                                            style={{ minHeight: "auto", height: 42 }}
-                                            placeholder="Ví dụ: 15 - 20 triệu"
-                                            value={application.screeningAnswers["salary_expect"] ?? ""}
-                                            onChange={(e) => application.updateScreeningAnswer("salary_expect", e.target.value)}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label htmlFor="demo-q2" className={styles.reviewLabel}>
-                                            2. Bạn có thể bắt đầu làm việc sau bao lâu kể từ khi nhận offer?
-                                        </label>
-                                        <input
-                                            id="demo-q2"
-                                            type="text"
-                                            className={styles.textarea}
-                                            style={{ minHeight: "auto", height: 42 }}
-                                            placeholder="Ví dụ: Có thể nhận việc ngay hoặc sau 2 tuần"
-                                            value={application.screeningAnswers["start_availability"] ?? ""}
-                                            onChange={(e) => application.updateScreeningAnswer("start_availability", e.target.value)}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label htmlFor="demo-q3" className={styles.reviewLabel}>
-                                            3. Bạn đã có kinh nghiệm làm việc thực tế với vị trí này chưa?
-                                        </label>
-                                        <textarea
-                                            id="demo-q3"
-                                            className={styles.textarea}
-                                            style={{ minHeight: 90 }}
-                                            placeholder="Mô tả ngắn gọn kinh nghiệm liên quan của bạn..."
-                                            value={application.screeningAnswers["experience_brief"] ?? ""}
-                                            onChange={(e) => application.updateScreeningAnswer("experience_brief", e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className={styles.buttonRow}>
-                                    <button
-                                        type="button"
-                                        className={styles.secondaryBtn}
-                                        onClick={() => application.goToStep("details")}
-                                    >
-                                        ← Quay lại thông tin
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={styles.submitBtn}
-                                        onClick={() => application.goToStep("review")}
-                                    >
-                                        Tiếp tục: Xem lại hồ sơ →
-                                    </button>
-                                </div>
-                            </div>
+                            <ApplicationQuestionsStep
+                                questions={DEMO_SCREENING_QUESTIONS}
+                                answers={application.screeningAnswers}
+                                onAnswerChange={application.updateScreeningAnswer}
+                                onBack={() => application.goToStep("details")}
+                                onContinue={() => application.goToStep("review")}
+                                isDemo
+                            />
                         )}
 
                         {application.currentStep === "review" && (
-                            <div className={styles.formCard}>
-                                <h2 className={styles.sectionTitle}>Bước 4: Xem lại thông tin hồ sơ (Bản xem trước)</h2>
-                                <p className={styles.sectionSubtitle}>
-                                    Kiểm tra lại toàn bộ thông tin ứng tuyển của bạn trước khi gửi.
-                                </p>
-
-                                <div className={styles.reviewGrid}>
-                                    <div className={styles.reviewRow}>
-                                        <span className={styles.reviewLabel}>Vị trí ứng tuyển</span>
-                                        <span className={styles.reviewValue}>{application.job.title}</span>
-                                    </div>
-                                    <div className={styles.reviewRow}>
-                                        <span className={styles.reviewLabel}>Doanh nghiệp</span>
-                                        <span className={styles.reviewValue}>{application.job.company}</span>
-                                    </div>
-                                    <div className={styles.reviewRow}>
-                                        <span className={styles.reviewLabel}>CV đính kèm</span>
-                                        <span className={styles.reviewValue}>
-                                            {application.selectedResume?.name || "CV mặc định"}
-                                        </span>
-                                    </div>
-                                    <div className={styles.reviewRow}>
-                                        <span className={styles.reviewLabel}>Họ và tên ứng viên</span>
-                                        <span className={styles.reviewValue}>
-                                            {application.details.contact.fullName || "Chưa nhập"}
-                                        </span>
-                                    </div>
-                                    <div className={styles.reviewRow}>
-                                        <span className={styles.reviewLabel}>Email liên hệ</span>
-                                        <span className={styles.reviewValue}>
-                                            {application.details.contact.email || "Chưa nhập"}
-                                        </span>
-                                    </div>
-                                    <div className={styles.reviewRow}>
-                                        <span className={styles.reviewLabel}>Số điện thoại</span>
-                                        <span className={styles.reviewValue}>
-                                            {application.details.contact.phone || "Chưa nhập"}
-                                        </span>
-                                    </div>
-                                    {application.details.currentLocation && (
-                                        <div className={styles.reviewRow}>
-                                            <span className={styles.reviewLabel}>Nơi ở hiện tại</span>
-                                            <span className={styles.reviewValue}>
-                                                {application.details.currentLocation}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {application.details.coverLetter && (
-                                        <div className={styles.reviewRow}>
-                                            <span className={styles.reviewLabel}>Thư giới thiệu</span>
-                                            <span className={styles.reviewValue}>
-                                                {application.details.coverLetter}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {Object.keys(application.screeningAnswers).length > 0 && (
-                                        <div className={styles.reviewRow}>
-                                            <span className={styles.reviewLabel}>Câu trả lời sàng lọc (Demo)</span>
-                                            <span className={styles.reviewValue}>
-                                                {Object.entries(application.screeningAnswers).map(([k, v]) => `${k}: ${v}`).join("\n")}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <aside className={`${styles.bannerNotice} ${styles.bannerWarning}`} role="status">
-                                    <strong>Chưa hỗ trợ gửi đơn ứng tuyển:</strong>
-                                    <span>
-                                        Đây là bản xem trước. Chức năng gửi đơn ứng tuyển chưa được kết nối; Chưa có đơn ứng tuyển nào được gửi. Tính năng nộp đơn thực tế chỉ khả dụng với các tin tuyển dụng thật từ Backend.
-                                    </span>
-                                </aside>
-
-                                <div className={styles.buttonRow}>
-                                    <button
-                                        type="button"
-                                        className={styles.secondaryBtn}
-                                        onClick={() => application.goToStep("questions")}
-                                    >
-                                        ← Sửa câu hỏi
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={styles.submitBtn}
-                                        disabled
-                                        title="Chưa hỗ trợ gửi đơn ứng tuyển cho tin mẫu"
-                                    >
-                                        Nộp đơn (Bản xem trước demo)
-                                    </button>
-                                </div>
-                            </div>
+                            <ApplicationReviewStep
+                                job={{
+                                    id: application.job.id,
+                                    title: application.job.title,
+                                    companyName: application.job.company,
+                                    locationText: application.job.location,
+                                    salaryText: application.job.salary,
+                                    employmentTypeLabel: application.job.type,
+                                }}
+                                selectedResume={application.selectedResume}
+                                details={application.details}
+                                questions={DEMO_SCREENING_QUESTIONS}
+                                screeningAnswers={application.screeningAnswers}
+                                onEditStep={application.goToStep}
+                                onSubmit={() => {}}
+                                isDemo
+                            />
                         )}
 
                     </main>
@@ -366,22 +276,46 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
     return applicationDraftService.getDraft(userId, jobId);
   }, [userId, jobId]);
 
-  const [step, setStep] = useState<"resume" | "details" | "questions" | "review" | "success">(
-    () => (initialDraft?.currentStep as ("resume" | "details" | "questions" | "review" | "success")) ?? "resume"
+  const [step, setStep] = useState<ApplicationStep>(
+    () => (initialDraft?.currentStep as ApplicationStep) ?? "resume"
   );
   const [job, setJob] = useState<JobDto | null>(null);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>(() => initialDraft?.selectedResumeId ?? "");
   const [selectedVersionId, setSelectedVersionId] = useState<string>(() => initialDraft?.selectedResumeVersionId ?? "");
-  const [coverLetter, setCoverLetter] = useState<string>(() => initialDraft?.details?.coverLetter ?? "");
-  const [screeningAnswers, setScreeningAnswers] = useState<Record<string, string>>(
-    () => initialDraft?.screeningAnswers ?? {}
+  const [screeningAnswers, setScreeningAnswers] = useState<Record<string, ScreeningAnswerValue>>(
+    () => (initialDraft?.screeningAnswers as Record<string, ScreeningAnswerValue>) ?? {}
   );
   const [profileExists, setProfileExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submittedApp, setSubmittedApp] = useState<CompanyApplicationDto | null>(null);
+
+  const initialDetails = useMemo(() => {
+    return createInitialDetails({
+      contact: {
+        fullName: initialDraft?.details?.contact?.fullName || user?.name || "",
+        email: initialDraft?.details?.contact?.email || user?.email || "",
+        phone: initialDraft?.details?.contact?.phone || "",
+      },
+      currentLocation: initialDraft?.details?.currentLocation || "",
+      availability: (initialDraft?.details?.availability as any) || "",
+      preferredContactMethod: initialDraft?.details?.preferredContactMethod || "email",
+      coverLetter: initialDraft?.details?.coverLetter || "",
+    });
+  }, [initialDraft, user]);
+
+  const {
+    details,
+    detailsErrors,
+    canContinueDetails,
+    updateContact,
+    updateDetails,
+    prefillFromResume,
+  } = useApplicationDetails({
+    initialDetails,
+  });
 
   // Lưu draft khi có thay đổi trong quá trình điền wizard
   useEffect(() => {
@@ -390,20 +324,10 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
       currentStep: step,
       selectedResumeId,
       selectedResumeVersionId: selectedVersionId,
-      details: {
-        contact: {
-          fullName: user?.name ?? "",
-          email: user?.email ?? "",
-          phone: "",
-        },
-        currentLocation: "",
-        availability: "immediately",
-        preferredContactMethod: "email",
-        coverLetter,
-      },
+      details,
       screeningAnswers,
     });
-  }, [userId, jobId, step, selectedResumeId, selectedVersionId, coverLetter, screeningAnswers, user]);
+  }, [userId, jobId, step, selectedResumeId, selectedVersionId, details, screeningAnswers]);
 
   useEffect(() => {
     let active = true;
@@ -458,19 +382,38 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
     };
   }, [jobId]);
 
-  const selectedResume = resumes.find((r) => r.id === selectedResumeId);
+  const selectedResume = resumes.find((r) => r.id === selectedResumeId) ?? null;
+
+  // Prefill thông tin từ CV vào form Step 2 (không ghi đè các trường người dùng đã nhập)
+  useEffect(() => {
+    if (selectedResume) {
+      prefillFromResume(selectedResume);
+    }
+  }, [selectedResume, prefillFromResume]);
 
   const handleSelectResume = (r: Resume) => {
     setSelectedResumeId(r.id);
     setSelectedVersionId(r.currentVersion.id);
   };
 
-  const handleUpdateScreeningAnswer = useCallback((questionId: string, value: string) => {
+  const handleUpdateScreeningAnswer = useCallback((questionId: string, value: ScreeningAnswerValue) => {
     setScreeningAnswers((prev) => ({
       ...prev,
       [questionId]: value,
     }));
   }, []);
+
+  // Map real screening questions from job
+  const realQuestions: ScreeningQuestionItem[] = useMemo(() => {
+    if (!job?.screeningQuestions || job.screeningQuestions.length === 0) return [];
+    return job.screeningQuestions.map((q) => ({
+      id: q.id,
+      type: q.type,
+      label: q.label,
+      isRequired: q.isRequired,
+      options: q.options,
+    }));
+  }, [job?.screeningQuestions]);
 
   const handleSubmit = async () => {
     if (!isLiveWritesEnabled()) {
@@ -480,14 +423,47 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
       setError("Vui lòng chọn một bản CV để ứng tuyển.");
       return;
     }
+    if (!canContinueDetails) {
+      setError("Vui lòng hoàn thành đầy đủ thông tin liên hệ và thời gian làm việc ở Bước 2.");
+      setStep("details");
+      return;
+    }
+
+    // Validate screening questions
+    const validationErrors = validateScreeningQuestions(realQuestions, screeningAnswers);
+    if (Object.keys(validationErrors).length > 0) {
+      setError("Vui lòng hoàn thành các câu hỏi sàng lọc bắt buộc ở Bước 3.");
+      setStep("questions");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
+      const answersPayload = realQuestions
+        .filter((q) => screeningAnswers[q.id] !== undefined && screeningAnswers[q.id] !== "")
+        .map((q) => ({
+          questionId: q.id,
+          answer: screeningAnswers[q.id],
+        }));
+
       const res = await candidateApplicationApi.submit(jobId, {
         resumeId: selectedResumeId,
         resumeVersionId: selectedVersionId,
-        coverLetter: coverLetter.trim() || undefined,
+        details: {
+          contact: {
+            fullName: details.contact.fullName.trim(),
+            email: details.contact.email.trim(),
+            phone: details.contact.phone.trim(),
+          },
+          currentLocation: details.currentLocation.trim() || undefined,
+          availability: details.availability as any,
+          preferredContactMethod: details.preferredContactMethod,
+        },
+        coverLetter: details.coverLetter.trim() || undefined,
+        answers: answersPayload.length > 0 ? answersPayload : undefined,
       });
+
       // Xóa draft sau khi nộp thành công
       applicationDraftService.clearDraft(userId, jobId);
       setSubmittedApp(res);
@@ -498,6 +474,8 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
         setError("Bạn đã nộp đơn ứng tuyển cho vị trí này trước đó. Không thể gửi trùng lặp.");
       } else if (apiErr.status === 404 && apiErr.code === "CANDIDATE_PROFILE_NOT_FOUND") {
         setError("Không tìm thấy hồ sơ ứng viên. Vui lòng hoàn thành hồ sơ cá nhân trước khi ứng tuyển.");
+      } else if (apiErr.code === "RESUME_UNAVAILABLE") {
+        setError("Bản CV đã chọn không hợp lệ hoặc không thuộc quyền sở hữu của bạn.");
       } else {
         setError(apiErr.message || "Gửi đơn ứng tuyển thất bại. Vui lòng thử lại.");
       }
@@ -737,194 +715,50 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
             )}
 
             {step === "details" && (
-              <div className={styles.formCard}>
-                <h2 className={styles.sectionTitle}>Bước 2: Thông tin ứng viên & Thư giới thiệu</h2>
-                <p className={styles.sectionSubtitle}>
-                  Thông tin liên hệ xác thực và thư giới thiệu đính kèm cho nhà tuyển dụng.
-                </p>
-
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-                    <div>
-                      <span className={styles.reviewLabel}>Họ và tên ứng viên</span>
-                      <input
-                        type="text"
-                        className={styles.textarea}
-                        style={{ minHeight: "auto", height: 42, background: "#f8fafc" }}
-                        value={user?.name || "Ứng viên FINDWORK"}
-                        readOnly
-                      />
-                    </div>
-                    <div>
-                      <span className={styles.reviewLabel}>Email liên hệ</span>
-                      <input
-                        type="text"
-                        className={styles.textarea}
-                        style={{ minHeight: "auto", height: 42, background: "#f8fafc" }}
-                        value={user?.email || "Chưa cập nhật"}
-                        readOnly
-                      />
-                    </div>
-                  </div>
-
-                  <label htmlFor="cover-letter-input" className={styles.reviewLabel}>
-                    Nội dung thư giới thiệu (Tùy chọn, tối đa 5000 ký tự)
-                  </label>
-                  <textarea
-                    id="cover-letter-input"
-                    className={styles.textarea}
-                    placeholder="Kính gửi nhà tuyển dụng, tôi ứng tuyển vị trí này vì có kinh nghiệm phù hợp với các yêu cầu..."
-                    value={coverLetter}
-                    maxLength={5000}
-                    onChange={(e) => setCoverLetter(e.target.value)}
-                  />
-                  <div className={styles.charCounter}>
-                    {coverLetter.length} / 5000 ký tự
-                  </div>
-                </div>
-
-                <div className={styles.buttonRow}>
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => setStep("resume")}
-                  >
-                    ← Quay lại chọn CV
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.submitBtn}
-                    onClick={() => setStep("questions")}
-                  >
-                    Tiếp tục: Câu hỏi sàng lọc →
-                  </button>
-                </div>
-              </div>
+              <ApplicationDetailsStep
+                details={details}
+                errors={detailsErrors}
+                selectedResume={selectedResume}
+                canContinue={canContinueDetails}
+                onContactChange={updateContact}
+                onDetailsChange={updateDetails}
+                onBack={() => setStep("resume")}
+                onContinue={() => setStep("questions")}
+              />
             )}
 
             {step === "questions" && (
-              <div className={styles.formCard}>
-                <h2 className={styles.sectionTitle}>Bước 3: Câu hỏi sàng lọc của nhà tuyển dụng</h2>
-                <p className={styles.sectionSubtitle}>
-                  Nhà tuyển dụng có thể đặt các câu hỏi sàng lọc nhằm nắm bắt rõ hơn năng lực của ứng viên.
-                </p>
-
-                <div className={`${styles.bannerNotice} ${styles.bannerInfo}`} style={{ marginBottom: 24 }}>
-                  <strong>Trạng thái sàng lọc vị trí:</strong>
-                  <span>
-                    Vị trí này không yêu cầu câu hỏi sàng lọc bổ sung bắt buộc từ nhà tuyển dụng. Toàn bộ thông tin CV và thư giới thiệu của bạn đã sẵn sàng để gửi.
-                  </span>
-                </div>
-
-                <div style={{ marginBottom: 20 }}>
-                  <label htmlFor="additional-notes" className={styles.reviewLabel}>
-                    Ghi chú bổ sung cho nhà tuyển dụng (Tùy chọn)
-                  </label>
-                  <textarea
-                    id="additional-notes"
-                    className={styles.textarea}
-                    style={{ minHeight: 90 }}
-                    placeholder="Bổ sung thêm thông tin về thời gian phỏng vấn phù hợp hoặc các lưu ý khác..."
-                    value={screeningAnswers["notes"] ?? ""}
-                    onChange={(e) => handleUpdateScreeningAnswer("notes", e.target.value)}
-                  />
-                </div>
-
-                <div className={styles.buttonRow}>
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => setStep("details")}
-                  >
-                    ← Quay lại thông tin
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.submitBtn}
-                    onClick={() => setStep("review")}
-                  >
-                    Tiếp tục: Xem lại hồ sơ →
-                  </button>
-                </div>
-              </div>
+              <ApplicationQuestionsStep
+                questions={realQuestions}
+                answers={screeningAnswers}
+                onAnswerChange={handleUpdateScreeningAnswer}
+                onBack={() => setStep("details")}
+                onContinue={() => setStep("review")}
+                isDemo={false}
+              />
             )}
 
             {step === "review" && (
-              <div className={styles.formCard}>
-                <h2 className={styles.sectionTitle}>Bước 4: Xem lại và xác nhận nộp đơn</h2>
-                <p className={styles.sectionSubtitle}>
-                  Vui lòng kiểm tra lại toàn bộ thông tin trước khi gửi đơn ứng tuyển tới nhà tuyển dụng.
-                </p>
-
-                <div className={styles.reviewGrid}>
-                  <div className={styles.reviewRow}>
-                    <span className={styles.reviewLabel}>Vị trí ứng tuyển</span>
-                    <span className={styles.reviewValue}>{job.title}</span>
-                  </div>
-                  <div className={styles.reviewRow}>
-                    <span className={styles.reviewLabel}>Doanh nghiệp</span>
-                    <span className={styles.reviewValue}>{job.companyName || "Chưa cập nhật"}</span>
-                  </div>
-                  <div className={styles.reviewRow}>
-                    <span className={styles.reviewLabel}>CV đính kèm</span>
-                    <span className={styles.reviewValue}>
-                      {selectedResume?.name} (Phiên bản v{selectedResume?.currentVersion.versionNumber})
-                    </span>
-                  </div>
-                  <div className={styles.reviewRow}>
-                    <span className={styles.reviewLabel}>Ứng viên</span>
-                    <span className={styles.reviewValue}>
-                      {user?.name || user?.email || "Ứng viên FINDWORK"}
-                    </span>
-                  </div>
-                  <div className={styles.reviewRow}>
-                    <span className={styles.reviewLabel}>Thư giới thiệu</span>
-                    <span className={styles.reviewValue}>
-                      {coverLetter.trim() || "(Không đính kèm thư giới thiệu)"}
-                    </span>
-                  </div>
-                  {screeningAnswers["notes"] && (
-                    <div className={styles.reviewRow}>
-                      <span className={styles.reviewLabel}>Ghi chú bổ sung</span>
-                      <span className={styles.reviewValue}>
-                        {screeningAnswers["notes"]}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {!isLiveWritesEnabled() && (
-                  <aside className={`${styles.bannerNotice} ${styles.bannerWarning}`} role="note">
-                    <strong>Chế độ an toàn kiểm thử (ENABLE_LIVE_WRITES: false):</strong>
-                    <span>
-                      Cổng ghi cơ sở dữ liệu trực tiếp đang được tạm khóa để bảo đảm an toàn nộp bài theo quy định sprint. API nộp đơn thực tế (POST /api/v1/jobs/:jobId/applications) đã được kết nối hoàn chỉnh. Khi bật ENABLE_LIVE_WRITES: true, đơn sẽ được ghi nhận trực tiếp vào hệ thống.
-                    </span>
-                  </aside>
-                )}
-
-                <div className={styles.buttonRow}>
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => setStep("questions")}
-                  >
-                    ← Quay lại sửa câu hỏi
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.submitBtn}
-                    disabled={submitting || !isLiveWritesEnabled()}
-                    onClick={handleSubmit}
-                    title={!isLiveWritesEnabled() ? "Cổng ghi trực tiếp đang khóa an toàn" : "Xác nhận nộp đơn ứng tuyển"}
-                  >
-                    {submitting
-                      ? "Đang gửi đơn..."
-                      : isLiveWritesEnabled()
-                      ? "Xác nhận nộp đơn"
-                      : "Nộp đơn (Cổng ghi an toàn đang khóa)"}
-                  </button>
-                </div>
-              </div>
+              <ApplicationReviewStep
+                job={{
+                  id: job.id,
+                  title: job.title,
+                  companyName: job.companyName,
+                  categoryName: job.categoryName,
+                  employmentTypeLabel: job.employmentType ? EMPLOYMENT_TYPE_LABEL[job.employmentType] : null,
+                  workplaceTypeLabel: job.workplaceType ? WORKPLACE_TYPE_LABEL[job.workplaceType] : null,
+                  salaryText: formatSalary(job),
+                }}
+                selectedResume={selectedResume}
+                details={details}
+                questions={realQuestions}
+                screeningAnswers={screeningAnswers}
+                onEditStep={setStep}
+                onSubmit={handleSubmit}
+                isSubmitting={submitting}
+                isDemo={false}
+                isLiveWritesEnabled={isLiveWritesEnabled()}
+              />
             )}
           </main>
 

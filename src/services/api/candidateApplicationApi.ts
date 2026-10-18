@@ -8,10 +8,39 @@ import {
   type Paged,
 } from "./apiTypes";
 
+export interface ApplicationContactInput {
+  fullName: string;
+  email: string;
+  phone: string;
+}
+
+export type ApplicationAvailabilityInput =
+  | "immediately"
+  | "within-1-week"
+  | "within-2-weeks"
+  | "within-1-month"
+  | "negotiable";
+
+export type ApplicationContactMethodInput = "email" | "phone";
+
+export interface ApplicationDetailsInput {
+  contact: ApplicationContactInput;
+  currentLocation?: string;
+  availability: ApplicationAvailabilityInput;
+  preferredContactMethod: ApplicationContactMethodInput;
+}
+
+export interface SubmitScreeningAnswerInput {
+  questionId: string;
+  answer: string | boolean | string[];
+}
+
 export interface SubmitApplicationInput {
   resumeId: string;
   resumeVersionId: string;
+  details: ApplicationDetailsInput;
   coverLetter?: string;
+  answers?: SubmitScreeningAnswerInput[];
 }
 
 export interface CandidateApplicationQuery {
@@ -32,13 +61,21 @@ export const candidateApplicationApi = {
     signal?: AbortSignal,
   ): Promise<CompanyApplicationDto> {
     try {
+      const payload: Record<string, unknown> = {
+        resumeId: input.resumeId,
+        resumeVersionId: input.resumeVersionId,
+        details: input.details,
+      };
+      if (input.coverLetter?.trim()) {
+        payload.coverLetter = input.coverLetter.trim();
+      }
+      if (input.answers && input.answers.length > 0) {
+        payload.answers = input.answers;
+      }
+
       const res = await apiClient.post(
         `/jobs/${encodeURIComponent(jobId)}/applications`,
-        {
-          resumeId: input.resumeId,
-          resumeVersionId: input.resumeVersionId,
-          ...(input.coverLetter?.trim() ? { coverLetter: input.coverLetter.trim() } : {}),
-        },
+        payload,
         { signal },
       );
       return normalizeCompanyApplication(unwrapData(res.data));

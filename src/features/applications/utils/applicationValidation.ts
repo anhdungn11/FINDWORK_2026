@@ -1,6 +1,7 @@
 import type {
   ApplicationDetailsErrors,
   ApplicationDetailsForm,
+  ScreeningAnswerValue,
 } from "@/features/applications/types/application.types";
 
 const EMAIL_PATTERN =
@@ -65,4 +66,73 @@ export const isApplicationDetailsValid = (
       validateApplicationDetails(details),
     ).length === 0
   );
+};
+
+export interface ScreeningQuestionItem {
+  id: string;
+  type: "TEXT" | "TEXTAREA" | "YES_NO" | "SELECT" | "MULTI_SELECT";
+  label: string;
+  isRequired: boolean;
+  options?: string[] | null;
+}
+
+export type ScreeningValidationErrors = Record<string, string>;
+
+export const validateScreeningQuestions = (
+  questions: ScreeningQuestionItem[],
+  answers: Record<string, ScreeningAnswerValue>,
+): ScreeningValidationErrors => {
+  const errors: ScreeningValidationErrors = {};
+
+  for (const q of questions) {
+    const val = answers[q.id];
+    if (q.isRequired) {
+      if (
+        val === undefined ||
+        val === null ||
+        (typeof val === "string" && val.trim() === "")
+      ) {
+        errors[q.id] = "Vui lòng trả lời câu hỏi bắt buộc này.";
+        continue;
+      }
+      if (Array.isArray(val) && val.length === 0) {
+        errors[q.id] = "Vui lòng chọn ít nhất một lựa chọn.";
+        continue;
+      }
+    }
+
+    if (val !== undefined && val !== null && val !== "") {
+      switch (q.type) {
+        case "TEXT":
+          if (typeof val === "string" && val.trim().length > 500) {
+            errors[q.id] = "Câu trả lời không được vượt quá 500 ký tự.";
+          }
+          break;
+        case "TEXTAREA":
+          if (typeof val === "string" && val.trim().length > 5000) {
+            errors[q.id] = "Câu trả lời không được vượt quá 5000 ký tự.";
+          }
+          break;
+        case "YES_NO":
+          if (typeof val !== "boolean") {
+            errors[q.id] = "Vui lòng chọn Có hoặc Không.";
+          }
+          break;
+        case "SELECT":
+          if (q.options && q.options.length > 0 && typeof val === "string" && !q.options.includes(val)) {
+            errors[q.id] = "Lựa chọn không hợp lệ trong danh sách.";
+          }
+          break;
+        case "MULTI_SELECT":
+          if (!Array.isArray(val) || (q.isRequired && val.length === 0)) {
+            errors[q.id] = "Vui lòng chọn ít nhất một lựa chọn.";
+          } else if (q.options && q.options.length > 0 && !val.every((item) => q.options!.includes(item))) {
+            errors[q.id] = "Có lựa chọn không hợp lệ trong danh sách.";
+          }
+          break;
+      }
+    }
+  }
+
+  return errors;
 };
