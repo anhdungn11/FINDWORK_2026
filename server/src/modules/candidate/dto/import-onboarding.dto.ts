@@ -11,6 +11,11 @@ export class ImportCandidateOnboardingDto {
   @Equals(true)
   confirmPrivacy!: true;
 
+  @ApiProperty({ required: false, type: Boolean, description: "Confirm each difference between saved draft privacy choices and private profile defaults" })
+  @IsOptional()
+  @IsBoolean()
+  confirmPrivacyDifferences?: boolean;
+
   @ApiProperty({ required: false, type: Boolean, description: "Acknowledge omission of unsupported avatar/CV assets only when the saved draft contains them" })
   @IsOptional()
   @IsBoolean()

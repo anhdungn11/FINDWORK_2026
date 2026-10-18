@@ -23,6 +23,8 @@ const textId = "77777777-7777-4777-8777-777777777777";
 const selectId = "88888888-8888-4888-8888-888888888888";
 const multiId = "99999999-9999-4999-8999-999999999999";
 const yesId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const details = { contact: { fullName: "Candidate", email: "candidate@example.com", phone: "0901234567" },
+  availability: "immediately" as const, preferredContactMethod: "email" as const };
 
 const questions = [
   { id: textId, type: "TEXT" as const, label: "Years of experience?", isRequired: true, displayOrder: 0, options: null },
@@ -149,7 +151,7 @@ describe("recruitment screening questions", () => {
 
   it("persists answer snapshots inside the existing application transaction and selects them for details", async () => {
     const { tx, db, service } = applicationDb();
-    await service.submit(userId, jobId, { resumeId, resumeVersionId: versionId, answers });
+    await service.submit(userId, jobId, { resumeId, resumeVersionId: versionId, details, answers });
     expect(tx.applicationAnswer.createMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.arrayContaining([expect.objectContaining({
         jobId, applicationId: "application", screeningQuestionId: multiId,
@@ -162,14 +164,14 @@ describe("recruitment screening questions", () => {
       select: expect.objectContaining({ answers: expect.objectContaining({ select: expect.objectContaining({ questionSnapshot: true, answerValue: true }) }) }),
     }));
     tx.screeningQuestion.findMany.mockResolvedValueOnce([{ ...questions[0], isRequired: true }]);
-    await expect(service.submit(userId, jobId, { resumeId, resumeVersionId: versionId }))
+    await expect(service.submit(userId, jobId, { resumeId, resumeVersionId: versionId, details }))
       .rejects.toMatchObject({ status: 400, response: { code: "SCREENING_REQUIRED_ANSWER_MISSING" } });
     expect(tx.application.create).toHaveBeenCalledTimes(1);
   });
 
   it("rejects malformed nested answer DTOs before the service", async () => {
     const malformed = plainToInstance(SubmitApplicationDto, {
-      resumeId, resumeVersionId: versionId,
+      resumeId, resumeVersionId: versionId, details,
       answers: [{ questionId: textId, answer: { arbitrary: "payload" } }],
     });
     expect(await validate(malformed)).not.toHaveLength(0);

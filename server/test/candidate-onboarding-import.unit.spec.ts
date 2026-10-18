@@ -87,14 +87,20 @@ describe("Candidate onboarding import", () => {
     expect(invalid.tx.candidateProfile.create).not.toHaveBeenCalled();
   });
 
-  it("imports changed draft privacy while saving every backend default", async () => {
+  it("requires separate confirmation before changing saved draft privacy choices", async () => {
     const content = draft();
     content.privacy = { searchableProfile: true, showEmail: true, showPhone: true, allowResumeDownload: true, allowJobMatching: false };
     expect(parseCandidateOnboardingDraft(content).privacyDifferences).toEqual([
       "searchableProfile", "showEmail", "showPhone", "allowResumeDownload", "allowJobMatching",
     ]);
     const { service, tx } = harness(content);
-    await expect(service.import("self", { version: 3, confirmPrivacy: true })).resolves.toMatchObject({ id: "profile" });
+    await expect(service.import("self", { version: 3, confirmPrivacy: true })).rejects.toMatchObject({
+      status: 400, response: { code: "CANDIDATE_IMPORT_PRIVACY_DIFFERENCES",
+        details: { privacyDifferences: ["searchableProfile", "showEmail", "showPhone", "allowResumeDownload", "allowJobMatching"],
+          initialPrivacy: CANDIDATE_IMPORT_PRIVACY_DEFAULTS } },
+    });
+    expect(tx.candidateProfile.create).not.toHaveBeenCalled();
+    await expect(service.import("self", { version: 3, confirmPrivacy: true, confirmPrivacyDifferences: true })).resolves.toMatchObject({ id: "profile" });
     expect(tx.candidatePrivacySetting.create).toHaveBeenCalledWith({ data: { candidateProfileId: "profile", ...CANDIDATE_IMPORT_PRIVACY_DEFAULTS } });
     await expect(tx.candidateOnboardingDraft.findUnique.mock.results[0]?.value).resolves.toMatchObject({ content });
     expect(tx.candidateOnboardingDraft.delete).not.toHaveBeenCalled();
@@ -128,7 +134,7 @@ describe("Candidate onboarding import", () => {
     content.resume.hasExistingResume = true;
     content.privacy.showEmail = true;
     const { service, tx } = harness(content);
-    await expect(service.import("self", { version: 3, confirmPrivacy: true, confirmOmitUnsupportedAssets: true })).resolves.toMatchObject({ id: "profile" });
+    await expect(service.import("self", { version: 3, confirmPrivacy: true, confirmPrivacyDifferences: true, confirmOmitUnsupportedAssets: true })).resolves.toMatchObject({ id: "profile" });
     expect(tx.candidateProfile.create).toHaveBeenCalledWith({ data: expect.objectContaining({ fullName: "Test Candidate" }), select: { id: true } });
     expect(tx.candidateProfile.create.mock.calls[0]?.[0].data).not.toHaveProperty("avatarAssetKey");
     expect(tx.resume.create).not.toHaveBeenCalled();

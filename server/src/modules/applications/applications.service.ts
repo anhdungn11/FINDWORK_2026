@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma } from "../../generated/prisma/client";
+import { Prisma, type ApplicationAvailability, type ApplicationContactMethod } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import type { ApplicationPageQueryDto, ReviewApplicationDto, SubmitApplicationDto } from "./dto/application.dto";
 import { validateScreeningAnswers } from "./screening-answers";
@@ -7,6 +7,7 @@ import { validateScreeningAnswers } from "./screening-answers";
 const applicationSelect = {
   id: true, companyId: true, jobId: true, status: true, version: true, resumeId: true,
   resumeVersionId: true, fullNameSnapshot: true, emailSnapshot: true, phoneSnapshot: true,
+  currentLocationSnapshot: true, availability: true, preferredContactMethod: true,
   coverLetter: true, jobSnapshot: true, submittedAt: true, createdAt: true, updatedAt: true,
   job: { select: { id: true, title: true, status: true, company: { select: { id: true, name: true, slug: true } } } },
 } as const;
@@ -55,7 +56,7 @@ export class ApplicationsService {
         });
         if (!job) throw unavailable();
         const profile = await tx.candidateProfile.findUnique({
-          where: { userId }, select: { id: true, fullName: true, phone: true, user: { select: { email: true } } },
+          where: { userId }, select: { id: true },
         });
         if (!profile) throw new NotFoundException({ code: "CANDIDATE_PROFILE_NOT_FOUND", message: "Candidate profile was not found." });
         const version = await tx.resumeVersion.findFirst({
@@ -76,7 +77,12 @@ export class ApplicationsService {
           data: {
             candidateProfileId: profile.id, companyId: job.companyId, jobId,
             resumeId: dto.resumeId, resumeVersionId: version.id, status: "SUBMITTED",
-            fullNameSnapshot: profile.fullName, emailSnapshot: profile.user.email, phoneSnapshot: profile.phone,
+            fullNameSnapshot: dto.details.contact.fullName,
+            emailSnapshot: dto.details.contact.email,
+            phoneSnapshot: dto.details.contact.phone,
+            currentLocationSnapshot: dto.details.currentLocation || null,
+            availability: dto.details.availability.replaceAll("-", "_").toUpperCase() as ApplicationAvailability,
+            preferredContactMethod: dto.details.preferredContactMethod.toUpperCase() as ApplicationContactMethod,
             coverLetter: dto.coverLetter, jobSnapshot: { id: job.id, title: job.title, categoryId: job.categoryId, publishedAt: job.publishedAt?.toISOString() },
             submittedAt: now,
             statusHistory: { create: { toStatus: "SUBMITTED", changedByUserId: userId } },

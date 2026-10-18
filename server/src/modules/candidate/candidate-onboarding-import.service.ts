@@ -16,6 +16,7 @@ export class CandidateOnboardingImportService {
 
   async import(userId: string, dto: ImportCandidateOnboardingDto) {
     if (!Number.isInteger(dto.version) || dto.version < 1 || dto.confirmPrivacy !== true ||
+      (dto.confirmPrivacyDifferences !== undefined && typeof dto.confirmPrivacyDifferences !== "boolean") ||
       (dto.confirmOmitUnsupportedAssets !== undefined && typeof dto.confirmOmitUnsupportedAssets !== "boolean")) {
       throw new BadRequestException({ code: "CANDIDATE_IMPORT_REQUEST_INVALID", message: "A valid draft version and privacy confirmation are required." });
     }
@@ -29,6 +30,13 @@ export class CandidateOnboardingImportService {
         if (draft.version !== dto.version) throw new ConflictException({ code: "CANDIDATE_ONBOARDING_VERSION_CONFLICT", message: "Onboarding draft version changed." });
 
         const parsed = parseCandidateOnboardingDraft(draft.content);
+        if (parsed.privacyDifferences.length > 0 && dto.confirmPrivacyDifferences !== true) {
+          throw new BadRequestException({
+            code: "CANDIDATE_IMPORT_PRIVACY_DIFFERENCES",
+            message: "Confirm the listed changes from draft privacy choices to initial profile settings.",
+            details: { privacyDifferences: parsed.privacyDifferences, initialPrivacy: CANDIDATE_IMPORT_PRIVACY_DEFAULTS },
+          });
+        }
         if (parsed.unsupportedAssets.length > 0 && dto.confirmOmitUnsupportedAssets !== true) {
           throw new BadRequestException({
             code: "CANDIDATE_IMPORT_UNSUPPORTED_ASSETS",

@@ -12,7 +12,7 @@ Khi draft chứa avatar/CV chưa có storage backend, ứng viên có thể xác
 { "version": 3, "confirmPrivacy": true, "confirmOmitUnsupportedAssets": true }
 ```
 
-`confirmOmitUnsupportedAssets` là boolean optional. Không cần gửi khi draft không có asset. `confirmPrivacy` luôn phải là `true` và chỉ xác nhận ứng viên đã được thông báo về trạng thái riêng tư ban đầu; nó không bật công khai hồ sơ.
+`confirmOmitUnsupportedAssets` là boolean optional. Không cần gửi khi draft không có asset. `confirmPrivacy` luôn phải là `true` và xác nhận ứng viên đã được thông báo về trạng thái riêng tư ban đầu; nó không bật công khai hồ sơ. Nếu một trong năm lựa chọn privacy của draft khác trạng thái ban đầu, Backend trả `400 CANDIDATE_IMPORT_PRIVACY_DIFFERENCES` kèm `details.privacyDifferences` và `details.initialPrivacy`. Sau khi trình bày từng khác biệt và nhận xác nhận riêng của người dùng, gửi thêm `"confirmPrivacyDifferences": true`. Xác nhận này không thay thế `confirmPrivacy`.
 
 ## Privacy handoff cho CP8C
 
@@ -26,7 +26,7 @@ CP8C cần lấy `data.privacy` và `version` từ `GET /api/v1/candidate/onboar
 | `allowResumeDownload` | `false` |
 | `allowJobMatching` | `true` |
 
-Field khác biệt khi giá trị trong draft không bằng giá trị ở cột phải. CP8C phải nêu rõ từng khác biệt, kể cả trường hợp `allowJobMatching` trong draft là `false`, rồi mới gửi `confirmPrivacy: true`. Backend kiểm tra đủ năm giá trị boolean nhưng **không áp dụng** chúng vào profile. Draft giữ nguyên; ứng viên có thể điều chỉnh privacy sau import bằng API privacy hiện có. CP8C chưa tích hợp luồng này.
+Field khác biệt khi giá trị trong draft không bằng giá trị ở cột phải. CP8C phải nêu rõ từng khác biệt, kể cả trường hợp `allowJobMatching` trong draft là `false`, rồi mới gửi `confirmPrivacyDifferences: true` cùng `confirmPrivacy: true`. Backend kiểm tra đủ năm giá trị boolean nhưng **không áp dụng** chúng vào profile. Draft giữ nguyên; ứng viên có thể điều chỉnh privacy sau import bằng API privacy hiện có.
 
 ## Unsupported asset handoff cho CP8C
 

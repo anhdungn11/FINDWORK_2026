@@ -8,6 +8,9 @@ import { REQUIRED_PERMISSIONS_KEY } from "../src/modules/authorization/decorator
 import { REQUIRED_COMPANY_PERMISSIONS_KEY } from "../src/modules/authorization/decorators/require-company-permissions.decorator";
 import { CandidateResumesService } from "../src/modules/candidate/candidate-resumes.service";
 import { Prisma } from "../src/generated/prisma/client";
+import { plainToInstance } from "class-transformer";
+import { validate } from "class-validator";
+import { SubmitApplicationDto } from "../src/modules/applications/dto/application.dto";
 
 const companyId = "11111111-1111-4111-8111-111111111111";
 const jobId = "22222222-2222-4222-8222-222222222222";
@@ -15,6 +18,11 @@ const applicationId = "33333333-3333-4333-8333-333333333333";
 const userId = "44444444-4444-4444-8444-444444444444";
 const resumeId = "55555555-5555-4555-8555-555555555555";
 const versionId = "66666666-6666-4666-8666-666666666666";
+const details = {
+  contact: { fullName: "Application Name", email: "apply@example.com", phone: "+84901234567" },
+  currentLocation: "Ho Chi Minh City", availability: "within-2-weeks" as const,
+  preferredContactMethod: "phone" as const,
+};
 
 function fakeDb() {
   const tx = {
@@ -44,6 +52,21 @@ function fakeDb() {
 }
 
 describe("applications MVP security", () => {
+  it("validates application-specific contact and availability before any database write", async () => {
+    const valid = plainToInstance(SubmitApplicationDto, { resumeId, resumeVersionId: versionId, details });
+    expect(await validate(valid)).toEqual([]);
+    for (const badDetails of [
+      undefined,
+      { ...details, contact: { ...details.contact, fullName: " " } },
+      { ...details, contact: { ...details.contact, email: "invalid" } },
+      { ...details, contact: { ...details.contact, phone: "123" } },
+      { ...details, availability: "tomorrow" },
+      { ...details, preferredContactMethod: "sms" },
+    ]) {
+      const input = plainToInstance(SubmitApplicationDto, { resumeId, resumeVersionId: versionId, details: badDetails });
+      expect(await validate(input)).not.toEqual([]);
+    }
+  });
   it("requires system own-scope and company-scoped permission guards", () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, CandidateApplicationsController)).toEqual([AccessTokenGuard, PermissionGuard]);
     expect(Reflect.getMetadata(GUARDS_METADATA, CompanyApplicationsController)).toEqual([AccessTokenGuard, CompanyPermissionGuard]);
@@ -53,18 +76,23 @@ describe("applications MVP security", () => {
 
   it("submits only to an available job with an owned ready builder version and status history", async () => {
     const { tx, db } = fakeDb();
-    await new ApplicationsService(db as never).submit(userId, jobId, { resumeId, resumeVersionId: versionId });
+    await new ApplicationsService(db as never).submit(userId, jobId, { resumeId, resumeVersionId: versionId, details });
     expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
     expect(tx.job.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: jobId, status: "PUBLISHED", company: { status: "ACTIVE" } }) }));
     expect(tx.resumeVersion.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: versionId, resumeId, resume: expect.objectContaining({ candidateProfileId: "profile", status: "READY", sourceType: "BUILDER" }) }) }));
-    expect(tx.application.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ companyId, jobId, status: "SUBMITTED", candidateProfileId: "profile", statusHistory: { create: { toStatus: "SUBMITTED", changedByUserId: userId } } }) }));
+    expect(tx.application.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      companyId, jobId, status: "SUBMITTED", candidateProfileId: "profile",
+      fullNameSnapshot: "Application Name", emailSnapshot: "apply@example.com", phoneSnapshot: "+84901234567",
+      currentLocationSnapshot: "Ho Chi Minh City", availability: "WITHIN_2_WEEKS", preferredContactMethod: "PHONE",
+      statusHistory: { create: { toStatus: "SUBMITTED", changedByUserId: userId } },
+    }) }));
     expect(tx.applicationAnswer.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects unavailable resumes before creating an application", async () => {
     const { tx, db } = fakeDb();
     tx.resumeVersion.findFirst.mockResolvedValue(null);
-    await expect(new ApplicationsService(db as never).submit(userId, jobId, { resumeId, resumeVersionId: versionId })).rejects.toMatchObject({ status: 400 });
+    await expect(new ApplicationsService(db as never).submit(userId, jobId, { resumeId, resumeVersionId: versionId, details })).rejects.toMatchObject({ status: 400 });
     expect(tx.application.create).not.toHaveBeenCalled();
   });
 
@@ -73,7 +101,7 @@ describe("applications MVP security", () => {
     tx.application.create.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("duplicate", {
       code: "P2002", clientVersion: "7.10.0",
     }));
-    await expect(new ApplicationsService(db as never).submit(userId, jobId, { resumeId, resumeVersionId: versionId }))
+    await expect(new ApplicationsService(db as never).submit(userId, jobId, { resumeId, resumeVersionId: versionId, details }))
       .rejects.toMatchObject({ status: 409, response: { code: "APPLICATION_DUPLICATE" } });
   });
 
