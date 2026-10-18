@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { getReturnDestination } from "@/app/router/returnDestination";
 
 import ResumeBuilderForm from "@/features/resume/builder/components/ResumeBuilderForm";
 import ResumeBuilderNav from "@/features/resume/builder/components/ResumeBuilderNav";
@@ -89,6 +90,11 @@ const ResumeBuilderEditor = ({
   existingResume: Resume | null;
 }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rawReturnTo = searchParams.get("returnTo");
+  const targetReturnUrl = rawReturnTo ? getReturnDestination(rawReturnTo) : null;
+  const isCustomReturn = Boolean(rawReturnTo && targetReturnUrl && targetReturnUrl === rawReturnTo);
+
   const [saveError, setSaveError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -104,8 +110,9 @@ const ResumeBuilderEditor = ({
     setIsSaving(true);
 
     try {
+      let savedResume: Resume;
       if (existingResume) {
-        await resumeService.updateBuilderResume({
+        savedResume = await resumeService.updateBuilderResume({
           resumeId: existingResume.id,
           name: builder.resumeName,
           templateCode: builder.templateCode,
@@ -113,7 +120,7 @@ const ResumeBuilderEditor = ({
           settings: builder.settings,
         });
       } else {
-        await resumeService.createBuilderResume({
+        savedResume = await resumeService.createBuilderResume({
           name: builder.resumeName,
           templateCode: builder.templateCode,
           content: builder.content,
@@ -121,7 +128,12 @@ const ResumeBuilderEditor = ({
         });
       }
 
-      navigate("/cv");
+      if (isCustomReturn && targetReturnUrl) {
+        const separator = targetReturnUrl.includes("?") ? "&" : "?";
+        navigate(`${targetReturnUrl}${separator}createdCvId=${encodeURIComponent(savedResume.id)}`);
+      } else {
+        navigate("/cv");
+      }
     } catch (error) {
       setSaveError(
         error instanceof Error ? error.message : "Không thể lưu CV.",
@@ -138,10 +150,16 @@ const ResumeBuilderEditor = ({
           <button
             type="button"
             className={styles.backButton}
-            onClick={() => navigate("/cv")}
+            onClick={() => {
+              if (isCustomReturn && targetReturnUrl) {
+                navigate(targetReturnUrl);
+              } else {
+                navigate("/cv");
+              }
+            }}
           >
             <span aria-hidden="true">←</span>
-            CV của tôi
+            {isCustomReturn ? "Quay lại đơn ứng tuyển" : "CV của tôi"}
           </button>
 
           <div className={styles.brandBlock}>

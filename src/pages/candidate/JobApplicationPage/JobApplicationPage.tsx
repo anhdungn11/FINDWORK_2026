@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
     Link,
     useParams,
+    useSearchParams,
 } from "react-router-dom";
 
 import ApplicationJobSummary from "@/features/applications/components/ApplicationJobSummary/ApplicationJobSummary";
@@ -138,6 +139,7 @@ const MockJobApplicationPage = ({ jobId }: { jobId: number }) => {
                     <main className={styles.mainColumn}>
                         {application.currentStep === "resume" && (
                             <ResumeSelectionStep
+                                jobId={jobId}
                                 resumes={application.resumes}
                                 selectedResumeId={
                                     application.selectedResumeId
@@ -355,6 +357,7 @@ interface RealJobApplicationPageProps {
 }
 
 const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const userId = user?.id ?? null;
 
@@ -421,15 +424,25 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
 
         setResumes(resumeList);
         if (resumeList.length > 0) {
-          // Ưu tiên giữ lại resume đã chọn trong draft nếu còn tồn tại
-          const draftResume = resumeList.find((r) => r.id === selectedResumeId);
-          if (draftResume) {
-            setSelectedResumeId(draftResume.id);
-            setSelectedVersionId(draftResume.currentVersion.id);
+          const createdCvId = searchParams.get("createdCvId");
+          if (createdCvId && resumeList.some((r) => r.id === createdCvId)) {
+            const newlyCreated = resumeList.find((r) => r.id === createdCvId)!;
+            setSelectedResumeId(newlyCreated.id);
+            setSelectedVersionId(newlyCreated.currentVersion.id);
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.delete("createdCvId");
+            setSearchParams(nextParams, { replace: true });
           } else {
-            const defaultResume = resumeList.find((r) => r.isDefault) ?? resumeList[0];
-            setSelectedResumeId(defaultResume.id);
-            setSelectedVersionId(defaultResume.currentVersion.id);
+            // Ưu tiên giữ lại resume đã chọn trong draft nếu còn tồn tại
+            const draftResume = resumeList.find((r) => r.id === selectedResumeId);
+            if (draftResume) {
+              setSelectedResumeId(draftResume.id);
+              setSelectedVersionId(draftResume.currentVersion.id);
+            } else {
+              const defaultResume = resumeList.find((r) => r.isDefault) ?? resumeList[0];
+              setSelectedResumeId(defaultResume.id);
+              setSelectedVersionId(defaultResume.currentVersion.id);
+            }
           }
         }
         setLoading(false);
@@ -570,7 +583,7 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
               </span>
             </div>
             <div className={styles.buttonRow}>
-              <Link to="/cv/create" className={styles.submitBtn}>
+              <Link to={`/cv/create?returnTo=${encodeURIComponent(`/jobs/${jobId}/apply`)}`} className={styles.submitBtn}>
                 Tạo CV ngay
               </Link>
               <Link to={`/jobs/${jobId}`} className={styles.secondaryBtn}>
@@ -654,10 +667,30 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
           <main className={styles.mainColumn}>
             {step === "resume" && (
               <div className={styles.formCard}>
-                <h2 className={styles.sectionTitle}>Bước 1: Chọn CV ứng tuyển</h2>
-                <p className={styles.sectionSubtitle}>
-                  Chọn bản CV bạn muốn sử dụng để nộp cho vị trí này. Nhà tuyển dụng sẽ xem bản CV snapshot kèm thông tin phiên bản này.
-                </p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <h2 className={styles.sectionTitle}>Bước 1: Chọn CV ứng tuyển</h2>
+                    <p className={styles.sectionSubtitle}>
+                      Chọn bản CV bạn muốn sử dụng để nộp cho vị trí này. Nhà tuyển dụng sẽ xem bản CV snapshot kèm thông tin phiên bản này.
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Link
+                      to={`/cv/create?returnTo=${encodeURIComponent(`/jobs/${jobId}/apply`)}`}
+                      className={styles.secondaryBtn}
+                      style={{ padding: "8px 14px", fontSize: 13, textDecoration: "none", whiteSpace: "nowrap" }}
+                    >
+                      + Tạo CV mới
+                    </Link>
+                    <Link
+                      to="/cv"
+                      className={styles.secondaryBtn}
+                      style={{ padding: "8px 14px", fontSize: 13, textDecoration: "none", whiteSpace: "nowrap" }}
+                    >
+                      Quản lý CV
+                    </Link>
+                  </div>
+                </div>
 
                 <div className={styles.resumeOptionList}>
                   {resumes.map((r) => {
@@ -694,6 +727,7 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
                   <button
                     type="button"
                     className={styles.submitBtn}
+                    disabled={!selectedResumeId}
                     onClick={() => setStep("details")}
                   >
                     Tiếp tục: Thông tin & Thư giới thiệu →

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuthStore, type AuthState } from "../../store/authStore";
 
@@ -9,6 +9,12 @@ export const getCandidateRouteState = (
   if (status === "idle" || status === "loading" || status === "loggingOut") return "loading";
   return status === "authenticated" && hasSession ? "allowed" : "denied";
 };
+
+const CandidateRouteFallback = () => (
+  <div style={{ padding: "48px 16px", textAlign: "center" }}>
+    <p role="status">Đang tải trang...</p>
+  </div>
+);
 
 const CandidateRoute = () => {
   const status = useAuthStore((state) => state.status);
@@ -28,7 +34,11 @@ const CandidateRoute = () => {
   if (routeState === "denied") {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
   }
-  return <Outlet />;
+  return (
+    <Suspense fallback={<CandidateRouteFallback />}>
+      <Outlet />
+    </Suspense>
+  );
 };
 
 export default CandidateRoute;

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -47,6 +48,9 @@ export interface UseApplicationDetailsOptions {
 export const useApplicationDetails = (
   options?: UseApplicationDetailsOptions,
 ) => {
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   const [details, setDetails] = useState<ApplicationDetailsForm>(
     () => options?.initialDetails ?? createInitialDetails(),
   );
@@ -74,11 +78,11 @@ export const useApplicationDetails = (
             [field]: value,
           },
         };
-        options?.onDetailsChange?.(next);
+        optionsRef.current?.onDetailsChange?.(next);
         return next;
       });
     },
-    [options],
+    [],
   );
 
   const updateDetails = useCallback(
@@ -91,37 +95,37 @@ export const useApplicationDetails = (
           ...current,
           [field]: value,
         };
-        options?.onDetailsChange?.(next);
+        optionsRef.current?.onDetailsChange?.(next);
         return next;
       });
     },
-    [options],
+    [],
   );
 
   const prefillFromResume = useCallback(
     (resume: Resume | null) => {
       setDetails((current) => {
         const next = mergeResumePrefillIntoDetails(current, resume);
-        options?.onDetailsChange?.(next);
+        optionsRef.current?.onDetailsChange?.(next);
         return next;
       });
     },
-    [options],
+    [],
   );
 
   const setAllDetails = useCallback(
     (newDetails: ApplicationDetailsForm) => {
       setDetails(newDetails);
-      options?.onDetailsChange?.(newDetails);
+      optionsRef.current?.onDetailsChange?.(newDetails);
     },
-    [options],
+    [],
   );
 
   const resetDetails = useCallback(() => {
     const initial = createInitialDetails();
     setDetails(initial);
-    options?.onDetailsChange?.(initial);
-  }, [options]);
+    optionsRef.current?.onDetailsChange?.(initial);
+  }, []);
 
   return {
     details,

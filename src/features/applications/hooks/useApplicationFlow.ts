@@ -2,8 +2,10 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   useApplicationData,
@@ -89,21 +91,29 @@ export const useApplicationFlow = ({
     () => initialDraft?.screeningAnswers ?? {},
   );
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const createdCvId = searchParams.get("createdCvId");
+
   /**
-   * Đồng bộ lại state khi chuyển đổi giữa các Job IDs khác nhau.
+   * Đồng bộ lại state khi chuyển đổi giữa các Job IDs hoặc User IDs khác nhau.
+   * Dùng ref so sánh để không bị re-run vòng lặp vô hạn ở mỗi lần render.
    */
+  const prevContextRef = useRef({ jobId, userId });
   useEffect(() => {
-    const existingDraft = applicationDraftService.getDraft(userId, jobId);
-    if (existingDraft) {
-      setCurrentStep(existingDraft.currentStep);
-      setSelectedResumeId(existingDraft.selectedResumeId);
-      setAllDetails(existingDraft.details);
-      setScreeningAnswers(existingDraft.screeningAnswers);
-    } else {
-      setCurrentStep("resume");
-      setSelectedResumeId("");
-      resetDetails();
-      setScreeningAnswers({});
+    if (prevContextRef.current.jobId !== jobId || prevContextRef.current.userId !== userId) {
+      prevContextRef.current = { jobId, userId };
+      const existingDraft = applicationDraftService.getDraft(userId, jobId);
+      if (existingDraft) {
+        setCurrentStep(existingDraft.currentStep);
+        setSelectedResumeId(existingDraft.selectedResumeId);
+        setAllDetails(existingDraft.details);
+        setScreeningAnswers(existingDraft.screeningAnswers);
+      } else {
+        setCurrentStep("resume");
+        setSelectedResumeId("");
+        resetDetails();
+        setScreeningAnswers({});
+      }
     }
   }, [jobId, userId, resetDetails, setAllDetails]);
 
@@ -121,13 +131,22 @@ export const useApplicationFlow = ({
 
   /**
    * Khi danh sách CV sẵn sàng:
-   * - Giữ CV từ draft nếu hợp lệ
-   * - Nếu chưa có thì chọn CV default
-   * - Nếu không có default thì lấy CV đầu tiên
+   * 1. Ưu tiên createdCvId nếu vừa tạo CV mới thành công quay lại
+   * 2. Giữ CV hiện tại nếu hợp lệ trong danh sách
+   * 3. Giữ CV từ draft nếu hợp lệ trong danh sách
+   * 4. Mặc định chọn CV default hoặc CV đầu tiên
    */
   useEffect(() => {
     if (resumes.length === 0) {
       setSelectedResumeId("");
+      return;
+    }
+
+    if (createdCvId && resumes.some((resume) => resume.id === createdCvId)) {
+      setSelectedResumeId(createdCvId);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("createdCvId");
+      setSearchParams(nextParams, { replace: true });
       return;
     }
 
@@ -140,12 +159,17 @@ export const useApplicationFlow = ({
         return currentId;
       }
 
+      const draft = applicationDraftService.getDraft(userId, jobId);
+      if (draft?.selectedResumeId && resumes.some((resume) => resume.id === draft.selectedResumeId)) {
+        return draft.selectedResumeId;
+      }
+
       const defaultResume =
         resumes.find((resume) => resume.isDefault) ?? resumes[0];
 
       return defaultResume.id;
     });
-  }, [resumes]);
+  }, [resumes, createdCvId, searchParams, setSearchParams, userId, jobId]);
 
   const selectedResume = useMemo(
     () =>

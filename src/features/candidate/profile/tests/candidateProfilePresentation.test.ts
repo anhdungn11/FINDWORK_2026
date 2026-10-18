@@ -283,12 +283,12 @@ describe("Candidate Profile Production Preview Security (P0)", () => {
     assert.equal(errorResult.presentationState, "network_error");
     assert.equal(errorResult.showDevBanner, true);
 
-    // 8. No preview param in dev
+    // 8. No preview param in dev - dev banner must be hidden during normal account navigation
     const defaultDevResult = resolveCandidateProfilePageState({
       isDev: true,
       previewParam: null,
     });
     assert.equal(defaultDevResult.presentationState, "eligibility_unknown");
-    assert.equal(defaultDevResult.showDevBanner, true);
+    assert.equal(defaultDevResult.showDevBanner, false);
   });
 });

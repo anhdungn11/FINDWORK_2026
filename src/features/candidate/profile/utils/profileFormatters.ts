@@ -267,7 +267,7 @@ export function resolveCandidateProfilePageState({
     presentationState,
     activeProfile,
     activeDraft,
-    showDevBanner: true,
+    showDevBanner: Boolean(isDev && previewParam),
   };
 }
 

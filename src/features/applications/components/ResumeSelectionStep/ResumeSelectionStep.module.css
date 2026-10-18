@@ -32,6 +32,28 @@
   align-items: flex-start;
 }
 
+.headingActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.createLink {
+  padding: 9px 12px;
+  border: 1px solid #2563eb;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.createLink:hover {
+  background: #dbeafe;
+}
+
 .manageLink {
   padding: 9px 12px;
   border: 1px solid #cbd5e1;
