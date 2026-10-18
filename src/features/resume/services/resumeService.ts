@@ -146,13 +146,15 @@ const createUploadedVersion = (
 export function normalizeBackendResume(dto: BackendResumeDto): Resume {
   const latestVersion = dto.versions?.[0];
   const versionNumber = latestVersion?.versionNumber ?? 1;
+  const rawSourceType = String(dto.sourceType ?? "").toUpperCase();
+  const rawStatus = String(dto.status ?? "").toUpperCase();
 
   return {
     id: dto.id,
     name: dto.name,
-    sourceType: dto.sourceType === "BUILDER" ? "builder" : "uploaded",
+    sourceType: rawSourceType === "BUILDER" ? "builder" : "uploaded",
     isDefault: dto.isDefault ?? false,
-    status: dto.status === "READY" ? "ready" : dto.status === "FAILED" ? "failed" : "uploading",
+    status: rawStatus === "READY" ? "ready" : rawStatus === "FAILED" ? "failed" : "uploading",
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
     currentVersion: {

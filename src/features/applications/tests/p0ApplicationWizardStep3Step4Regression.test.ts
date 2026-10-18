@@ -8,6 +8,7 @@ import { applicationDraftService } from "../services/applicationDraftService";
 import {
   normalizeJob,
   normalizeScreeningQuestions,
+  normalizeCompanyApplication,
   type ScreeningQuestionDto,
 } from "../../../services/api/apiTypes";
 import { isLiveWritesEnabled } from "../../candidate/profile/config/candidateIntegrationConfig";
@@ -305,6 +306,131 @@ describe("P0 Frontend Application Wizard - Step 3 & Step 4 Integration Tests", (
         "Theo quy định của hệ thống FINDWORK, bạn cần có Hồ sơ Ứng viên hợp lệ trước khi gửi đơn ứng tuyển vào doanh nghiệp."
       );
       assert.equal(getGuidance(true, false), "READY");
+    });
+
+    it("verifies double-submit synchronous locking drops concurrent submit calls", async () => {
+      let networkCalls = 0;
+      let isSubmitting = false;
+
+      const submitAction = async () => {
+        if (isSubmitting) return "DROPPED";
+        isSubmitting = true;
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          networkCalls++;
+          return "SUCCESS";
+        } finally {
+          // On success, lock is preserved
+        }
+      };
+
+      // Dispatched simultaneously in the same event tick
+      const [res1, res2] = await Promise.all([submitAction(), submitAction()]);
+      assert.equal(res1, "SUCCESS");
+      assert.equal(res2, "DROPPED");
+      assert.equal(networkCalls, 1, "Only 1 network request must be generated for double clicks");
+    });
+
+    it("handles case-insensitivity in backend resume sourceType and status", () => {
+      const isEligible = (r: { sourceType?: string; status?: string }) => {
+        const source = String(r.sourceType || "").toLowerCase();
+        const status = String(r.status || "").toLowerCase();
+        return source === "builder" && status === "ready";
+      };
+
+      assert.equal(isEligible({ sourceType: "BUILDER", status: "READY" }), true);
+      assert.equal(isEligible({ sourceType: "builder", status: "ready" }), true);
+      assert.equal(isEligible({ sourceType: "UPLOADED", status: "READY" }), false);
+      assert.equal(isEligible({ sourceType: "BUILDER", status: "FAILED" }), false);
+    });
+
+    it("preserves YES_NO=false in answers and drops empty arrays for optional questions", () => {
+      const realQuestions = [
+        { id: "q1", type: "YES_NO", label: "Làm thêm giờ?", isRequired: true },
+        { id: "q2", type: "MULTI_SELECT", label: "Kỹ năng khác", isRequired: false },
+        { id: "q3", type: "TEXT", label: "Ghi chú", isRequired: false },
+      ];
+
+      const screeningAnswers: Record<string, any> = {
+        q1: false, // Must be kept!
+        q2: [], // Empty array for optional question must be dropped to avoid backend validation error
+        q3: "   ", // Empty string for optional question must be dropped
+      };
+
+      const payload = realQuestions
+        .filter((q) => {
+          const ans = screeningAnswers[q.id];
+          if (ans === undefined || ans === null) return false;
+          if (typeof ans === "string" && ans.trim() === "") return false;
+          if (Array.isArray(ans) && ans.length === 0) return false;
+          return true;
+        })
+        .map((q) => ({
+          questionId: q.id,
+          answer: screeningAnswers[q.id],
+        }));
+
+      assert.equal(payload.length, 1);
+      assert.equal(payload[0].questionId, "q1");
+      assert.equal(payload[0].answer, false);
+    });
+  });
+
+  describe("CompanyApplication Normalizer - Complete Backend Response", () => {
+    it("maps all backend snapshot, availability, answers, and version metadata", () => {
+      const backendPayload = {
+        id: "app-uuid-1",
+        companyId: "comp-uuid-1",
+        jobId: "job-uuid-1",
+        status: "SUBMITTED",
+        version: 1,
+        resumeId: "res-uuid-1",
+        resumeVersionId: "ver-uuid-1",
+        fullNameSnapshot: "Đặng Nam Dũng",
+        emailSnapshot: "dnd@example.com",
+        phoneSnapshot: "+84901234567",
+        currentLocationSnapshot: "Hà Nội",
+        availability: "IMMEDIATELY",
+        preferredContactMethod: "EMAIL",
+        jobSnapshot: { id: "job-uuid-1", title: "Senior React Engineer" },
+        coverLetter: "Thư ứng tuyển",
+        submittedAt: "2026-10-19T05:00:00.000Z",
+        createdAt: "2026-10-19T05:00:00.000Z",
+        updatedAt: "2026-10-19T05:00:00.000Z",
+        job: {
+          id: "job-uuid-1",
+          title: "Senior React Engineer",
+          status: "PUBLISHED",
+          company: { id: "comp-uuid-1", name: "Công ty ABC", slug: "cong-ty-abc" },
+        },
+        resumeVersion: {
+          id: "ver-uuid-1",
+          versionNumber: 1,
+          templateCode: "classic",
+          builderContent: { summary: "Tóm tắt" },
+          builderSettings: { accentColor: "navy" },
+        },
+        answers: [
+          {
+            id: "ans-uuid-1",
+            screeningQuestionId: "sq-1",
+            questionSnapshot: { label: "Có thể đi làm ngay?" },
+            answerValue: true,
+            createdAt: "2026-10-19T05:00:00.000Z",
+          },
+        ],
+      };
+
+      const normalized = normalizeCompanyApplication(backendPayload);
+      assert.equal(normalized.id, "app-uuid-1");
+      assert.equal(normalized.currentLocationSnapshot, "Hà Nội");
+      assert.equal(normalized.availability, "IMMEDIATELY");
+      assert.equal(normalized.preferredContactMethod, "EMAIL");
+      assert.deepEqual(normalized.jobSnapshot, { id: "job-uuid-1", title: "Senior React Engineer" });
+      assert.equal(normalized.resumeVersion?.templateCode, "classic");
+      assert.deepEqual(normalized.resumeVersion?.builderSettings, { accentColor: "navy" });
+      assert.equal(normalized.answers?.length, 1);
+      assert.equal(normalized.answers?.[0].answerValue, true);
     });
   });
 

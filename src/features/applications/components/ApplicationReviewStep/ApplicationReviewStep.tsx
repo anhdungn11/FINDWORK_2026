@@ -346,12 +346,6 @@ export const ApplicationReviewStep = ({
                   <div className={styles.qaAnswer}>{renderScreeningAnswer(q)}</div>
                 </div>
               ))}
-              {typeof screeningAnswers["notes"] === "string" && screeningAnswers["notes"].trim() && (
-                <div className={styles.qaItem}>
-                  <div className={styles.qaQuestion}>Ghi chú thêm cho nhà tuyển dụng:</div>
-                  <div className={styles.qaAnswer}>{screeningAnswers["notes"].trim()}</div>
-                </div>
-              )}
             </div>
           )}
         </div>

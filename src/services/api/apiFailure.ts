@@ -15,13 +15,15 @@ export class ApiFailure extends Error {
   readonly kind: ApiFailureKind;
   readonly status: number;
   readonly code: string;
+  readonly details?: unknown;
 
-  constructor(kind: ApiFailureKind, status: number, code: string, message: string) {
+  constructor(kind: ApiFailureKind, status: number, code: string, message: string, details?: unknown) {
     super(message);
     this.name = "ApiFailure";
     this.kind = kind;
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -53,15 +55,21 @@ export function toApiFailure(error: unknown): ApiFailure {
   if (axios.isAxiosError(error)) {
     if (!error.response) return new ApiFailure("network", 0, "NETWORK_ERROR", MESSAGES.network);
     const status = error.response.status;
-    const data = error.response.data as { code?: unknown; message?: unknown } | undefined;
+    const data = error.response.data as { code?: unknown; message?: unknown; details?: unknown } | undefined;
     const code = typeof data?.code === "string" ? data.code : kindFromStatus(status).toUpperCase();
     const kind = kindFromStatus(status);
-    // 400 giữ thông điệp từ server (validation) để người dùng sửa được; còn lại dùng thông điệp chuẩn.
-    const serverMessage = Array.isArray(data?.message)
-      ? (data?.message as unknown[]).filter((m): m is string => typeof m === "string").join(", ")
-      : typeof data?.message === "string" ? data.message : "";
-    const message = kind === "validation" && serverMessage ? serverMessage : MESSAGES[kind];
-    return new ApiFailure(kind, status, code, message);
+
+    let serverMessage = "";
+    if (Array.isArray(data?.details) && data.details.length > 0) {
+      serverMessage = data.details.filter((d): d is string => typeof d === "string").join(", ");
+    } else if (Array.isArray(data?.message) && data.message.length > 0) {
+      serverMessage = data.message.filter((m): m is string => typeof m === "string").join(", ");
+    } else if (typeof data?.message === "string" && data.message.trim()) {
+      serverMessage = data.message.trim();
+    }
+
+    const message = serverMessage || MESSAGES[kind];
+    return new ApiFailure(kind, status, code, message, data?.details);
   }
   return new ApiFailure("unknown", 0, "UNKNOWN", MESSAGES.unknown);
 }

@@ -147,6 +147,14 @@ export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
   WITHDRAWN: "Đã rút đơn",
 };
 
+export interface CompanyApplicationAnswerDto {
+  id: string;
+  screeningQuestionId: string;
+  questionSnapshot: unknown;
+  answerValue: unknown;
+  createdAt: string;
+}
+
 export interface CompanyApplicationDto {
   id: string;
   companyId: string;
@@ -158,12 +166,23 @@ export interface CompanyApplicationDto {
   fullNameSnapshot: string | null;
   emailSnapshot: string | null;
   phoneSnapshot: string | null;
+  currentLocationSnapshot?: string | null;
+  availability?: string | null;
+  preferredContactMethod?: string | null;
+  jobSnapshot?: unknown;
   coverLetter: string | null;
   submittedAt: string | null;
   createdAt: string;
   updatedAt: string;
   job?: { id: string; title: string; status: string; company?: { id: string; name: string; slug: string } };
-  resumeVersion?: { id: string; versionNumber: number; builderContent: unknown };
+  resumeVersion?: {
+    id: string;
+    versionNumber: number;
+    templateCode?: string | null;
+    builderContent?: unknown;
+    builderSettings?: unknown;
+  };
+  answers?: CompanyApplicationAnswerDto[];
 }
 
 type Raw = Record<string, unknown>;
@@ -337,6 +356,8 @@ export function normalizeCompanyApplication(value: unknown): CompanyApplicationD
   const j = obj(r.job);
   const jComp = obj(j.company);
   const rv = obj(r.resumeVersion);
+  const rawAnswers = Array.isArray(r.answers) ? r.answers : [];
+
   return {
     id: str(r.id) ?? "",
     companyId: str(r.companyId) ?? "",
@@ -348,6 +369,10 @@ export function normalizeCompanyApplication(value: unknown): CompanyApplicationD
     fullNameSnapshot: str(r.fullNameSnapshot),
     emailSnapshot: str(r.emailSnapshot),
     phoneSnapshot: str(r.phoneSnapshot),
+    currentLocationSnapshot: str(r.currentLocationSnapshot),
+    availability: str(r.availability),
+    preferredContactMethod: str(r.preferredContactMethod),
+    jobSnapshot: r.jobSnapshot,
     coverLetter: str(r.coverLetter),
     submittedAt: str(r.submittedAt),
     createdAt: str(r.createdAt) ?? "",
@@ -361,8 +386,20 @@ export function normalizeCompanyApplication(value: unknown): CompanyApplicationD
     resumeVersion: rv.id ? {
       id: str(rv.id) ?? "",
       versionNumber: num(rv.versionNumber) ?? 1,
+      templateCode: str(rv.templateCode),
       builderContent: rv.builderContent,
+      builderSettings: rv.builderSettings,
     } : undefined,
+    answers: rawAnswers.map((a: unknown) => {
+      const aObj = obj(a);
+      return {
+        id: str(aObj.id) ?? "",
+        screeningQuestionId: str(aObj.screeningQuestionId) ?? "",
+        questionSnapshot: aObj.questionSnapshot,
+        answerValue: aObj.answerValue,
+        createdAt: str(aObj.createdAt) ?? "",
+      };
+    }),
   };
 }
 

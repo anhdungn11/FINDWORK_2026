@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     Link,
     useParams,
@@ -402,12 +402,20 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
     }
   }, [selectedResume, prefillFromResume]);
 
+  const isSubmittingRef = useRef(false);
+
   const isSelectedResumeEligible = Boolean(
-    selectedResume && selectedResume.sourceType === "builder" && selectedResume.status === "ready"
+    selectedResume &&
+      String(selectedResume.sourceType || "").toLowerCase() === "builder" &&
+      String(selectedResume.status || "").toLowerCase() === "ready" &&
+      Boolean(selectedResume.currentVersion?.id)
   );
 
   const handleSelectResume = (r: Resume) => {
-    if (r.sourceType !== "builder" || r.status !== "ready") return;
+    const isEligible =
+      String(r.sourceType || "").toLowerCase() === "builder" &&
+      String(r.status || "").toLowerCase() === "ready";
+    if (!isEligible) return;
     setSelectedResumeId(r.id);
     setSelectedVersionId(r.currentVersion.id);
   };
@@ -432,10 +440,15 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
   }, [job?.screeningQuestions]);
 
   const handleSubmit = async () => {
-    if (submitting) return;
+    // 1. Chốt chặn synchronous lock: chống 2 click diễn ra trong cùng 1 tick event loop
+    if (isSubmittingRef.current) {
+      return;
+    }
+
     if (!isLiveWritesEnabled()) {
       return;
     }
+
     if (!selectedResumeId || !selectedVersionId) {
       setError("Vui lòng chọn một bản CV để ứng tuyển.");
       return;
@@ -458,14 +471,27 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
       return;
     }
 
+    // Khóa đồng bộ ngay lập tức trước khi chuyển sang await
+    isSubmittingRef.current = true;
     setSubmitting(true);
     setError(null);
+
     try {
+      // Chuẩn bị payload câu trả lời sàng lọc: chỉ gửi các câu hỏi thực sự có câu trả lời
+      // YES_NO: false vẫn là câu trả lời hợp lệ (boolean)
+      // MULTI_SELECT: mảng không rỗng
+      // TEXT / TEXTAREA / SELECT: chuỗi không rỗng
       const answersPayload = realQuestions
-        .filter((q) => screeningAnswers[q.id] !== undefined && screeningAnswers[q.id] !== "")
+        .filter((q) => {
+          const ans = screeningAnswers[q.id];
+          if (ans === undefined || ans === null) return false;
+          if (typeof ans === "string" && ans.trim() === "") return false;
+          if (Array.isArray(ans) && ans.length === 0) return false;
+          return true;
+        })
         .map((q) => ({
           questionId: q.id,
-          answer: screeningAnswers[q.id],
+          answer: typeof screeningAnswers[q.id] === "string" ? (screeningAnswers[q.id] as string).trim() : screeningAnswers[q.id],
         }));
 
       const res = await candidateApplicationApi.submit(jobId, {
@@ -485,26 +511,39 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
         answers: answersPayload.length > 0 ? answersPayload : undefined,
       });
 
-      // Xóa draft sau khi nộp thành công
+      // Chỉ xóa draft khi server trả về 201 thành công
       applicationDraftService.clearDraft(userId, jobId);
       setSubmittedApp(res);
       setStep("success");
+      // GIỮ NGUYÊN KHÓA isSubmittingRef.current = true: không cho phép resubmit đơn đã nộp thành công
     } catch (err: unknown) {
-      const apiErr = err as { status?: number; code?: string; message?: string };
-      if (apiErr.status === 409 || apiErr.code === "APPLICATION_DUPLICATE") {
-        setError("Bạn đã nộp đơn ứng tuyển cho vị trí này trước đó. Không thể gửi trùng lặp.");
-      } else if (apiErr.code === "JOB_UNAVAILABLE" || (apiErr.status === 409 && apiErr.message?.includes("Job"))) {
+      // Khi server trả lỗi, draft vẫn được giữ nguyên trong sessionStorage
+      isSubmittingRef.current = false;
+      const apiErr = err as { status?: number; code?: string; message?: string; details?: unknown };
+      const errCode = apiErr.code ?? "";
+      const status = apiErr.status ?? 0;
+
+      if (errCode === "APPLICATION_DUPLICATE" || (status === 409 && !errCode.includes("JOB"))) {
+        setError("Bạn đã nộp đơn ứng tuyển cho vị trí này trước đó. Vui lòng kiểm tra danh sách đơn đã nộp.");
+        isSubmittingRef.current = true; // Duplicate application: giữ khóa để tránh spam request trùng
+      } else if (errCode === "JOB_UNAVAILABLE" || (status === 409 && (errCode === "JOB_UNAVAILABLE" || apiErr.message?.includes("Job")))) {
         setError("Vị trí tuyển dụng này hiện không còn nhận hồ sơ ứng tuyển (đã đóng, tạm dừng hoặc hết hạn).");
-      } else if (apiErr.status === 404 && (apiErr.code === "CANDIDATE_PROFILE_NOT_FOUND" || apiErr.code === "NOT_FOUND")) {
+      } else if (status === 404 && (errCode === "CANDIDATE_PROFILE_NOT_FOUND" || errCode === "NOT_FOUND")) {
         setError("Không tìm thấy hồ sơ ứng viên hợp lệ trên hệ thống. Vui lòng hoàn tất hồ sơ cá nhân trước khi ứng tuyển.");
-      } else if (apiErr.code === "RESUME_UNAVAILABLE") {
+      } else if (errCode === "RESUME_UNAVAILABLE") {
         setError("Bản CV đã chọn không hợp lệ, chưa ở trạng thái sẵn sàng hoặc không thuộc quyền sở hữu của bạn.");
-      } else if (apiErr.code === "SCREENING_REQUIRED_ANSWER_MISSING") {
+      } else if (errCode === "SCREENING_REQUIRED_ANSWER_MISSING") {
         setError("Vui lòng trả lời đầy đủ các câu hỏi sàng lọc bắt buộc của nhà tuyển dụng.");
-      } else if (apiErr.status === 401) {
+      } else if (errCode === "SCREENING_ANSWER_INVALID" || errCode === "SCREENING_OPTION_INVALID") {
+        setError("Câu trả lời câu hỏi sàng lọc không hợp lệ hoặc không thuộc danh sách lựa chọn của nhà tuyển dụng.");
+      } else if (errCode === "SCREENING_QUESTION_INVALID") {
+        setError("Câu hỏi sàng lọc không hợp lệ hoặc không thuộc vị trí tuyển dụng này.");
+      } else if (status === 401 || errCode.startsWith("AUTH_")) {
         setError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.");
-      } else if (apiErr.status === 403) {
+      } else if (status === 403) {
         setError("Tài khoản của bạn không có quyền nộp đơn cho vị trí này.");
+      } else if (status === 0 || errCode === "NETWORK_ERROR") {
+        setError("Không thể kết nối tới máy chủ hoặc yêu cầu đã hết thời gian chờ. Đơn của bạn chưa được xác nhận, bản nháp vẫn được lưu an toàn. Vui lòng thử lại sau.");
       } else {
         setError(apiErr.message || "Gửi đơn ứng tuyển thất bại. Vui lòng thử lại sau.");
       }
@@ -709,7 +748,9 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
                 <div className={styles.resumeOptionList}>
                   {resumes.map((r) => {
                     const isSelected = r.id === selectedResumeId;
-                    const isEligible = r.sourceType === "builder" && r.status === "ready";
+                    const isEligible =
+                      String(r.sourceType || "").toLowerCase() === "builder" &&
+                      String(r.status || "").toLowerCase() === "ready";
                     return (
                       <label
                         key={r.id}
@@ -738,12 +779,12 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
                               </span>
                             ) : (
                               <span style={{ fontSize: 11, background: "#fee2e2", color: "#991b1b", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
-                                {r.sourceType !== "builder" ? "Chưa hỗ trợ tệp tải lên" : "Chưa hoàn tất"}
+                                {String(r.sourceType || "").toLowerCase() !== "builder" ? "Chưa hỗ trợ tệp tải lên" : "Chưa hoàn tất"}
                               </span>
                             )}
                           </div>
                           <div className={styles.resumeMeta}>
-                            <span>Loại: {r.sourceType === "builder" ? "Tạo trực tuyến (CV Builder)" : "File PDF tải lên"}</span>
+                            <span>Loại: {String(r.sourceType || "").toLowerCase() === "builder" ? "Tạo trực tuyến (CV Builder)" : "File PDF tải lên"}</span>
                             <span>Phiên bản: v{r.currentVersion.versionNumber}</span>
                             <span>Cập nhật: {new Date(r.updatedAt).toLocaleDateString("vi-VN")}</span>
                           </div>
@@ -758,7 +799,7 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
                   })}
                 </div>
 
-                {!resumes.some((r) => r.sourceType === "builder" && r.status === "ready") && (
+                {!resumes.some((r) => String(r.sourceType || "").toLowerCase() === "builder" && String(r.status || "").toLowerCase() === "ready") && (
                   <div className={`${styles.bannerNotice} ${styles.bannerWarning}`} style={{ marginTop: 12 }}>
                     <strong>Lưu ý:</strong> Tài khoản của bạn chưa có bản CV nào tạo trực tuyến (CV Builder) ở trạng thái sẵn sàng. Vui lòng bấm <strong>"+ Tạo CV mới"</strong> để tạo CV trước khi ứng tuyển.
                   </div>

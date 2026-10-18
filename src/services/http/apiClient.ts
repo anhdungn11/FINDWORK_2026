@@ -43,8 +43,11 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 export function extractApiErrorMessage(error: unknown, fallbackMessage = "Đã có lỗi xảy ra"): string {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiErrorResponse>;
+    const axiosError = error as AxiosError<ApiErrorResponse & { details?: unknown }>;
     const data = axiosError.response?.data;
+    if (Array.isArray(data?.details) && data.details.length > 0) {
+      return data.details.filter((d): d is string => typeof d === "string").join(", ");
+    }
     if (data?.message) {
       if (Array.isArray(data.message)) {
         return data.message.join(", ");
