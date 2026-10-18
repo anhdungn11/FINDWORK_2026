@@ -104,9 +104,11 @@ describe("submission recruitment workflow E2E", () => {
     await db.user.create({ data: { id, email, emailNormalized: email, passwordHash: "integration-test-only", status: "ACTIVE" } });
     users.push(id);
     const sessionId = randomUUID();
+    const now = Date.now();
     await db.authSession.create({ data: {
       id: sessionId, userId: id, refreshTokenHash: randomUUID(),
-      expiresAt: new Date(Date.now() + (expired ? -60_000 : 3_600_000)),
+      ...(expired ? { createdAt: new Date(now - 120_000) } : {}),
+      expiresAt: new Date(now + (expired ? -60_000 : 3_600_000)),
     } });
     return { id, email, token: await tokens.signAccessToken(id, sessionId) };
   }
@@ -311,7 +313,7 @@ describe("submission recruitment workflow E2E", () => {
       });
     const historyBeforeDuplicate = await db.applicationStatusHistory.count({ where: { applicationId } });
     await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
-      .set(bearer(candidate.token)).send({ resumeId, resumeVersionId: versionId, details: applicationDetails }).expect(409);
+      .set(bearer(candidate.token)).send(submission).expect(409);
     expect(await db.applicationStatusHistory.count({ where: { applicationId } })).toBe(historyBeforeDuplicate);
     await request(app.getHttpServer()).get(api(`/candidate/applications/${applicationId}`))
       .set(bearer(otherCandidate.token)).expect(404);
