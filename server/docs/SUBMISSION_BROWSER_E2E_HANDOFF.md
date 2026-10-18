@@ -2,6 +2,67 @@
 
 Source of truth: current Nest controllers, DTOs and services in `server/src`. Base path is `/api/v1`; IDs for Job, Company, Resume, ResumeVersion, Question and Application are UUID v4. The backend Submission workflow integration suite passed **1/1** against `findwork_test` after its fixture corrections. That suite uses an in-process Nest app. No real browser flow or browser fixture setup has been run.
 
+## HTTP runtime and browser routing (observed 2026-10-19)
+
+- The existing Backend at `http://127.0.0.1:3000/api/v1` is PID **29012**, started before the current build. Its live PostgreSQL connection was matched by TCP client port to `findwork_dev`. Health 200 on this process does **not** make it safe for browser writes.
+- A separate Backend test HTTP process was started from this worktree's current `server/dist/main.js` with `D:\DACSN\Find-Work\server\.env.test`: PID **2312**, `http://localhost:3001/api/v1`, `NODE_ENV=test`. It listens on `127.0.0.1:3001` only. Health and public Jobs GET returned 200. Its live TCP connection was matched to PostgreSQL `findwork_test` on `127.0.0.1:5432`; the test URL selects schema `public`. The public Jobs list was empty before fixture setup. This HTTP check did not create data. PIDs are observations, not permanent configuration.
+- The existing Vite process is on port **5176**. Its `vite.config.ts` proxies relative `/api/v1` to port **3000**, therefore this browser instance reaches `findwork_dev`. Do not use it for writes. The test Backend allows origin `http://localhost:5173` only: read-only preflight returned `Access-Control-Allow-Origin: http://localhost:5173` and credentials `true`; origins `http://localhost:5176` and `http://127.0.0.1:5173` had no allowed-origin header.
+- Use a dedicated Frontend Vite process at **`http://localhost:5173`** with `VITE_API_BASE_URL=http://localhost:3001/api/v1` set **before Vite starts**. Antigravity owns that process and the Frontend write gate. Use `localhost` for both browser and API so the HTTP-only, `SameSite=Lax` refresh cookie works with the Axios `withCredentials: true` client. A Vite restart is needed for a changed `VITE_API_BASE_URL`; setting it after startup does not reroute the current process.
+
+The test HTTP process above is currently running. If it is no longer running, start it in a **separate Backend terminal** from `D:\DACSN\Find-Work-Submission-Backend-MVP\server`; leave the dev process on 3000 untouched:
+
+```powershell
+$env:EMAIL_DELIVERY_MODE = 'disabled'
+$env:EMAIL_WORKER_ENABLED = 'false'
+$env:EMAIL_INVITATION_DELIVERY_ENABLED = 'false'
+node -r dotenv/config .\dist\main.js dotenv_config_path=D:\DACSN\Find-Work\server\.env.test dotenv_config_override=true
+```
+
+The test file sets `PORT=3001`, `API_PREFIX=api/v1`, `CORS_ORIGINS=http://localhost:5173` and the test DB URL. `dotenv_config_override=true` gives that file precedence over inherited dev values; the three email settings above prevent external delivery. `main.ts` binds `NODE_ENV=test` to `127.0.0.1` (other environments keep their existing bind behavior). `AppModule` starts no maintenance/email worker, and its Prisma startup hook only connects. Do not run worker entrypoints. Source inspection and startup/health confirmed no automatic database mutation, but this is not proof about future feature requests.
+
+Verify the running process, **not just its config file**:
+
+```powershell
+Invoke-WebRequest http://localhost:3001/api/v1/health -UseBasicParsing
+Invoke-WebRequest http://localhost:3001/api/v1/jobs -UseBasicParsing
+netstat -ano -p tcp | Select-String ':3001|:5432'
+```
+
+Find the PID listening on `127.0.0.1:3001`, then its established `127.0.0.1:<clientPort> -> 127.0.0.1:5432` connection in `netstat`. From `server`, run this **read-only** check immediately after a health GET; it obtains the current client port automatically:
+
+```powershell
+curl.exe --silent --output NUL http://localhost:3001/api/v1/health
+$listener = netstat -ano -p tcp | Select-String '^\s*TCP\s+127\.0\.0\.1:3001\s+0\.0\.0\.0:0\s+LISTENING\s+(\d+)' | Select-Object -First 1
+if (-not $listener) { throw 'No loopback test HTTP listener.' }
+$testHttpPid = [int]$listener.Matches[0].Groups[1].Value
+$pgLine = netstat -ano -p tcp | Select-String ("^\s*TCP\s+127\.0\.0\.1:(\d+)\s+127\.0\.0\.1:5432\s+ESTABLISHED\s+" + $testHttpPid + "\s*$") | Select-Object -First 1
+if (-not $pgLine) { throw 'No PostgreSQL connection from test HTTP process; retry immediately after health GET.' }
+$dbClientPort = [int]$pgLine.Matches[0].Groups[1].Value
+$readOnlyCheck = @'
+const {parse} = require('dotenv');
+const {readFileSync} = require('fs');
+const {Client} = require('pg');
+(async () => {
+  const env = parse(readFileSync(process.argv[2]));
+  const client = new Client({connectionString: env.DATABASE_URL});
+  await client.connect();
+  try {
+    const own = await client.query('SELECT current_database() AS db, current_schema() AS schema, inet_server_addr()::text AS host, inet_server_port() AS port');
+    const runtime = await client.query('SELECT datname, client_addr::text AS host, client_port FROM pg_stat_activity WHERE client_port = $1', [Number(process.argv[3])]);
+    console.log(JSON.stringify({testConnection: own.rows[0], httpProcessConnection: runtime.rows}));
+    if (own.rows[0].db !== 'findwork_test' || own.rows[0].schema !== 'public' || own.rows[0].port !== 5432 ||
+        !own.rows[0].host.startsWith('127.0.0.1') || runtime.rows.length !== 1 ||
+        runtime.rows[0].datname !== 'findwork_test' || !runtime.rows[0].host.startsWith('127.0.0.1')) process.exitCode = 1;
+  } finally { await client.end(); }
+})().catch(() => { console.error('Database identity check failed.'); process.exitCode = 1; });
+'@
+$readOnlyCheck | node - D:\DACSN\Find-Work\server\.env.test $dbClientPort
+```
+
+Stop if the check fails, if the HTTP port is occupied by another process, or if the Node process's TCP client port does not match the row queried above. Health reports only `database: up`; it does not expose the DB name. The client port changes when the process reconnects.
+
+After approved fixture setup, retain its output `runId`, `jobId`, `companyId`, `resumeId`, `resumeVersionId`, question IDs and two login emails. The passwords stay with the operator. Confirm `GET http://localhost:3001/api/v1/jobs/<jobId>` returns a PUBLISHED UUID Job with five questions. After an approved browser submission, require POST HTTP 201 with an Application UUID; verify persistence through authenticated `GET /api/v1/candidate/applications/:applicationId` and recruiter `GET /api/v1/companies/:companyId/jobs/:jobId/applications/:applicationId`, including saved answers and snapshots. A success screen alone is insufficient. Run the scoped cleanup below with the **same run ID** only after browser activity stops. If setup fails partway, keep that run ID, inspect the partial records and use the same scoped cleanup; if cleanup refuses an external reference, stop for manual review rather than deleting broadly.
+
 ## Before opening the browser
 
 - Confirm the **running Backend used by the browser** connects to `findwork_test` on `127.0.0.1:5432/public`. The fixture CLI checks its own connection, but cannot prove the already running server uses that database. Do not infer this from a matching API URL.

@@ -19,6 +19,7 @@ async function bootstrap(): Promise<void> {
   const apiPrefix = config.getOrThrow<string>("API_PREFIX");
   const corsOrigins = config.getOrThrow<string[]>("CORS_ORIGINS");
   const port = config.getOrThrow<number>("PORT");
+  const nodeEnv = config.getOrThrow<string>("NODE_ENV");
 
   app.enableShutdownHooks();
   app.setGlobalPrefix(apiPrefix);
@@ -59,7 +60,11 @@ async function bootstrap(): Promise<void> {
     useGlobalPrefix: true,
   });
 
-  await app.listen(port);
+  if (nodeEnv === "test") {
+    await app.listen(port, "127.0.0.1");
+  } else {
+    await app.listen(port);
+  }
 }
 
 void bootstrap();
