@@ -22,7 +22,7 @@ export class AdminService {
     const [users, activeUsers, companies, activeCompanies, pendingCompanies, jobs, publishedJobs, applications] = await Promise.all([
       this.db.user.count(), this.db.user.count({ where: { status: "ACTIVE" } }),
       this.db.company.count(), this.db.company.count({ where: { status: "ACTIVE" } }),
-      this.db.company.count({ where: { verificationStatus: "PENDING" } }),
+      this.db.company.count({ where: { status: "ACTIVE", verificationStatus: "PENDING" } }),
       this.db.job.count(), this.db.job.count({ where: { status: "PUBLISHED" } }),
       this.db.application.count(),
     ]);

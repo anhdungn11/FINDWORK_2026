@@ -82,6 +82,14 @@ describe("platform admin MVP security", () => {
     }));
   });
 
+  it("does not audit a verification decision after a competing state change", async () => {
+    const { tx, db } = fakeDb();
+    tx.company.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(new AdminService(db as never).setCompanyVerification(actorId, companyId, "REJECTED"))
+      .rejects.toMatchObject({ status: 409 });
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
   it("rejects self status mutation before opening a transaction", async () => {
     const { db } = fakeDb();
     await expect(new AdminService(db as never).setUserStatus(actorId, actorId, "SUSPENDED")).rejects.toMatchObject({ status: 403 });
