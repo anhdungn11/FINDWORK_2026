@@ -54,6 +54,19 @@ export class CompanyProfileLocationsController {
     return this.service.updateProfile(companyId, auth.userId, dto);
   }
 
+  @Post("verification-request")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Submit the company's legal profile for administrative verification" })
+  @RequireCompanyPermissions("company.update")
+  requestVerification(
+    @Param("companyId", ParseUUIDPipe) companyId: string,
+    @CurrentAuth() auth: AuthenticatedPrincipal,
+    @Req() req: CompanyAuthorizedRequest,
+  ) {
+    this.requireCompanyWide(req, "company.update");
+    return this.service.requestVerification(companyId, auth.userId);
+  }
+
   @Get("locations")
   @ApiOperation({ summary: "List company locations" })
   @RequireCompanyPermissions("company.view")

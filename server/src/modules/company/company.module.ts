@@ -13,17 +13,21 @@ import { CompanyInvitationsController, CompanyInvitationAcceptanceController } f
 import { CompanyInvitationsService } from "./company-invitations.service";
 import { CompanyInvitationsRepository } from "./company-invitations.repository";
 import { CompanyInvitationDeliveryService } from "./company-invitation-delivery.service";
+import { CompanyMembersController } from "./company-members.controller";
+import { CompanyMembersService } from "./company-members.service";
 
 @Module({
   imports: [AuthModule, AuthorizationModule, PrismaModule, EmailDeliveryModule],
   controllers: [
     CompanyController, CompanyProfileLocationsController,
     CompanyInvitationsController, CompanyInvitationAcceptanceController,
+    CompanyMembersController,
   ],
   providers: [
     CompanyRepository, CompanyService,
     CompanyProfileLocationsRepository, CompanyProfileLocationsService,
     CompanyInvitationsRepository, CompanyInvitationsService, CompanyInvitationDeliveryService,
+    CompanyMembersService,
   ],
 })
 export class CompanyModule {}

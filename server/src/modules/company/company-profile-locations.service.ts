@@ -12,6 +12,9 @@ export class CompanyProfileLocationsService {
   updateProfile(companyId: string, actorUserId: string, dto: UpdateCompanyProfileDto) {
     return this.repo.updateProfile(companyId, actorUserId, dto);
   }
+  requestVerification(companyId: string, actorUserId: string) {
+    return this.repo.requestVerification(companyId, actorUserId);
+  }
   listLocations(companyId: string) { return this.repo.listLocations(companyId); }
   getLocation(companyId: string, locationId: string) {
     return this.repo.getLocation(companyId, locationId);

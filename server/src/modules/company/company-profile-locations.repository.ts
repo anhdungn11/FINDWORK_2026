@@ -204,6 +204,33 @@ export class CompanyProfileLocationsRepository {
     });
   }
 
+  async requestVerification(companyId: string, actorUserId: string) {
+    return this.mutate(companyId, actorUserId, async (tx) => {
+      const current = await tx.company.findUniqueOrThrow({
+        where: { id: companyId },
+        select: { verificationStatus: true, legalName: true, taxCode: true },
+      });
+      if (current.verificationStatus !== "UNVERIFIED" && current.verificationStatus !== "REJECTED") {
+        throw conflict("COMPANY_VERIFICATION_STATE_CONFLICT", "Company verification is already pending or complete.");
+      }
+      if (!current.legalName || !current.taxCode) {
+        throw badRequest("COMPANY_VERIFICATION_PROFILE_INCOMPLETE", "Legal name and tax code are required for review.");
+      }
+      const changed = await tx.company.updateMany({
+        where: { id: companyId, verificationStatus: current.verificationStatus, status: "ACTIVE" },
+        data: { verificationStatus: "PENDING", verifiedAt: null },
+      });
+      if (changed.count !== 1) throw conflict("COMPANY_VERIFICATION_STATE_CONFLICT", "Company verification state changed.");
+      await tx.auditLog.create({ data: {
+        actorUserId, companyId, action: "company.verification.request",
+        targetType: "Company", targetId: companyId,
+        beforeData: { verificationStatus: current.verificationStatus },
+        afterData: { verificationStatus: "PENDING" },
+      } });
+      return tx.company.findUniqueOrThrow({ where: { id: companyId }, select: profileSelect });
+    });
+  }
+
   private async validateLocation(
     tx: Prisma.TransactionClient,
     input: LocationValues,
