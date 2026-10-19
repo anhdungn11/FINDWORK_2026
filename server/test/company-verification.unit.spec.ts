@@ -59,4 +59,18 @@ describe("company verification request", () => {
     await expect(repo.requestVerification(companyId, actorUserId)).rejects.toMatchObject({ status: 403 });
     expect(tx.company.updateMany).not.toHaveBeenCalled();
   });
+
+  it("does not audit a verification request when its compare-and-swap loses", async () => {
+    const { tx, repo } = fixture("REJECTED");
+    tx.company.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(repo.requestVerification(companyId, actorUserId)).rejects.toMatchObject({ status: 409 });
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("does not audit a verification request when its compare-and-swap loses", async () => {
+    const { tx, repo } = fixture("REJECTED");
+    tx.company.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(repo.requestVerification(companyId, actorUserId)).rejects.toMatchObject({ status: 409 });
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
 });

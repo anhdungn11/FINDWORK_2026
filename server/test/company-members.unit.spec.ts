@@ -106,4 +106,22 @@ describe("company member management", () => {
     await expect(other.service.transferOwnership(companyId, actorId, memberId)).rejects.toMatchObject({ status: 404 });
     expect(other.tx.companyMember.updateMany).not.toHaveBeenCalled();
   });
+
+  it("stops a stale ownership transfer before role or audit writes", async () => {
+    const { tx, service } = fixture();
+    tx.companyMember.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    await expect(service.transferOwnership(companyId, actorId, memberId)).rejects.toMatchObject({ status: 409 });
+    expect(tx.companyMemberRole.deleteMany).not.toHaveBeenCalled();
+    expect(tx.companyMemberRole.createMany).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("stops a stale ownership transfer before role or audit writes", async () => {
+    const { tx, service } = fixture();
+    tx.companyMember.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    await expect(service.transferOwnership(companyId, actorId, memberId)).rejects.toMatchObject({ status: 409 });
+    expect(tx.companyMemberRole.deleteMany).not.toHaveBeenCalled();
+    expect(tx.companyMemberRole.createMany).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
 });

@@ -368,17 +368,31 @@ describe("Phase 4.3A Company Foundation integration", () => {
     const membersPath = `${API}/${companyId}/members`;
     await request(app.getHttpServer()).get(membersPath)
       .set("Authorization", `Bearer ${outsider.accessToken}`).expect(403);
+    await request(app.getHttpServer()).patch(`${membersPath}/${member.id}/role`)
+      .set("Authorization", `Bearer ${outsider.accessToken}`)
+      .send({ role: "ADMIN" }).expect(403);
+    await request(app.getHttpServer()).delete(`${membersPath}/${member.id}`)
+      .set("Authorization", `Bearer ${outsider.accessToken}`).expect(403);
     await request(app.getHttpServer()).get(membersPath)
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(200)
       .expect((r) => expect(r.body.data).toHaveLength(2));
     await request(app.getHttpServer()).patch(`${membersPath}/${member.id}/role`)
       .set("Authorization", `Bearer ${peer.accessToken}`)
       .send({ role: "RECRUITER" }).expect(403);
+    await request(app.getHttpServer()).post(`${membersPath}/ownership-transfer`)
+      .set("Authorization", `Bearer ${peer.accessToken}`)
+      .send({ memberId: member.id }).expect(403);
     await request(app.getHttpServer()).patch(`${membersPath}/${member.id}/role`)
       .set("Authorization", `Bearer ${owner.accessToken}`)
       .send({ role: "RECRUITER" }).expect(200);
     expect((await prisma.companyMemberRole.findMany({ where: { companyMemberId: member.id },
       select: { role: { select: { name: true } } } })).map((row) => row.role.name)).toEqual(["RECRUITER"]);
+    await request(app.getHttpServer()).patch(`${membersPath}/${member.id}/role`)
+      .set("Authorization", `Bearer ${peer.accessToken}`)
+      .send({ role: "ADMIN" }).expect(403);
+    await request(app.getHttpServer()).post(`${membersPath}/ownership-transfer`)
+      .set("Authorization", `Bearer ${peer.accessToken}`)
+      .send({ memberId: member.id }).expect(403);
 
     await request(app.getHttpServer()).post(`${API}/${companyId}/verification-request`)
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(400);
@@ -388,6 +402,13 @@ describe("Phase 4.3A Company Foundation integration", () => {
     await request(app.getHttpServer()).post(`${API}/${companyId}/verification-request`)
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(200)
       .expect((r) => expect(r.body.verificationStatus).toBe("PENDING"));
+    await request(app.getHttpServer()).post(`${API}/${companyId}/verification-request`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(409);
+    await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${companyId}/verification`)
+      .send({ status: "VERIFIED" }).expect(401);
+    await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${companyId}/verification`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ status: "VERIFIED" }).expect(403);
     const verificationRole = await prisma.role.findFirstOrThrow({
       where: { kind: "SYSTEM", systemCode: "VERIFICATION_ADMIN", isActive: true }, select: { id: true },
     });
@@ -398,6 +419,9 @@ describe("Phase 4.3A Company Foundation integration", () => {
     await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${companyId}/verification`)
       .set("Authorization", `Bearer ${reviewer.accessToken}`)
       .send({ status: "VERIFIED" }).expect(200);
+    await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${companyId}/verification`)
+      .set("Authorization", `Bearer ${reviewer.accessToken}`)
+      .send({ status: "REJECTED" }).expect(409);
     await request(app.getHttpServer()).get(`${API}/${companyId}`).expect(200)
       .expect((r) => expect(r.body.isVerified).toBe(true));
 
@@ -405,6 +429,8 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(200);
     expect((await prisma.companyMember.findUniqueOrThrow({ where: { id: member.id } })).status).toBe("REMOVED");
     expect((await authorizationService.resolveRequiredCompanyPermissions(peer.id, companyId, ["company.view"])).allowed).toBe(false);
+    await request(app.getHttpServer()).get(`${API}/${companyId}/profile`)
+      .set("Authorization", `Bearer ${peer.accessToken}`).expect(403);
     expect(await prisma.auditLog.count({ where: { companyId, action: { in: [
       "company.member.role.update", "company.verification.request", "admin.company.verify", "company.member.remove",
     ] } } })).toBe(4);
@@ -431,6 +457,22 @@ describe("Phase 4.3A Company Foundation integration", () => {
     await request(app.getHttpServer()).post(transfer)
       .set("Authorization", `Bearer ${outsider.accessToken}`)
       .send({ memberId: member.id }).expect(403);
+    const outsideCompany = await request(app.getHttpServer()).post(API)
+      .set("Authorization", `Bearer ${outsider.accessToken}`)
+      .send({ name: "Transfer Other", slug: slug("transfer-other") }).expect(201);
+    const outsideMember = await prisma.companyMember.findFirstOrThrow({
+      where: { companyId: outsideCompany.body.id, userId: outsider.id }, select: { id: true },
+    });
+    await request(app.getHttpServer()).post(transfer)
+      .set("Authorization", `Bearer ${original.accessToken}`)
+      .send({ memberId: outsideMember.id }).expect(404);
+    const inactive = await createAuthenticatedUser("transfer-inactive");
+    const inactiveMember = await prisma.companyMember.create({
+      data: { companyId, userId: inactive.id, status: "INACTIVE" }, select: { id: true },
+    });
+    await request(app.getHttpServer()).post(transfer)
+      .set("Authorization", `Bearer ${original.accessToken}`)
+      .send({ memberId: inactiveMember.id }).expect(404);
     await request(app.getHttpServer()).post(transfer)
       .set("Authorization", `Bearer ${original.accessToken}`)
       .send({ memberId: member.id }).expect(200)
@@ -442,9 +484,46 @@ describe("Phase 4.3A Company Foundation integration", () => {
     expect((await authorizationService.resolveRequiredCompanyPermissions(
       original.id, companyId, ["company.ownership.transfer"],
     )).allowed).toBe(false);
+    await request(app.getHttpServer()).post(transfer)
+      .set("Authorization", `Bearer ${original.accessToken}`)
+      .send({ memberId: member.id }).expect(403);
     expect((await authorizationService.resolveRequiredCompanyPermissions(
       successor.id, companyId, ["company.ownership.transfer"],
     )).allowed).toBe(true);
+    expect(await prisma.auditLog.count({ where: { companyId, action: "company.ownership.transfer" } })).toBe(1);
+  });
+
+  it("serializes competing ownership transfers and leaves one owner", async () => {
+    const original = await createAuthenticatedUser("race-original");
+    const nextA = await createAuthenticatedUser("race-a");
+    const nextB = await createAuthenticatedUser("race-b");
+    const created = await request(app.getHttpServer()).post(API)
+      .set("Authorization", `Bearer ${original.accessToken}`)
+      .send({ name: "Race Company", slug: slug("race") }).expect(201);
+    const companyId = created.body.id as string;
+    const viewer = await prisma.role.findFirstOrThrow({
+      where: { companyId, normalizedName: "viewer" }, select: { id: true },
+    });
+    const targets: string[] = [];
+    for (const user of [nextA, nextB]) {
+      const member = await prisma.companyMember.create({
+        data: { companyId, userId: user.id, status: "ACTIVE" }, select: { id: true },
+      });
+      targets.push(member.id);
+      await prisma.companyMemberRole.create({ data: {
+        companyId, companyMemberId: member.id, roleId: viewer.id, assignedByUserId: original.id,
+      } });
+    }
+    const transfer = `${API}/${companyId}/members/ownership-transfer`;
+    const results = await Promise.all(targets.map((memberId) => request(app.getHttpServer())
+      .post(transfer).set("Authorization", `Bearer ${original.accessToken}`).send({ memberId })));
+    expect(results.filter((result) => result.status === 200)).toHaveLength(1);
+    expect(results.filter((result) => result.status === 403 || result.status === 409)).toHaveLength(1);
+    const owner = await prisma.companyMember.findMany({
+      where: { companyId, isOwner: true, status: "ACTIVE" }, select: { id: true },
+    });
+    expect(owner).toHaveLength(1);
+    expect(targets).toContain(owner[0]?.id);
     expect(await prisma.auditLog.count({ where: { companyId, action: "company.ownership.transfer" } })).toBe(1);
   });
 });
