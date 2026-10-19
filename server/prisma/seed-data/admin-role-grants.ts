@@ -1,9 +1,14 @@
 import { SYSTEM_ROLES } from "./system-roles";
 
 export const ADMIN_ROLE_CODES = ["USER_ADMIN", "AUDIT_VIEWER"] as const;
+const APPROVED_GRANTS: Record<(typeof ADMIN_ROLE_CODES)[number], string[]> = {
+  USER_ADMIN: ["user.view:SYSTEM", "user.update:SYSTEM"],
+  AUDIT_VIEWER: ["audit.view:SYSTEM"],
+};
 export const ADMIN_ROLE_DEFINITIONS = ADMIN_ROLE_CODES.map((code) => {
   const role = SYSTEM_ROLES.find((item) => item.systemCode === code);
-  if (!role || !role.isProtected || role.permissions.some((grant) => grant.scope !== "SYSTEM")) {
+  const actual = role?.permissions.map((grant) => `${grant.code}:${grant.scope}`).sort();
+  if (!role || !role.isProtected || JSON.stringify(actual) !== JSON.stringify([...APPROVED_GRANTS[code]].sort())) {
     throw new Error(`Invalid scoped admin role definition: ${code}`);
   }
   return role;
