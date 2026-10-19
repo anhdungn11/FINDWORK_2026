@@ -6,6 +6,8 @@
   },
   "include": [
     "prisma/seed-reference-foundation.ts",
+    "prisma/apply-admin-role-grants.ts",
+    "prisma/seed-data/admin-role-grants.ts",
     "prisma/seed-data/reference-foundation.ts",
     "prisma/seed-data/build-reference-snapshot.ts",
     "prisma/seed-data/vietnam-administrative-2026.ts"
