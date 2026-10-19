@@ -5,6 +5,7 @@ import {
   CANDIDATE_PROFILE_INTEGRATION_FLAGS,
   setLiveWritesEnabledForTesting,
 } from "../../candidate/profile/config/candidateIntegrationConfig";
+import { formatAvailability, formatContactMethod } from "../../../services/api/apiTypes";
 
 describe("P0 Backend Error Codes & Application Submit Lifecycle Regression", () => {
   describe("P0-B: Backend Error Code Accuracy", () => {
@@ -39,6 +40,27 @@ describe("P0 Backend Error Codes & Application Submit Lifecycle Regression", () 
       assert.equal(formatLocation("   "), undefined);
       assert.equal(formatLocation("Hà Nội"), "Hà Nội");
       assert.equal(formatLocation("  Hồ Chí Minh  "), "Hồ Chí Minh");
+    });
+
+    it("verifies formatAvailability and formatContactMethod map backend enums accurately", () => {
+      assert.equal(formatAvailability("IMMEDIATELY"), "Có thể đi làm ngay");
+      assert.equal(formatAvailability("immediately"), "Có thể đi làm ngay");
+      assert.equal(formatAvailability("WITHIN_1_WEEK"), "Trong vòng 1 tuần");
+      assert.equal(formatAvailability("within-1-week"), "Trong vòng 1 tuần");
+      assert.equal(formatAvailability("WITHIN_2_WEEKS"), "Trong vòng 2 tuần");
+      assert.equal(formatAvailability("within-2-weeks"), "Trong vòng 2 tuần");
+      assert.equal(formatAvailability("WITHIN_1_MONTH"), "Trong vòng 1 tháng");
+      assert.equal(formatAvailability("within-1-month"), "Trong vòng 1 tháng");
+      assert.equal(formatAvailability("NEGOTIABLE"), "Thương lượng");
+      assert.equal(formatAvailability("negotiable"), "Thương lượng");
+      assert.equal(formatAvailability(null), "—");
+      assert.equal(formatAvailability(undefined), "—");
+
+      assert.equal(formatContactMethod("EMAIL"), "Email");
+      assert.equal(formatContactMethod("email"), "Email");
+      assert.equal(formatContactMethod("PHONE"), "Điện thoại");
+      assert.equal(formatContactMethod("phone"), "Điện thoại");
+      assert.equal(formatContactMethod(null), "—");
     });
   });
 

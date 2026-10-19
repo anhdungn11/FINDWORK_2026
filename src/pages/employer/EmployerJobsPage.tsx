@@ -82,6 +82,7 @@ const EmployerJobsPage = () => {
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {canEditJob(job.status) && <Link className={ui.btn} to={`/employer/jobs/${job.id}/edit`}>Sửa</Link>}
+                        <Link className={ui.btn} to={`/employer/applicants?jobId=${job.id}`}>Ứng viên</Link>
                         {availableTransitions(job.status).map((a) => (
                           <button key={a} type="button" className={ui.btn} disabled={!writes || busyId === job.id} aria-disabled={!writes}
                             title={writes ? undefined : "Thao tác ghi đang tắt"} onClick={() => transition(job, a)}>

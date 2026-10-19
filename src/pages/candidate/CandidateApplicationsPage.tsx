@@ -4,6 +4,8 @@ import { Briefcase, Calendar, ArrowRight, FileText, CheckCircle2 } from "lucide-
 import { candidateApplicationApi } from "@/services/api/candidateApplicationApi";
 import {
   APPLICATION_STATUS_LABEL,
+  formatAvailability,
+  formatContactMethod,
   type ApplicationStatus,
   type CompanyApplicationDto,
   type Paged,
@@ -197,8 +199,50 @@ const CandidateApplicationsPage = () => {
                     <span>Số điện thoại:</span>
                     <strong>{selectedApp.phoneSnapshot || "Chưa cập nhật"}</strong>
                   </div>
+                  <div>
+                    <span>Địa điểm hiện tại:</span>
+                    <strong>{selectedApp.currentLocationSnapshot || "Chưa cập nhật"}</strong>
+                  </div>
+                  <div>
+                    <span>Thời gian bắt đầu:</span>
+                    <strong>{formatAvailability(selectedApp.availability)}</strong>
+                  </div>
+                  <div>
+                    <span>Phương thức liên hệ:</span>
+                    <strong>{formatContactMethod(selectedApp.preferredContactMethod)}</strong>
+                  </div>
                 </div>
               </div>
+
+              {selectedApp.answers && selectedApp.answers.length > 0 && (
+                <div className={styles.detailSection}>
+                  <h4>Câu hỏi sàng lọc đã trả lời</h4>
+                  <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
+                    {selectedApp.answers.map((ans, idx) => {
+                      const qSnap = ans.questionSnapshot as { label?: string; type?: string } | undefined;
+                      const qLabel = qSnap?.label || `Câu hỏi ${idx + 1}`;
+                      let answerText = "—";
+                      if (typeof ans.answerValue === "boolean") {
+                        answerText = ans.answerValue ? "Có" : "Không";
+                      } else if (Array.isArray(ans.answerValue)) {
+                        answerText = ans.answerValue.join(", ");
+                      } else if (ans.answerValue !== undefined && ans.answerValue !== null) {
+                        answerText = String(ans.answerValue);
+                      }
+                      return (
+                        <div key={ans.id || idx} style={{ borderBottom: "1px solid var(--color-border, #e2e8f0)", paddingBottom: 8 }}>
+                          <div style={{ fontWeight: 600, fontSize: "0.875rem", marginBottom: 4 }}>
+                            {idx + 1}. {qLabel}
+                          </div>
+                          <div style={{ color: "var(--color-text-secondary, #475569)", fontSize: "0.875rem" }}>
+                            {answerText}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {selectedApp.coverLetter && (
                 <div className={styles.detailSection}>

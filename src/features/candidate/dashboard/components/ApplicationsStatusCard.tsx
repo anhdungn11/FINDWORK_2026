@@ -1,10 +1,30 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Bookmark, Briefcase, Info, Send } from "lucide-react";
 import { useSavedJobs } from "@/features/candidate/savedJobs/useSavedJobs";
+import { candidateApplicationApi } from "@/services/api/candidateApplicationApi";
 import styles from "../styles/CandidateDashboard.module.css";
 
 export const ApplicationsStatusCard = () => {
   const { savedCount } = useSavedJobs();
+  const [appCount, setAppCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    candidateApplicationApi
+      .list({ page: 1, pageSize: 1 })
+      .then((res) => {
+        if (active && res?.pagination?.total !== undefined) {
+          setAppCount(res.pagination.total);
+        }
+      })
+      .catch(() => {
+        // Fallback gracefully without breaking UI
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <article className={styles.card} aria-labelledby="applications-status-title">
@@ -44,7 +64,7 @@ export const ApplicationsStatusCard = () => {
 
           <Link to="/candidate/applications" className={styles.buttonSecondary} style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
             <Send size={16} aria-hidden="true" />
-            Lịch sử ứng tuyển
+            Lịch sử ứng tuyển {appCount !== null ? `(${appCount})` : ""}
           </Link>
 
           <Link to="/jobs" className={styles.buttonSecondary} style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>

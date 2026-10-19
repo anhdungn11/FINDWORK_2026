@@ -147,6 +147,28 @@ export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
   WITHDRAWN: "Đã rút đơn",
 };
 
+export const formatAvailability = (val?: string | null): string => {
+  if (!val) return "—";
+  const normalized = val.toUpperCase().replaceAll("-", "_");
+  const map: Record<string, string> = {
+    IMMEDIATELY: "Có thể đi làm ngay",
+    WITHIN_1_WEEK: "Trong vòng 1 tuần",
+    WITHIN_2_WEEKS: "Trong vòng 2 tuần",
+    WITHIN_1_MONTH: "Trong vòng 1 tháng",
+    NEGOTIABLE: "Thương lượng",
+  };
+  return map[normalized] || val;
+};
+
+export const formatContactMethod = (val?: string | null): string => {
+  if (!val) return "—";
+  const normalized = val.toUpperCase();
+  if (normalized === "EMAIL") return "Email";
+  if (normalized === "PHONE") return "Điện thoại";
+  return val;
+};
+
+
 export interface CompanyApplicationAnswerDto {
   id: string;
   screeningQuestionId: string;

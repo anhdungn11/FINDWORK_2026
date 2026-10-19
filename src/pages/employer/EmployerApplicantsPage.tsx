@@ -18,6 +18,8 @@ import {
 } from "@/services/api/companyWorkspaceApi";
 import {
   APPLICATION_STATUS_LABEL,
+  formatAvailability,
+  formatContactMethod,
   type ApplicationReviewStatus,
   type CompanyApplicationDto,
 } from "@/services/api/apiTypes";
@@ -335,12 +337,21 @@ const EmployerApplicantsPage = () => {
             </div>
 
             <div style={{ display: "grid", gap: 16 }}>
-              <Card title="Thông tin liên hệ">
+              <Card title="Thông tin liên hệ & Làm việc">
                 <p style={{ margin: "0 0 6px" }}>
                   <strong>Email:</strong> {activeApplication.emailSnapshot || "—"}
                 </p>
                 <p style={{ margin: "0 0 6px" }}>
                   <strong>Số điện thoại:</strong> {activeApplication.phoneSnapshot || "—"}
+                </p>
+                <p style={{ margin: "0 0 6px" }}>
+                  <strong>Địa điểm hiện tại:</strong> {activeApplication.currentLocationSnapshot || "—"}
+                </p>
+                <p style={{ margin: "0 0 6px" }}>
+                  <strong>Thời gian bắt đầu:</strong> {formatAvailability(activeApplication.availability)}
+                </p>
+                <p style={{ margin: "0 0 6px" }}>
+                  <strong>Phương thức liên hệ ưu tiên:</strong> {formatContactMethod(activeApplication.preferredContactMethod)}
                 </p>
                 <p style={{ margin: 0 }}>
                   <strong>Trạng thái hồ sơ:</strong>{" "}
@@ -349,6 +360,35 @@ const EmployerApplicantsPage = () => {
                   </Badge>
                 </p>
               </Card>
+
+              {activeApplication.answers && activeApplication.answers.length > 0 && (
+                <Card title="Câu hỏi sàng lọc đã trả lời">
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {activeApplication.answers.map((ans, idx) => {
+                      const qSnap = ans.questionSnapshot as { label?: string; type?: string } | undefined;
+                      const qLabel = qSnap?.label || `Câu hỏi ${idx + 1}`;
+                      let answerText = "—";
+                      if (typeof ans.answerValue === "boolean") {
+                        answerText = ans.answerValue ? "Có" : "Không";
+                      } else if (Array.isArray(ans.answerValue)) {
+                        answerText = ans.answerValue.join(", ");
+                      } else if (ans.answerValue !== undefined && ans.answerValue !== null) {
+                        answerText = String(ans.answerValue);
+                      }
+                      return (
+                        <div key={ans.id || idx} style={{ borderBottom: "1px solid var(--color-border, #e2e8f0)", paddingBottom: 8 }}>
+                          <div style={{ fontWeight: 600, fontSize: "0.875rem", marginBottom: 4 }}>
+                            {idx + 1}. {qLabel}
+                          </div>
+                          <div style={{ color: "var(--color-text-secondary, #475569)", fontSize: "0.875rem" }}>
+                            {answerText}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
 
               {activeApplication.coverLetter && (
                 <Card title="Thư giới thiệu (Cover Letter)">
