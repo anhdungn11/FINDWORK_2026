@@ -24,7 +24,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const EmployerMembersPage = () => {
-  const { active } = useCompanyWorkspace();
+  const { active, reload: reloadWorkspace } = useCompanyWorkspace();
   const currentUser = useAuthStore((s) => s.user);
   const writes = isWorkspaceWritesEnabled();
 
@@ -108,6 +108,7 @@ const EmployerMembersPage = () => {
         text: `Đã chuyển thành công quyền Chủ sở hữu công ty cho "${targetName}".`,
       });
       members.reload();
+      reloadWorkspace();
     } catch (err) {
       setNotice({ tone: "error", text: toApiFailure(err).message });
     } finally {

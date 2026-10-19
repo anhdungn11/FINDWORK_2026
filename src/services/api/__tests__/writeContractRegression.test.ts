@@ -3,7 +3,13 @@ import { describe, it } from "node:test";
 import { apiClient } from "../../http/apiClient";
 import { adminApi } from "../adminApi";
 import { companyWorkspaceApi } from "../companyWorkspaceApi";
-import { setWorkspaceWritesForTesting } from "../../../config/featureFlags";
+import { isWorkspaceWritesEnabled, setWorkspaceWritesForTesting } from "../../../config/featureFlags";
+import {
+  isLiveWritesEnabled,
+  setLiveWritesEnabledForTesting,
+  assertLiveWritesAllowed,
+  CandidateWriteGateBlockedError,
+} from "../../../features/candidate/profile/config/candidateIntegrationConfig";
 
 describe("P0-01 Backend API Contract & HTTP Method Regression", () => {
   const companyId = "c1111111-1111-4111-8111-111111111111";
@@ -521,6 +527,40 @@ describe("P0-01 Backend API Contract & HTTP Method Regression", () => {
         apiClient.patch = originalPatch;
         setWorkspaceWritesForTesting(null);
       }
+    });
+
+    it("defaults both write gates to CLOSED (false)", () => {
+      setWorkspaceWritesForTesting(null);
+      setLiveWritesEnabledForTesting(null);
+
+      // In default test/node environment without explicit opt-in, both gates must be closed
+      assert.equal(isWorkspaceWritesEnabled(), false, "isWorkspaceWritesEnabled must default to false");
+      assert.equal(isLiveWritesEnabled(), false, "isLiveWritesEnabled must default to false");
+    });
+
+    it("Candidate write gate blocks mutations and throws CandidateWriteGateBlockedError when closed", () => {
+      setLiveWritesEnabledForTesting(false);
+      assert.equal(isLiveWritesEnabled(), false);
+
+      assert.throws(
+        () => assertLiveWritesAllowed("submitApplication"),
+        (err: unknown) => {
+          assert.ok(err instanceof CandidateWriteGateBlockedError);
+          assert.equal(err.operation, "submitApplication");
+          assert.equal(err.code, "WRITE_GATE_BLOCKED");
+          assert.equal(err.status, 403);
+          return true;
+        },
+      );
+
+      setLiveWritesEnabledForTesting(null);
+    });
+
+    it("Candidate write gate allows mutations when explicitly enabled for testing", () => {
+      setLiveWritesEnabledForTesting(true);
+      assert.equal(isLiveWritesEnabled(), true);
+      assert.doesNotThrow(() => assertLiveWritesAllowed("submitApplication"));
+      setLiveWritesEnabledForTesting(null);
     });
   });
 });

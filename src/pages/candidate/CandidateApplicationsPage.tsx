@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Briefcase, Calendar, ArrowRight, FileText, CheckCircle2 } from "lucide-react";
+import { Briefcase, Calendar, ArrowRight, FileText, CheckCircle2, RefreshCw } from "lucide-react";
 import { candidateApplicationApi } from "@/services/api/candidateApplicationApi";
 import {
   APPLICATION_STATUS_LABEL,
@@ -63,9 +63,28 @@ const CandidateApplicationsPage = () => {
         title="Lịch sử ứng tuyển"
         subtitle="Theo dõi tiến độ các đơn ứng tuyển bạn đã gửi tới nhà tuyển dụng"
         actions={
-          <Link to="/jobs" className={styles.findJobsLink}>
-            Tìm thêm việc làm <ArrowRight size={15} aria-hidden="true" />
-          </Link>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              type="button"
+              className={styles.findJobsLink}
+              style={{
+                background: "transparent",
+                border: "1px solid var(--color-border, #cbd5e1)",
+                color: "var(--color-text, #1e293b)",
+                cursor: "pointer",
+                padding: "8px 14px",
+              }}
+              disabled={loading}
+              onClick={() => fetchApplications()}
+              title="Làm mới trạng thái đơn ứng tuyển từ máy chủ"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} aria-hidden="true" />
+              <span>{loading ? "Đang tải..." : "Làm mới"}</span>
+            </button>
+            <Link to="/jobs" className={styles.findJobsLink}>
+              Tìm thêm việc làm <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+          </div>
         }
       />
 

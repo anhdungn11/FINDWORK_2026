@@ -6,12 +6,12 @@
  * Để đảm bảo an toàn tuyệt đối, KHÔNG thực hiện ghi dữ liệu trực tiếp vào
  * database thực tế ở chế độ mặc định:
  * - Giao diện ĐỌC (Bootstrap, Load Profile, Child Resources, Draft) được kết nối.
- * - Giao diện GHI (Create, Update, Delete, Import) được bảo vệ bởi cổng an toàn
+ * - Giao diện GHI (Create, Update, Delete, Import, Submit Application) được bảo vệ bởi cổng an toàn
  *   (Activation Safety Gate), mặc định là false.
  * - KHÔNG tạo trạng thái thành công giả (fake save success).
  * - KHÔNG sinh ID giả mạo.
- * - Khi CP8A và CP8C nghiệm thu liên thông, việc kích hoạt chỉ cần thay đổi cấu hình
- *   ENABLE_LIVE_WRITES: true mà không phải viết lại UI.
+ * - Cổng ghi chỉ mở khi có cấu hình kiểm thử tường minh tới backend test (port 3001 / findwork_test).
+ * - Tuyệt đối cấm thao tác ghi tới backend dev (port 3000 / findwork_dev).
  */
 
 export interface CandidateIntegrationFlags {
@@ -25,21 +25,23 @@ let testOverrideLiveWrites: boolean | null = null;
 
 export const CANDIDATE_PROFILE_INTEGRATION_FLAGS: CandidateIntegrationFlags = {
   ENABLE_REAL_READ: true,
-  // TẮT MẶC ĐỊNH cho đến khi CP8A hoàn tất kiểm thử liên thông cơ sở dữ liệu
+  // TẮT MẶC ĐỊNH cho đến khi được chỉ định cấu hình test cô lập
   ENABLE_LIVE_WRITES: false,
 };
 
 /**
- * Kiểm tra xem tính năng ghi thực tế có đang được bật hay không.
+ * Kiểm tra xem tính năng ghi thực tế của Candidate (Apply, Save Job, Profile update) có được phép không.
  *
  * THIẾT KẾ AN TOÀN FAIL-CLOSED:
  * 1. Mặc định là FALSE (chặn toàn bộ ghi dữ liệu vào bất kỳ database nào).
  * 2. Trong môi trường Node/Unit Test (typeof window === "undefined"), cho phép test harness override
  *    để kiểm thử các kịch bản có kiểm soát trong test runner.
  * 3. Trong trình duyệt (Browser Runtime):
- *    - Bắt buộc cờ ENABLE_LIVE_WRITES phải là true (chỉ bật khi có chỉ thị nghiệm thu chính thức).
+ *    - Phải có opt-in tường minh qua biến môi trường (VITE_ENABLE_LIVE_WRITES=true hoặc VITE_ENABLE_WORKSPACE_WRITES=true).
  *    - Bắt buộc port trình duyệt phải là "5173" (chỉ chạy trên frontend test cô lập).
  *    - TUYỆT ĐỐI CHẶN mọi thao tác ghi từ port dev 5176 hoặc các port khác để bảo vệ findwork_dev.
+ *    - TUYỆT ĐỐI CHẶN nếu backend target là port 3000 (findwork_dev).
+ *    - Chỉ cho phép khi backend target là 127.0.0.1:3001 (findwork_test).
  */
 export function isLiveWritesEnabled(): boolean {
   // 1. Môi trường Unit test Node.js
@@ -47,11 +49,24 @@ export function isLiveWritesEnabled(): boolean {
     if (testOverrideLiveWrites !== null) {
       return testOverrideLiveWrites;
     }
-    return CANDIDATE_PROFILE_INTEGRATION_FLAGS.ENABLE_LIVE_WRITES;
+    const envEnabled =
+      import.meta.env?.VITE_ENABLE_LIVE_WRITES === "true" ||
+      import.meta.env?.VITE_ENABLE_WORKSPACE_WRITES === "true";
+    return envEnabled || CANDIDATE_PROFILE_INTEGRATION_FLAGS.ENABLE_LIVE_WRITES;
   }
 
   // 2. Môi trường Trình duyệt (Browser Runtime) - FAIL-CLOSED
-  if (!CANDIDATE_PROFILE_INTEGRATION_FLAGS.ENABLE_LIVE_WRITES) {
+  if (testOverrideLiveWrites !== null) {
+    return testOverrideLiveWrites;
+  }
+
+  // Phải được kích hoạt tường minh qua cấu hình hoặc biến môi trường
+  const explicitlyEnabled =
+    CANDIDATE_PROFILE_INTEGRATION_FLAGS.ENABLE_LIVE_WRITES ||
+    import.meta.env?.VITE_ENABLE_LIVE_WRITES === "true" ||
+    import.meta.env?.VITE_ENABLE_WORKSPACE_WRITES === "true";
+
+  if (!explicitlyEnabled) {
     return false;
   }
 
@@ -61,8 +76,28 @@ export function isLiveWritesEnabled(): boolean {
     return false;
   }
 
-  if (testOverrideLiveWrites !== null) {
-    return testOverrideLiveWrites;
+  const backendTarget = String(import.meta.env?.VITE_BACKEND_TARGET || "");
+  const backendPort = String(import.meta.env?.VITE_BACKEND_PORT || "");
+  const apiBaseUrl = String(import.meta.env?.VITE_API_BASE_URL || "");
+
+  // Khóa cứng: cấm tuyệt đối mọi thao tác ghi hướng tới backend dev port 3000 (findwork_dev)
+  if (
+    backendTarget.includes(":3000") ||
+    backendPort === "3000" ||
+    apiBaseUrl.includes(":3000")
+  ) {
+    return false;
+  }
+
+  // Backend target phải là test instance (port 3001)
+  const isTargetingTestBackend =
+    backendTarget.includes(":3001") ||
+    backendPort === "3001" ||
+    apiBaseUrl.includes(":3001") ||
+    (!backendTarget && !backendPort); // Vite proxy trên port 5173 mặc định định tuyến tới 3001
+
+  if (!isTargetingTestBackend) {
+    return false;
   }
 
   return true;

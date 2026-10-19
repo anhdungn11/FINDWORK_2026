@@ -20,7 +20,7 @@ const EMPLOYEE_SIZE_OPTIONS = [
 ];
 
 const EmployerProfilePage = () => {
-  const { active } = useCompanyWorkspace();
+  const { active, reload: reloadWorkspace } = useCompanyWorkspace();
   const profile = useAsyncData((s) => companyWorkspaceApi.getProfile(active.id, s), [active.id]);
   const categories = useAsyncData((s) => publicApi.listJobCategories(s), []);
 
@@ -67,6 +67,7 @@ const EmployerProfilePage = () => {
       setMessage({ tone: "ok", text: "Đã cập nhật hồ sơ doanh nghiệp thành công." });
       setIsEditing(false);
       profile.reload();
+      reloadWorkspace();
     } catch (err) {
       setMessage({ tone: "error", text: toApiFailure(err).message });
     } finally {
@@ -84,6 +85,7 @@ const EmployerProfilePage = () => {
         text: "Đã gửi yêu cầu xác minh doanh nghiệp. Ban quản trị sẽ tiến hành kiểm duyệt.",
       });
       profile.reload();
+      reloadWorkspace();
     } catch (err) {
       setMessage({ tone: "error", text: toApiFailure(err).message });
     } finally {

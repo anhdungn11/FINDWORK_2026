@@ -11,6 +11,7 @@ interface CompanyWorkspaceValue {
   companies: MyCompanyDto[];
   active: MyCompanyDto | null;
   setActiveId: (id: string) => void;
+  reload: () => void;
 }
 
 const Ctx = createContext<CompanyWorkspaceValue | null>(null);
@@ -23,8 +24,8 @@ export const CompanyWorkspaceProvider = ({ children }: { children: ReactNode }) 
   const value = useMemo<CompanyWorkspaceValue | null>(() => {
     if (!data) return null;
     const active = data.find((c) => c.id === activeId) ?? data[0] ?? null;
-    return { companies: data, active, setActiveId };
-  }, [data, activeId]);
+    return { companies: data, active, setActiveId, reload };
+  }, [data, activeId, reload]);
 
   if (loading) return <LoadingBlock rows={3} label="Đang tải không gian doanh nghiệp" />;
   if (error) return <ApiErrorState error={error as ApiFailure} onRetry={reload} />;
