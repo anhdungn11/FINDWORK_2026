@@ -106,4 +106,43 @@ export class CompanyMembersService {
       return { id: memberId, status: "REMOVED" as const };
     });
   }
+
+  async transferOwnership(companyId: string, actorUserId: string, targetMemberId: string) {
+    return this.mutate(companyId, actorUserId, ["company.ownership.transfer"], async (tx, actorMemberId, isOwner) => {
+      if (!isOwner || actorMemberId === targetMemberId) throw denied();
+      const target = await tx.companyMember.findFirst({
+        where: { id: targetMemberId, companyId, status: "ACTIVE", removedAt: null },
+        select: { id: true, isOwner: true },
+      });
+      if (!target) throw missing();
+      if (target.isOwner) throw conflict("COMPANY_OWNERSHIP_STATE_CONFLICT", "Target member is already an owner.");
+      const roles = await tx.role.findMany({
+        where: { companyId, kind: "COMPANY", normalizedName: { in: ["owner", "admin"] }, isActive: true },
+        select: { id: true, normalizedName: true, isProtected: true },
+      });
+      const ownerRole = roles.find((role) => role.normalizedName === "owner" && role.isProtected);
+      const adminRole = roles.find((role) => role.normalizedName === "admin" && !role.isProtected);
+      if (!ownerRole || !adminRole) throw conflict("COMPANY_ROLE_UNAVAILABLE", "Ownership roles are unavailable.");
+      const oldOwner = await tx.companyMember.updateMany({
+        where: { id: actorMemberId, companyId, status: "ACTIVE", isOwner: true, removedAt: null },
+        data: { isOwner: false },
+      });
+      const newOwner = await tx.companyMember.updateMany({
+        where: { id: targetMemberId, companyId, status: "ACTIVE", isOwner: false, removedAt: null },
+        data: { isOwner: true },
+      });
+      if (oldOwner.count !== 1 || newOwner.count !== 1) {
+        throw conflict("COMPANY_OWNERSHIP_STATE_CONFLICT", "Ownership changed concurrently.");
+      }
+      await tx.companyMemberRole.deleteMany({ where: { companyId, companyMemberId: { in: [actorMemberId, targetMemberId] } } });
+      await tx.companyMemberRole.createMany({ data: [
+        { companyId, companyMemberId: actorMemberId, roleId: adminRole.id, assignedByUserId: actorUserId },
+        { companyId, companyMemberId: targetMemberId, roleId: ownerRole.id, assignedByUserId: actorUserId },
+      ] });
+      await tx.auditLog.create({ data: { actorUserId, companyId, action: "company.ownership.transfer",
+        targetType: "CompanyMember", targetId: targetMemberId,
+        beforeData: { ownerMemberId: actorMemberId }, afterData: { ownerMemberId: targetMemberId } } });
+      return { companyId, previousOwnerMemberId: actorMemberId, ownerMemberId: targetMemberId };
+    });
+  }
 }

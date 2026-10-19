@@ -6,7 +6,7 @@ Base path: `/api/v1`. Protected routes require `Authorization: Bearer <accessTok
 
 | Workflow | Status | Evidence / blocker |
 | --- | --- | --- |
-| Company registration, owner bootstrap, profile and locations | IMPLEMENTED; TESTED in existing integration specs | Existing `company-foundation` and `company-profile-locations` specs; no database test run in this cycle. |
+| Company registration, owner bootstrap, ownership transfer, profile and locations | IMPLEMENTED; TESTED at unit level | Existing `company-foundation` and `company-profile-locations` specs plus a new unrun ownership integration scenario; no database test run in this cycle. |
 | Invitations and acceptance | IMPLEMENTED; TESTED in existing integration specs | Acceptance creates active VIEWER membership; no database test run in this cycle. |
 | Member listing, role change, removal | IMPLEMENTED; TESTED at unit level | New member service/controller, 4 focused unit tests and an unrun integration scenario; PostgreSQL E2E still BLOCKED by fixture/write/cleanup authorization. |
 | Company verification request and admin review | IMPLEMENTED; TESTED at unit level | Legal name and tax code required; PENDING decision gate; unrun integration scenario; PostgreSQL E2E still BLOCKED by fixture/write/cleanup authorization. |
@@ -21,6 +21,7 @@ Base path: `/api/v1`. Protected routes require `Authorization: Bearer <accessTok
 | `GET /companies/:companyId/members` | `company.member.view` at COMPANY scope | None | `{data:[{id,companyId,status,isOwner,joinedAt,removedAt,user:{id,email,status},roles:[{role:{id,name}}]}]}` for active members. | 401, 403, 400 invalid UUID. |
 | `PATCH /companies/:companyId/members/:memberId/role` | `company.member.update` and `company.role.manage` at COMPANY scope | `{role:"ADMIN"\|"HR_MANAGER"\|"RECRUITER"\|"HIRING_MANAGER"\|"VIEWER"}` | Updated member shape from list. One role is assigned. Only OWNER may assign ADMIN. Owners and the actor cannot be changed. | 400 invalid role/UUID; 403 unauthorized/protected member; 404 `COMPANY_MEMBER_NOT_FOUND`; 409 unavailable/unchanged role. |
 | `DELETE /companies/:companyId/members/:memberId` | `company.member.remove` at COMPANY scope | None | HTTP 200 `{id,status:"REMOVED"}`. A removed member loses company authorization. Owners and the actor cannot be removed. | 400 invalid UUID; 403 unauthorized/protected member; 404 `COMPANY_MEMBER_NOT_FOUND`; 409 concurrent change. |
+| `POST /companies/:companyId/members/ownership-transfer` | `company.ownership.transfer` at COMPANY scope; caller must be current owner | `{memberId:"<active member UUID>"}` | HTTP 200 `{companyId,previousOwnerMemberId,ownerMemberId}`. Former owner becomes ADMIN; target becomes OWNER in one transaction with audit. | 400 invalid UUID; 403 nonowner/self transfer; 404 other company/inactive member; 409 ownership/role conflict. |
 | `POST /companies/:companyId/verification-request` | `company.update` at COMPANY scope | None; set `legalName` and `taxCode` first with `PATCH /companies/:companyId/profile` | HTTP 200 company profile with `verificationStatus:"PENDING"`. Rejected companies may resubmit. | 400 `COMPANY_VERIFICATION_PROFILE_INCOMPLETE`; 403; 409 `COMPANY_VERIFICATION_STATE_CONFLICT`. |
 | `GET /admin/users/:userId` | `user.view` at SYSTEM scope | None | `{id,email,status,emailVerifiedAt,createdAt,updatedAt}`. | 401, 403, 404 `USER_NOT_FOUND`. |
 | `GET /admin/companies/:companyId` | `company.view` at SYSTEM scope | None | Company status, verification and legal profile, locations, and `_count` for members/jobs/applications. | 401, 403, 404 `COMPANY_NOT_FOUND`. |
@@ -33,7 +34,7 @@ Existing job/application/admin endpoints and response examples are in `SUBMISSIO
 ## Verification in this cycle
 
 - `npm.cmd run build`: passed.
-- `npm.cmd run test:unit -- --runInBand`: 16 suites, 158 tests passed.
+- `npm.cmd run test:unit -- --runInBand`: 16 suites, 160 tests passed at final HEAD.
 - `git diff --check`: passed.
 - `tsc --noEmit -p tsconfig.json`: passed after adding the integration scenario.
 - PostgreSQL integration, fixture CLI, live HTTP write smoke and cleanup: not run because each requires explicit authorization.

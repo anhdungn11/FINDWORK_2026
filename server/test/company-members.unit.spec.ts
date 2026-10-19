@@ -21,8 +21,12 @@ function fixture() {
     },
     permission: { findUnique: jest.fn().mockResolvedValue({ isDeprecated: false,
       companyMemberPermissions: [], rolePermissions: [{ dataScope: "COMPANY" }] }) },
-    role: { findFirst: jest.fn().mockResolvedValue({ id: "44444444-4444-4444-8444-444444444444" }) },
-    companyMemberRole: { deleteMany: jest.fn(), create: jest.fn() },
+    role: { findFirst: jest.fn().mockResolvedValue({ id: "44444444-4444-4444-8444-444444444444" }),
+      findMany: jest.fn().mockResolvedValue([
+        { id: "55555555-5555-4555-8555-555555555555", normalizedName: "owner", isProtected: true },
+        { id: "66666666-6666-4666-8666-666666666666", normalizedName: "admin", isProtected: false },
+      ]) },
+    companyMemberRole: { deleteMany: jest.fn(), create: jest.fn(), createMany: jest.fn() },
     auditLog: { create: jest.fn() },
   };
   const db = { $transaction: jest.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)) };
@@ -35,6 +39,7 @@ describe("company member management", () => {
     expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyMembersController.prototype.list)).toEqual(["company.member.view"]);
     expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyMembersController.prototype.updateRole)).toEqual(["company.member.update", "company.role.manage"]);
     expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyMembersController.prototype.remove)).toEqual(["company.member.remove"]);
+    expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyMembersController.prototype.transferOwnership)).toEqual(["company.ownership.transfer"]);
   });
 
   it("changes an active tenant member role and audits the write", async () => {
@@ -72,5 +77,33 @@ describe("company member management", () => {
       where: { id: memberId, companyId, status: "ACTIVE", removedAt: null },
       data: expect.objectContaining({ status: "REMOVED" }),
     }));
+  });
+
+  it("transfers owner flags and protected roles in one transaction", async () => {
+    const { tx, service } = fixture();
+    await expect(service.transferOwnership(companyId, actorId, memberId)).resolves.toEqual({
+      companyId, previousOwnerMemberId: actorId, ownerMemberId: memberId,
+    });
+    expect(tx.companyMember.updateMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: expect.objectContaining({ id: actorId, isOwner: true }), data: { isOwner: false },
+    }));
+    expect(tx.companyMember.updateMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: expect.objectContaining({ id: memberId, isOwner: false }), data: { isOwner: true },
+    }));
+    expect(tx.companyMemberRole.createMany).toHaveBeenCalledWith({ data: expect.arrayContaining([
+      expect.objectContaining({ companyMemberId: actorId, roleId: "66666666-6666-4666-8666-666666666666" }),
+      expect.objectContaining({ companyMemberId: memberId, roleId: "55555555-5555-4555-8555-555555555555" }),
+    ]) });
+    expect(tx.auditLog.create).toHaveBeenCalledWith({ data: expect.objectContaining({ action: "company.ownership.transfer" }) });
+  });
+
+  it("does not transfer ownership to the actor or a member of another tenant", async () => {
+    const same = fixture();
+    await expect(same.service.transferOwnership(companyId, actorId, actorId)).rejects.toMatchObject({ status: 403 });
+    expect(same.tx.companyMember.updateMany).not.toHaveBeenCalled();
+    const other = fixture();
+    other.tx.companyMember.findFirst.mockResolvedValueOnce(null);
+    await expect(other.service.transferOwnership(companyId, actorId, memberId)).rejects.toMatchObject({ status: 404 });
+    expect(other.tx.companyMember.updateMany).not.toHaveBeenCalled();
   });
 });

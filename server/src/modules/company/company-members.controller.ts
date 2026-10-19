@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, ParseUUIDPipe, Patch, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
@@ -6,7 +6,7 @@ import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
 import { CompanyPermissionGuard, type CompanyAuthorizedRequest } from "../authorization/guards/company-permission.guard";
 import { CompanyMembersService } from "./company-members.service";
-import { UpdateCompanyMemberDto } from "./dto/update-company-member.dto";
+import { TransferCompanyOwnershipDto, UpdateCompanyMemberDto } from "./dto/update-company-member.dto";
 
 function requireCompanyScope(req: CompanyAuthorizedRequest, code: string) {
   if (req.companyAuthorization?.permissions[code]?.scope !== "COMPANY") {
@@ -46,5 +46,15 @@ export class CompanyMembersController {
     @Req() req: CompanyAuthorizedRequest) {
     requireCompanyScope(req, "company.member.remove");
     return this.members.remove(companyId, memberId, auth.userId);
+  }
+
+  @Post("ownership-transfer")
+  @HttpCode(200)
+  @RequireCompanyPermissions("company.ownership.transfer")
+  transferOwnership(@Param("companyId", ParseUUIDPipe) companyId: string,
+    @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
+    @Body() dto: TransferCompanyOwnershipDto) {
+    requireCompanyScope(req, "company.ownership.transfer");
+    return this.members.transferOwnership(companyId, auth.userId, dto.memberId);
   }
 }

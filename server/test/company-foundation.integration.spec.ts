@@ -409,4 +409,42 @@ describe("Phase 4.3A Company Foundation integration", () => {
       "company.member.role.update", "company.verification.request", "admin.company.verify", "company.member.remove",
     ] } } })).toBe(4);
   });
+
+  it("transfers ownership only to an active member of the same company", async () => {
+    const original = await createAuthenticatedUser("transfer-original");
+    const successor = await createAuthenticatedUser("transfer-successor");
+    const outsider = await createAuthenticatedUser("transfer-outsider");
+    const created = await request(app.getHttpServer()).post(API)
+      .set("Authorization", `Bearer ${original.accessToken}`)
+      .send({ name: "Transfer Company", slug: slug("transfer") }).expect(201);
+    const companyId = created.body.id as string;
+    const viewer = await prisma.role.findFirstOrThrow({
+      where: { companyId, normalizedName: "viewer" }, select: { id: true },
+    });
+    const member = await prisma.companyMember.create({
+      data: { companyId, userId: successor.id, status: "ACTIVE" }, select: { id: true },
+    });
+    await prisma.companyMemberRole.create({ data: {
+      companyId, companyMemberId: member.id, roleId: viewer.id, assignedByUserId: original.id,
+    } });
+    const transfer = `${API}/${companyId}/members/ownership-transfer`;
+    await request(app.getHttpServer()).post(transfer)
+      .set("Authorization", `Bearer ${outsider.accessToken}`)
+      .send({ memberId: member.id }).expect(403);
+    await request(app.getHttpServer()).post(transfer)
+      .set("Authorization", `Bearer ${original.accessToken}`)
+      .send({ memberId: member.id }).expect(200)
+      .expect((r) => expect(r.body.ownerMemberId).toBe(member.id));
+    const owners = await prisma.companyMember.findMany({
+      where: { companyId, isOwner: true, status: "ACTIVE" }, select: { id: true },
+    });
+    expect(owners).toEqual([{ id: member.id }]);
+    expect((await authorizationService.resolveRequiredCompanyPermissions(
+      original.id, companyId, ["company.ownership.transfer"],
+    )).allowed).toBe(false);
+    expect((await authorizationService.resolveRequiredCompanyPermissions(
+      successor.id, companyId, ["company.ownership.transfer"],
+    )).allowed).toBe(true);
+    expect(await prisma.auditLog.count({ where: { companyId, action: "company.ownership.transfer" } })).toBe(1);
+  });
 });
