@@ -523,11 +523,13 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
       const errCode = apiErr.code ?? "";
       const status = apiErr.status ?? 0;
 
-      if (errCode === "APPLICATION_DUPLICATE" || (status === 409 && !errCode.includes("JOB"))) {
+      if (errCode === "APPLICATION_DUPLICATE" || (status === 409 && (errCode === "ALREADY_APPLIED" || apiErr.message?.includes("already applied")))) {
         setError("Bạn đã nộp đơn ứng tuyển cho vị trí này trước đó. Vui lòng kiểm tra danh sách đơn đã nộp.");
         isSubmittingRef.current = true; // Duplicate application: giữ khóa để tránh spam request trùng
-      } else if (errCode === "JOB_UNAVAILABLE" || (status === 409 && (errCode === "JOB_UNAVAILABLE" || apiErr.message?.includes("Job")))) {
+      } else if (errCode === "JOB_UNAVAILABLE" || (status === 409 && (errCode === "JOB_NOT_ACCEPTING" || apiErr.message?.includes("Job") || apiErr.message?.includes("not accepting")))) {
         setError("Vị trí tuyển dụng này hiện không còn nhận hồ sơ ứng tuyển (đã đóng, tạm dừng hoặc hết hạn).");
+      } else if (errCode === "SCREENING_CONFIGURATION_INVALID") {
+        setError("Cấu hình câu hỏi sàng lọc của tin tuyển dụng bị lỗi trên máy chủ. Vui lòng liên hệ nhà tuyển dụng hoặc hỗ trợ kỹ thuật.");
       } else if (status === 404 && (errCode === "CANDIDATE_PROFILE_NOT_FOUND" || errCode === "NOT_FOUND")) {
         setError("Không tìm thấy hồ sơ ứng viên hợp lệ trên hệ thống. Vui lòng hoàn tất hồ sơ cá nhân trước khi ứng tuyển.");
       } else if (errCode === "RESUME_UNAVAILABLE") {
@@ -538,6 +540,8 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
         setError("Câu trả lời câu hỏi sàng lọc không hợp lệ hoặc không thuộc danh sách lựa chọn của nhà tuyển dụng.");
       } else if (errCode === "SCREENING_QUESTION_INVALID") {
         setError("Câu hỏi sàng lọc không hợp lệ hoặc không thuộc vị trí tuyển dụng này.");
+      } else if (errCode === "VALIDATION_ERROR") {
+        setError(apiErr.message || "Thông tin gửi lên không đúng định dạng yêu cầu của hệ thống.");
       } else if (status === 401 || errCode.startsWith("AUTH_")) {
         setError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.");
       } else if (status === 403) {

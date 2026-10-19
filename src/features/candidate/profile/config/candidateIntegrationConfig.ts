@@ -29,12 +29,43 @@ export const CANDIDATE_PROFILE_INTEGRATION_FLAGS: CandidateIntegrationFlags = {
   ENABLE_LIVE_WRITES: false,
 };
 
-/** Kiểm tra xem tính năng ghi thực tế có đang được bật hay không */
+/**
+ * Kiểm tra xem tính năng ghi thực tế có đang được bật hay không.
+ *
+ * THIẾT KẾ AN TOÀN FAIL-CLOSED:
+ * 1. Mặc định là FALSE (chặn toàn bộ ghi dữ liệu vào bất kỳ database nào).
+ * 2. Trong môi trường Node/Unit Test (typeof window === "undefined"), cho phép test harness override
+ *    để kiểm thử các kịch bản có kiểm soát trong test runner.
+ * 3. Trong trình duyệt (Browser Runtime):
+ *    - Bắt buộc cờ ENABLE_LIVE_WRITES phải là true (chỉ bật khi có chỉ thị nghiệm thu chính thức).
+ *    - Bắt buộc port trình duyệt phải là "5173" (chỉ chạy trên frontend test cô lập).
+ *    - TUYỆT ĐỐI CHẶN mọi thao tác ghi từ port dev 5176 hoặc các port khác để bảo vệ findwork_dev.
+ */
 export function isLiveWritesEnabled(): boolean {
+  // 1. Môi trường Unit test Node.js
+  if (typeof window === "undefined") {
+    if (testOverrideLiveWrites !== null) {
+      return testOverrideLiveWrites;
+    }
+    return CANDIDATE_PROFILE_INTEGRATION_FLAGS.ENABLE_LIVE_WRITES;
+  }
+
+  // 2. Môi trường Trình duyệt (Browser Runtime) - FAIL-CLOSED
+  if (!CANDIDATE_PROFILE_INTEGRATION_FLAGS.ENABLE_LIVE_WRITES) {
+    return false;
+  }
+
+  // Khóa cứng: chỉ chấp nhận cổng Frontend Test cô lập (5173)
+  const port = window.location.port;
+  if (port !== "5173") {
+    return false;
+  }
+
   if (testOverrideLiveWrites !== null) {
     return testOverrideLiveWrites;
   }
-  return CANDIDATE_PROFILE_INTEGRATION_FLAGS.ENABLE_LIVE_WRITES;
+
+  return true;
 }
 
 /** Dành riêng cho Unit/Integration Test có kiểm soát trong môi trường cô lập */
