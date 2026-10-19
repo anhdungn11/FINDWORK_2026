@@ -48,7 +48,7 @@ export class InvitationDeliveryWorker {
   ) {}
 
   async processOne(): Promise<boolean> {
-    // Flag and production guard are checked before discovering or claiming work.
+    // Delivery configuration is checked before discovering or claiming work.
     this.settings.assertInvitationWorkerReady();
     this.crypto.assertReady();
     for (const keyId of await this.repo.pendingKeyIds()) this.crypto.assertKeyAvailable(keyId);

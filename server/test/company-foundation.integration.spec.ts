@@ -92,6 +92,7 @@ describe("Phase 4.3A Company Foundation integration", () => {
     await prisma.companyMember.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.company.deleteMany({ where: { id: { in: companyIds } } });
     await prisma.systemUserRole.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.auditLog.deleteMany({ where: { actorUserId: { in: userIds }, action: "admin.user.status" } });
     await prisma.authSession.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await app.close();
@@ -413,6 +414,17 @@ describe("Phase 4.3A Company Foundation integration", () => {
       where: { kind: "SYSTEM", systemCode: "VERIFICATION_ADMIN", isActive: true }, select: { id: true },
     });
     await prisma.systemUserRole.create({ data: { userId: reviewer.id, roleId: verificationRole.id } });
+    const supportRole = await prisma.role.findFirstOrThrow({
+      where: { kind: "SYSTEM", systemCode: "SUPPORT_ADMIN", isActive: true }, select: { id: true },
+    });
+    await prisma.systemUserRole.create({ data: { userId: reviewer.id, roleId: supportRole.id } });
+    const dashboard = await request(app.getHttpServer()).get("/api/v1/admin/dashboard")
+      .set("Authorization", `Bearer ${reviewer.accessToken}`).expect(200);
+    const queue = await request(app.getHttpServer()).get("/api/v1/admin/companies?verificationStatus=PENDING")
+      .set("Authorization", `Bearer ${reviewer.accessToken}`).expect(200);
+    expect(queue.body.pagination.total).toBe(dashboard.body.pendingCompanies);
+    expect(queue.body.data.every((company: { status: string; verificationStatus: string }) =>
+      company.status === "ACTIVE" && company.verificationStatus === "PENDING")).toBe(true);
     await request(app.getHttpServer()).get(`/api/v1/admin/companies?verificationStatus=PENDING&q=Review`)
       .set("Authorization", `Bearer ${reviewer.accessToken}`).expect(200)
       .expect((r) => expect(r.body.data.some((row: { id: string }) => row.id === companyId)).toBe(true));
@@ -424,6 +436,12 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .send({ status: "REJECTED" }).expect(409);
     await request(app.getHttpServer()).get(`${API}/${companyId}`).expect(200)
       .expect((r) => expect(r.body.isVerified).toBe(true));
+    await request(app.getHttpServer()).get(`${API}/${companyId}/profile`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(200)
+      .expect((r) => expect(r.body).toMatchObject({ legalName: "Review Company LLC", taxCode: "123456789",
+        verificationStatus: "VERIFIED" }));
+    expect(await prisma.company.findUniqueOrThrow({ where: { id: companyId },
+      select: { verificationStatus: true } })).toEqual({ verificationStatus: "VERIFIED" });
 
     await request(app.getHttpServer()).delete(`${membersPath}/${member.id}`)
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(200);
@@ -525,5 +543,55 @@ describe("Phase 4.3A Company Foundation integration", () => {
     expect(owner).toHaveLength(1);
     expect(targets).toContain(owner[0]?.id);
     expect(await prisma.auditLog.count({ where: { companyId, action: "company.ownership.transfer" } })).toBe(1);
+  });
+
+  it("lets USER_ADMIN suspend and reactivate ordinary accounts but protects platform role holders", async () => {
+    const admin = await createAuthenticatedUser("user-admin");
+    const auditor = await createAuthenticatedUser("audit-viewer");
+    const ordinary = await createAuthenticatedUser("status-target");
+    const privileged = await createAuthenticatedUser("status-privileged");
+    const statusPath = `/api/v1/admin/users/${ordinary.id}/status`;
+    await request(app.getHttpServer()).patch(statusPath)
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ status: "SUSPENDED" }).expect(403);
+    const roles = await prisma.role.findMany({ where: { kind: "SYSTEM", isActive: true,
+      systemCode: { in: ["USER_ADMIN", "AUDIT_VIEWER", "VERIFICATION_ADMIN"] } },
+      select: { id: true, systemCode: true } });
+    for (const code of ["USER_ADMIN", "AUDIT_VIEWER", "VERIFICATION_ADMIN"]) {
+      if (!roles.some((role) => role.systemCode === code)) throw new Error(`Missing approved test role ${code}`);
+    }
+    const roleId = (code: string) => roles.find((role) => role.systemCode === code)!.id;
+    await prisma.systemUserRole.createMany({ data: [
+      { userId: admin.id, roleId: roleId("USER_ADMIN") },
+      { userId: auditor.id, roleId: roleId("AUDIT_VIEWER") },
+      { userId: privileged.id, roleId: roleId("VERIFICATION_ADMIN") },
+    ] });
+    await request(app.getHttpServer()).get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${ordinary.accessToken}`).expect(200);
+    await request(app.getHttpServer()).patch(statusPath)
+      .set("Authorization", `Bearer ${auditor.accessToken}`)
+      .send({ status: "SUSPENDED" }).expect(403);
+    await request(app.getHttpServer()).patch(statusPath)
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ status: "SUSPENDED" }).expect(200)
+      .expect((r) => expect(r.body.status).toBe("SUSPENDED"));
+    await request(app.getHttpServer()).get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${ordinary.accessToken}`).expect(401);
+    await request(app.getHttpServer()).patch(statusPath)
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ status: "ACTIVE" }).expect(200)
+      .expect((r) => expect(r.body.status).toBe("ACTIVE"));
+    await request(app.getHttpServer()).get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${ordinary.accessToken}`).expect(200);
+    await request(app.getHttpServer()).patch(`/api/v1/admin/users/${privileged.id}/status`)
+      .set("Authorization", `Bearer ${admin.accessToken}`)
+      .send({ status: "SUSPENDED" }).expect(403);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: privileged.id } })).status).toBe("ACTIVE");
+    expect(await prisma.auditLog.count({ where: { actorUserId: admin.id, targetId: ordinary.id,
+      action: "admin.user.status" } })).toBe(2);
+    await request(app.getHttpServer()).get("/api/v1/admin/audit")
+      .set("Authorization", `Bearer ${auditor.accessToken}`).expect(200)
+      .expect((r) => expect(r.body.data.some((row: { actorUserId: string; action: string }) =>
+        row.actorUserId === admin.id && row.action === "admin.user.status")).toBe(true));
   });
 });

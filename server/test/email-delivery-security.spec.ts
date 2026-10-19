@@ -56,9 +56,18 @@ describe("Email delivery fail-closed crypto/config", () => {
     } as unknown as ConfigService);
     expect(() => inviteOnlySettings.assertInvitationWorkerReady()).not.toThrow();
     expect(() => inviteOnlySettings.assertWorkerReady()).toThrow();
-    expect(() => validateEnvironment({ ...withVerify, NODE_ENV: "production",
+    const production = validateEnvironment({ ...withVerify, NODE_ENV: "production",
+      CORS_ORIGINS: "https://example.invalid",
       EMAIL_INVITATION_DELIVERY_ENABLED: "true",
-      EMAIL_INVITATION_URL: "https://example.invalid/invite" })).toThrow();
+      EMAIL_INVITATION_URL: "https://example.invalid/invite" });
+    const productionSettings = new EmailDeliverySettings({
+      get: (name: string, fallback?: unknown) => production[name] ?? fallback,
+    } as unknown as ConfigService);
+    expect(() => productionSettings.assertCanQueueInvitation()).not.toThrow();
+    expect(() => validateEnvironment({ ...withVerify, NODE_ENV: "production",
+      CORS_ORIGINS: "https://example.invalid",
+      EMAIL_INVITATION_DELIVERY_ENABLED: "true",
+      EMAIL_INVITATION_URL: "http://localhost:5173/invite" })).toThrow("EMAIL_INVITATION_URL");
   });
   it("keeps verification worker startup dependent on a valid verification URL", () => {
     const valid = validateEnvironment({ ...base, EMAIL_DELIVERY_MODE: "resend",

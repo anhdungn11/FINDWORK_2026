@@ -44,7 +44,7 @@ export class EmailDeliverySettings {
     }
   }
   assertCanQueueInvitation(): void {
-    if (!this.invitationEnabled || this.nodeEnv === "production") {
+    if (!this.invitationEnabled) {
       throw new Error("EMAIL_INVITATION_DELIVERY_DISABLED");
     }
     if (this.mode !== "resend" || !this.activeKeyId || !this.keyringJson ||

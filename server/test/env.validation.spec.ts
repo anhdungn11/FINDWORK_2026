@@ -105,4 +105,13 @@ describe("validateEnvironment", () => {
       "JWT_ACCESS_SECRET must not use a placeholder in production",
     );
   });
+
+  it("requires explicit HTTPS CORS origins in production", () => {
+    expect(() => validateEnvironment({ ...VALID_ENV, NODE_ENV: "production" }))
+      .toThrow("CORS_ORIGINS must be set explicitly in production");
+    expect(() => validateEnvironment({ ...VALID_ENV, NODE_ENV: "production",
+      CORS_ORIGINS: "http://localhost:5173" })).toThrow("Production CORS origins must use HTTPS");
+    expect(validateEnvironment({ ...VALID_ENV, NODE_ENV: "production",
+      CORS_ORIGINS: "https://findwork.example" }).CORS_ORIGINS).toEqual(["https://findwork.example"]);
+  });
 });

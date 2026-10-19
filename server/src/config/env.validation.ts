@@ -50,7 +50,10 @@ function parseApiPrefix(value: unknown): string {
   return prefix;
 }
 
-function parseCorsOrigins(value: unknown): string[] {
+function parseCorsOrigins(value: unknown, nodeEnv: NodeEnvironment): string[] {
+  if (nodeEnv === "production" && (typeof value !== "string" || !value.trim())) {
+    throw new Error("CORS_ORIGINS must be set explicitly in production.");
+  }
   const origins = String(value ?? "http://localhost:5173")
     .split(",")
     .map((origin) => origin.trim())
@@ -75,6 +78,9 @@ function parseCorsOrigins(value: unknown): string[] {
       throw new Error(`Invalid CORS origin: ${origin}`);
     }
 
+    if (nodeEnv === "production" && parsed.protocol !== "https:") {
+      throw new Error("Production CORS origins must use HTTPS.");
+    }
     if (
       !["http:", "https:"].includes(parsed.protocol) ||
       parsed.pathname !== "/" ||
@@ -156,9 +162,6 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
   const invitationEnabled = String(raw.EMAIL_INVITATION_DELIVERY_ENABLED ?? "false");
   if (invitationEnabled !== "true" && invitationEnabled !== "false") {
     throw new Error("EMAIL_INVITATION_DELIVERY_ENABLED invalid");
-  }
-  if (env === "production" && invitationEnabled === "true") {
-    throw new Error("EMAIL_INVITATION_DELIVERY_ENABLED is unavailable in production");
   }
   const invitationUrl = String(raw.EMAIL_INVITATION_URL ?? "");
   const apiKey = String(raw.EMAIL_RESEND_API_KEY ?? "");
@@ -249,7 +252,7 @@ export function validateEnvironment(
     NODE_ENV: nodeEnv,
     PORT: parsePort(raw.PORT),
     API_PREFIX: parseApiPrefix(raw.API_PREFIX),
-    CORS_ORIGINS: parseCorsOrigins(raw.CORS_ORIGINS),
+    CORS_ORIGINS: parseCorsOrigins(raw.CORS_ORIGINS, nodeEnv),
     DATABASE_URL: parseDatabaseUrl(raw.DATABASE_URL),
 
     JWT_ACCESS_SECRET: jwtAccessSecret,
