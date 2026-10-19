@@ -3,8 +3,9 @@ import { useAsyncData } from "@/hooks/useAsyncData";
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import type { MyCompanyDto } from "@/services/api/apiTypes";
 import type { ApiFailure } from "@/services/api/apiFailure";
-import { LoadingBlock, EmptyState } from "@/components/ui";
+import { LoadingBlock } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
+import { CompanyRegistrationOnboarding } from "./components/CompanyRegistrationOnboarding";
 
 interface CompanyWorkspaceValue {
   companies: MyCompanyDto[];
@@ -28,14 +29,7 @@ export const CompanyWorkspaceProvider = ({ children }: { children: ReactNode }) 
   if (loading) return <LoadingBlock rows={3} label="Đang tải không gian doanh nghiệp" />;
   if (error) return <ApiErrorState error={error as ApiFailure} onRetry={reload} />;
   if (!value || !value.active) {
-    return (
-      <EmptyState
-        title="Tài khoản chưa thuộc doanh nghiệp nào"
-        text="Bạn chưa là thành viên của công ty nào. Hãy chấp nhận lời mời từ chủ doanh nghiệp hoặc liên hệ quản trị viên. Chức năng tạo doanh nghiệp mới chưa có giao diện trong phiên bản này."
-        actionLabel="Về trang chủ"
-        actionTo="/"
-      />
-    );
+    return <CompanyRegistrationOnboarding onCreated={reload} />;
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

@@ -21,7 +21,8 @@ export const SALARY_PERIOD_LABEL: Record<SalaryPeriod, string> = {
   HOUR: "giờ", DAY: "ngày", WEEK: "tuần", MONTH: "tháng", YEAR: "năm",
 };
 
-export type ScreeningQuestionType = "TEXT" | "TEXTAREA" | "YES_NO" | "SELECT" | "MULTI_SELECT";
+export const SCREENING_QUESTION_TYPES = ["TEXT", "TEXTAREA", "YES_NO", "SELECT", "MULTI_SELECT"] as const;
+export type ScreeningQuestionType = (typeof SCREENING_QUESTION_TYPES)[number];
 
 export interface ScreeningQuestionDto {
   id: string;
@@ -90,12 +91,57 @@ export interface CompanyProfileDto {
   name: string;
   slug: string | null;
   legalName: string | null;
+  taxCode?: string | null;
+  industryId?: string | null;
   description: string | null;
   website: string | null;
   employeeSizeRange: string | null;
   foundedYear: number | null;
   verificationStatus: string | null;
   status: string | null;
+}
+
+export const ASSIGNABLE_COMPANY_ROLES = ["ADMIN", "HR_MANAGER", "RECRUITER", "HIRING_MANAGER", "VIEWER"] as const;
+export type AssignableCompanyRole = (typeof ASSIGNABLE_COMPANY_ROLES)[number];
+
+export interface CompanyMemberDto {
+  id: string;
+  companyId: string;
+  status: "ACTIVE" | "INACTIVE" | "REMOVED";
+  isOwner: boolean;
+  joinedAt: string;
+  removedAt: string | null;
+  user: {
+    id: string;
+    email: string;
+    status: string;
+  };
+  roles: Array<{
+    role: {
+      id: string;
+      name: string;
+    };
+  }>;
+}
+
+export interface CompanyInvitationDto {
+  id: string;
+  companyId: string;
+  emailNormalized: string;
+  status: "PENDING" | "ACCEPTED" | "REVOKED" | "EXPIRED";
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+  invitedByMemberId: string | null;
+}
+
+export interface ScreeningQuestionInput {
+  type: ScreeningQuestionType;
+  label: string;
+  isRequired: boolean;
+  displayOrder: number;
+  options?: string[];
 }
 
 export interface CompanyLocationDto {
@@ -306,12 +352,58 @@ export function normalizeCompanyProfile(value: unknown): CompanyProfileDto {
     name: str(r.name) ?? "",
     slug: str(r.slug),
     legalName: str(r.legalName),
+    taxCode: str(r.taxCode),
+    industryId: str(r.industryId),
     description: str(r.description),
     website: str(r.website),
     employeeSizeRange: str(r.employeeSizeRange),
     foundedYear: num(r.foundedYear),
     verificationStatus: str(r.verificationStatus),
     status: str(r.status),
+  };
+}
+
+export function normalizeCompanyMember(value: unknown): CompanyMemberDto {
+  const r = obj(value);
+  const u = obj(r.user);
+  const rawRoles = Array.isArray(r.roles) ? r.roles : [];
+  return {
+    id: str(r.id) ?? "",
+    companyId: str(r.companyId) ?? "",
+    status: (str(r.status) as CompanyMemberDto["status"]) ?? "ACTIVE",
+    isOwner: r.isOwner === true,
+    joinedAt: str(r.joinedAt) ?? "",
+    removedAt: str(r.removedAt),
+    user: {
+      id: str(u.id) ?? "",
+      email: str(u.email) ?? "",
+      status: str(u.status) ?? "ACTIVE",
+    },
+    roles: rawRoles.map((item) => {
+      const ro = obj(item);
+      const inner = obj(ro.role);
+      return {
+        role: {
+          id: str(inner.id) ?? "",
+          name: str(inner.name) ?? "",
+        },
+      };
+    }),
+  };
+}
+
+export function normalizeCompanyInvitation(value: unknown): CompanyInvitationDto {
+  const r = obj(value);
+  return {
+    id: str(r.id) ?? "",
+    companyId: str(r.companyId) ?? "",
+    emailNormalized: str(r.emailNormalized) ?? str(r.email) ?? "",
+    status: (str(r.status) as CompanyInvitationDto["status"]) ?? "PENDING",
+    expiresAt: str(r.expiresAt) ?? "",
+    acceptedAt: str(r.acceptedAt),
+    revokedAt: str(r.revokedAt),
+    createdAt: str(r.createdAt) ?? "",
+    invitedByMemberId: str(r.invitedByMemberId),
   };
 }
 

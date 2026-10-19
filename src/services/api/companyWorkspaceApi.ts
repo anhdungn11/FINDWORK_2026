@@ -3,10 +3,13 @@ import { isWorkspaceWritesEnabled } from "../../config/featureFlags";
 import { toApiFailure, writeBlockedFailure } from "./apiFailure";
 import {
   normalizeCompanyProfile, normalizeJob, normalizeLocation, normalizeMyCompany, normalizePaged,
-  normalizeCompanyApplication, unwrapData,
+  normalizeCompanyApplication, normalizeCompanyMember, normalizeCompanyInvitation,
+  normalizeScreeningQuestions, unwrapData,
   type CompanyLocationDto, type CompanyProfileDto, type EmploymentType, type JobDto,
   type MyCompanyDto, type Paged, type SalaryPeriod, type WorkplaceType,
   type CompanyApplicationDto, type ApplicationReviewStatus,
+  type CompanyMemberDto, type CompanyInvitationDto, type AssignableCompanyRole,
+  type ScreeningQuestionDto, type ScreeningQuestionInput,
 } from "./apiTypes";
 
 export interface JobInput {
@@ -24,6 +27,29 @@ export interface JobInput {
   salaryNegotiable?: boolean;
   showSalary?: boolean;
   applicationDeadline?: string;
+}
+
+export interface CreateCompanyInput {
+  name: string;
+  slug: string;
+}
+
+export interface UpdateCompanyProfileInput {
+  name?: string;
+  legalName?: string | null;
+  taxCode?: string | null;
+  industryId?: string | null;
+  description?: string | null;
+  website?: string | null;
+  employeeSizeRange?: string | null;
+  foundedYear?: number | null;
+}
+
+export interface CompanyLocationInput {
+  addressLine?: string | null;
+  countryCode?: string | null;
+  provinceId?: string | null;
+  wardId?: string | null;
 }
 
 export type JobTransition = "publish" | "pause" | "close";
@@ -47,19 +73,86 @@ const items = (value: unknown): unknown[] => {
   return Array.isArray(data) ? data : [];
 };
 
-/** Company workspace — chỉ các endpoint có trong hợp đồng Backend. Quyền do Backend quyết định. */
+/** Company workspace — đầy đủ các endpoint theo hợp đồng Backend. Quyền do Backend kiểm soát. */
 export const companyWorkspaceApi = {
   listMine: (signal?: AbortSignal): Promise<MyCompanyDto[]> =>
     run(async () => items((await apiClient.get("/companies/me", { signal })).data).map(normalizeMyCompany)),
 
+  createCompany: (input: CreateCompanyInput): Promise<MyCompanyDto> => {
+    guardWrite("đăng ký doanh nghiệp mới");
+    return run(async () => normalizeMyCompany(unwrapData((await apiClient.post("/companies", input)).data)));
+  },
+
   getProfile: (companyId: string, signal?: AbortSignal): Promise<CompanyProfileDto> =>
     run(async () => normalizeCompanyProfile((await apiClient.get(`/companies/${companyId}/profile`, { signal })).data)),
+
+  updateProfile: (companyId: string, input: UpdateCompanyProfileInput): Promise<CompanyProfileDto> => {
+    guardWrite("cập nhật hồ sơ doanh nghiệp");
+    return run(async () => normalizeCompanyProfile(unwrapData((await apiClient.patch(`/companies/${companyId}/profile`, input)).data)));
+  },
+
+  requestVerification: (companyId: string): Promise<void> => {
+    guardWrite("gửi yêu cầu xác minh doanh nghiệp");
+    return run(async () => {
+      await apiClient.post(`/companies/${companyId}/verification-request`);
+    });
+  },
 
   listLocations: (companyId: string, signal?: AbortSignal): Promise<CompanyLocationDto[]> =>
     run(async () => items((await apiClient.get(`/companies/${companyId}/locations`, { signal })).data).map(normalizeLocation)),
 
-  listInvitations: (companyId: string, signal?: AbortSignal): Promise<Array<Record<string, unknown>>> =>
-    run(async () => items((await apiClient.get(`/companies/${companyId}/invitations`, { signal })).data) as Array<Record<string, unknown>>),
+  createLocation: (companyId: string, input: CompanyLocationInput): Promise<CompanyLocationDto> => {
+    guardWrite("thêm địa điểm làm việc");
+    return run(async () => normalizeLocation(unwrapData((await apiClient.post(`/companies/${companyId}/locations`, input)).data)));
+  },
+
+  updateLocation: (companyId: string, locationId: string, input: CompanyLocationInput): Promise<CompanyLocationDto> => {
+    guardWrite("cập nhật địa điểm làm việc");
+    return run(async () => normalizeLocation(unwrapData((await apiClient.patch(`/companies/${companyId}/locations/${locationId}`, input)).data)));
+  },
+
+  promoteHeadquarters: (companyId: string, locationId: string): Promise<CompanyLocationDto> => {
+    guardWrite("chuyển trụ sở chính");
+    return run(async () => normalizeLocation(unwrapData((await apiClient.put(`/companies/${companyId}/locations/${locationId}/headquarters`)).data)));
+  },
+
+  deleteLocation: (companyId: string, locationId: string): Promise<void> => {
+    guardWrite("xóa địa điểm làm việc");
+    return run(async () => {
+      await apiClient.delete(`/companies/${companyId}/locations/${locationId}`);
+    });
+  },
+
+  listMembers: (companyId: string, signal?: AbortSignal): Promise<CompanyMemberDto[]> =>
+    run(async () => items((await apiClient.get(`/companies/${companyId}/members`, { signal })).data).map(normalizeCompanyMember)),
+
+  updateMemberRole: (companyId: string, memberId: string, role: AssignableCompanyRole): Promise<CompanyMemberDto> => {
+    guardWrite("thay đổi vai trò thành viên");
+    return run(async () => normalizeCompanyMember(unwrapData((await apiClient.patch(`/companies/${companyId}/members/${memberId}/role`, { role })).data)));
+  },
+
+  removeMember: (companyId: string, memberId: string): Promise<{ id: string; status: string }> => {
+    guardWrite("xóa thành viên khỏi doanh nghiệp");
+    return run(async () => {
+      const res = await apiClient.delete(`/companies/${companyId}/members/${memberId}`);
+      return unwrapData(res.data) as { id: string; status: string };
+    });
+  },
+
+  listInvitations: (companyId: string, signal?: AbortSignal): Promise<CompanyInvitationDto[]> =>
+    run(async () => items((await apiClient.get(`/companies/${companyId}/invitations`, { signal })).data).map(normalizeCompanyInvitation)),
+
+  createInvitation: (companyId: string, email: string): Promise<CompanyInvitationDto> => {
+    guardWrite("mời thành viên");
+    return run(async () => normalizeCompanyInvitation(unwrapData((await apiClient.post(`/companies/${companyId}/invitations`, { email })).data)));
+  },
+
+  revokeInvitation: (companyId: string, invitationId: string): Promise<void> => {
+    guardWrite("thu hồi lời mời");
+    return run(async () => {
+      await apiClient.post(`/companies/${companyId}/invitations/${invitationId}/revoke`);
+    });
+  },
 
   listJobs: (companyId: string, params: { page?: number; pageSize?: number; status?: string }, signal?: AbortSignal): Promise<Paged<JobDto>> =>
     run(async () => {
@@ -86,6 +179,30 @@ export const companyWorkspaceApi = {
   transitionJob: (companyId: string, jobId: string, version: number, action: JobTransition): Promise<JobDto> => {
     guardWrite(`${action} tin tuyển dụng`);
     return run(async () => normalizeJob(unwrapData((await apiClient.post(`/companies/${companyId}/jobs/${jobId}/${action}`, { version })).data)));
+  },
+
+  listScreeningQuestions: (companyId: string, jobId: string, signal?: AbortSignal): Promise<{ jobId: string; version: number; questions: ScreeningQuestionDto[] }> =>
+    run(async () => {
+      const res = await apiClient.get(`/companies/${companyId}/jobs/${jobId}/screening-questions`, { signal });
+      const raw = unwrapData(res.data);
+      return {
+        jobId: String(raw.jobId ?? jobId),
+        version: Number(raw.version ?? 1),
+        questions: normalizeScreeningQuestions(raw.questions),
+      };
+    }),
+
+  replaceScreeningQuestions: (companyId: string, jobId: string, version: number, questions: ScreeningQuestionInput[]): Promise<{ jobId: string; version: number; questions: ScreeningQuestionDto[] }> => {
+    guardWrite("cập nhật câu hỏi sàng lọc");
+    return run(async () => {
+      const res = await apiClient.put(`/companies/${companyId}/jobs/${jobId}/screening-questions`, { version, questions });
+      const raw = unwrapData(res.data);
+      return {
+        jobId: String(raw.jobId ?? jobId),
+        version: Number(raw.version ?? version + 1),
+        questions: normalizeScreeningQuestions(raw.questions),
+      };
+    });
   },
 
   listJobApplications: (
@@ -148,11 +265,11 @@ export const availableReviewTransitions = (status: string | null): ApplicationRe
   return [];
 };
 
-/** Chuyển trạng thái hợp lệ theo hợp đồng: DRAFT→PUBLISHED, PUBLISHED→PAUSED, PUBLISHED/PAUSED→CLOSED. */
+/** Chuyển trạng thái hợp lệ theo hợp đồng: DRAFT→PUBLISHED, PUBLISHED→PAUSED/CLOSED, PAUSED→PUBLISHED/CLOSED. */
 export const availableTransitions = (status: string | null): JobTransition[] => {
   if (status === "DRAFT") return ["publish"];
   if (status === "PUBLISHED") return ["pause", "close"];
-  if (status === "PAUSED") return ["close"];
+  if (status === "PAUSED") return ["publish", "close"];
   return [];
 };
 

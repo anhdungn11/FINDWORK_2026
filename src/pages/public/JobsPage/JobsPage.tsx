@@ -3,6 +3,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useLocation } from "react-router-dom";
 
 import {
   jobs as rawMockJobs,
@@ -14,6 +15,7 @@ import {
   formatSalary,
 } from "@/services/api/apiTypes";
 import type { JobRecord } from "@/features/jobs/types/job.types";
+import { isDemoFixturesAllowed } from "@/config/featureFlags";
 
 import JobActiveFilters from "@/features/jobs/components/JobActiveFilters/JobActiveFilters";
 import JobAdvancedFilters from "@/features/jobs/components/JobAdvancedFilters/JobAdvancedFilters";
@@ -38,6 +40,8 @@ const mockJobs: JobRecord[] = rawMockJobs.map((j) => ({
 }));
 
 const JobsPage = () => {
+  const routerLocation = useLocation();
+  const allowDemo = isDemoFixturesAllowed(routerLocation.search);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [dataSource, setDataSource] = useState<"live" | "demo">("live");
   const [liveJobs, setLiveJobs] = useState<JobRecord[]>([]);
@@ -67,7 +71,7 @@ const JobsPage = () => {
             : "Không yêu cầu",
           salary: formatSalary(dto),
           postedAt: dto.publishedAt ? new Date(dto.publishedAt).toLocaleDateString("vi-VN") : "Mới đăng",
-          matchScore: 90,
+          matchScore: 0,
           isMock: false,
         }));
         setLiveJobs(mapped);
@@ -85,9 +89,9 @@ const JobsPage = () => {
   }, []);
 
   const activeJobs = useMemo(() => {
-    if (dataSource === "demo") return mockJobs;
+    if (allowDemo && dataSource === "demo") return mockJobs;
     return liveJobs;
-  }, [dataSource, liveJobs]);
+  }, [allowDemo, dataSource, liveJobs]);
 
   const jobFilters = useJobFilters(activeJobs);
 
@@ -129,41 +133,43 @@ const JobsPage = () => {
 
   return (
     <div className={styles.page}>
-      <aside className={styles.sourceToggleBar} role="region" aria-label="Nguồn dữ liệu việc làm">
-        <div className={`container ${styles.sourceToggleContainer}`}>
-          <div className={styles.sourceNotice}>
-            {dataSource === "live" ? (
-              <span>
-                <strong>Nguồn dữ liệu:</strong> Đang kết nối trực tiếp với Backend API (GET /api/v1/jobs)
-                {isLoadingLive && " — Đang tải dữ liệu..."}
-                {liveError && ` — Lỗi kết nối: ${liveError}`}
-                {!isLoadingLive && !liveError && ` (${liveJobs.length} tin tuyển dụng thực tế)`}
-              </span>
-            ) : (
-              <span>
-                <strong>Nguồn dữ liệu:</strong> Đang xem bộ dữ liệu mẫu minh họa (Demo fixtures - {mockJobs.length} tin)
-              </span>
-            )}
-          </div>
+      {allowDemo && (
+        <aside className={styles.sourceToggleBar} role="region" aria-label="Nguồn dữ liệu việc làm">
+          <div className={`container ${styles.sourceToggleContainer}`}>
+            <div className={styles.sourceNotice}>
+              {dataSource === "live" ? (
+                <span>
+                  <strong>Nguồn dữ liệu:</strong> Đang kết nối trực tiếp với Backend API (GET /api/v1/jobs)
+                  {isLoadingLive && " — Đang tải dữ liệu..."}
+                  {liveError && ` — Lỗi kết nối: ${liveError}`}
+                  {!isLoadingLive && !liveError && ` (${liveJobs.length} tin tuyển dụng thực tế)`}
+                </span>
+              ) : (
+                <span>
+                  <strong>Nguồn dữ liệu:</strong> Đang xem bộ dữ liệu mẫu minh họa (Demo fixtures - {mockJobs.length} tin)
+                </span>
+              )}
+            </div>
 
-          <div className={styles.sourceButtons}>
-            <button
-              type="button"
-              className={`${styles.sourceToggleBtn} ${dataSource === "live" ? styles.sourceToggleBtnActive : ""}`}
-              onClick={() => setDataSource("live")}
-            >
-              Tin thật từ Backend ({liveJobs.length})
-            </button>
-            <button
-              type="button"
-              className={`${styles.sourceToggleBtn} ${dataSource === "demo" ? styles.sourceToggleBtnActive : ""}`}
-              onClick={() => setDataSource("demo")}
-            >
-              Bản tin mẫu Demo ({mockJobs.length})
-            </button>
+            <div className={styles.sourceButtons}>
+              <button
+                type="button"
+                className={`${styles.sourceToggleBtn} ${dataSource === "live" ? styles.sourceToggleBtnActive : ""}`}
+                onClick={() => setDataSource("live")}
+              >
+                Tin thật từ Backend ({liveJobs.length})
+              </button>
+              <button
+                type="button"
+                className={`${styles.sourceToggleBtn} ${dataSource === "demo" ? styles.sourceToggleBtnActive : ""}`}
+                onClick={() => setDataSource("demo")}
+              >
+                Bản tin mẫu Demo ({mockJobs.length})
+              </button>
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       <JobsHero
         searchContent={
@@ -218,21 +224,42 @@ const JobsPage = () => {
 
       <JobsResultsSection
         resultsContent={
-          dataSource === "live" && !isLoadingLive && liveJobs.length === 0 ? (
+          isLoadingLive ? (
+            <div style={{ padding: "48px 24px", textAlign: "center" }}>
+              <p style={{ color: "var(--color-text-secondary)" }}>Đang tải danh sách việc làm...</p>
+            </div>
+          ) : liveError && dataSource === "live" ? (
             <div style={{ padding: "48px 24px", textAlign: "center", background: "var(--color-surface)", borderRadius: "14px", border: "1px solid var(--color-border)" }}>
-              <h3 style={{ margin: "0 0 10px", fontSize: "18px", color: "var(--color-text-primary)" }}>
-                Hiện chưa có tin tuyển dụng nào được xuất bản từ Backend
+              <h3 style={{ margin: "0 0 10px", fontSize: "18px", color: "var(--color-danger, #ef4444)" }}>
+                Không thể tải danh sách việc làm
               </h3>
               <p style={{ margin: "0 0 20px", fontSize: "14px", color: "var(--color-text-secondary)" }}>
-                Hệ thống Backend hiện tại chưa có việc làm nào ở trạng thái PUBLISHED. Bạn có thể chuyển sang chế độ xem dữ liệu mẫu minh họa để kiểm tra bộ lọc và giao diện.
+                {liveError}
               </p>
               <button
                 type="button"
                 className={styles.sourceToggleBtnActive}
                 style={{ padding: "10px 20px", borderRadius: "10px", cursor: "pointer", border: "none", fontWeight: 700 }}
-                onClick={() => setDataSource("demo")}
+                onClick={() => window.location.reload()}
               >
-                Xem dữ liệu mẫu minh họa (Demo)
+                Thử lại
+              </button>
+            </div>
+          ) : dataSource === "live" && liveJobs.length === 0 ? (
+            <div style={{ padding: "48px 24px", textAlign: "center", background: "var(--color-surface)", borderRadius: "14px", border: "1px solid var(--color-border)" }}>
+              <h3 style={{ margin: "0 0 10px", fontSize: "18px", color: "var(--color-text-primary)" }}>
+                Hiện chưa có tin tuyển dụng nào được xuất bản
+              </h3>
+              <p style={{ margin: "0 0 20px", fontSize: "14px", color: "var(--color-text-secondary)" }}>
+                Các doanh nghiệp đang cập nhật các cơ hội việc làm mới. Bạn có thể quay lại sau hoặc làm mới trang.
+              </p>
+              <button
+                type="button"
+                className={styles.sourceToggleBtnActive}
+                style={{ padding: "10px 20px", borderRadius: "10px", cursor: "pointer", border: "none", fontWeight: 700 }}
+                onClick={() => window.location.reload()}
+              >
+                Tải lại danh sách
               </button>
             </div>
           ) : (

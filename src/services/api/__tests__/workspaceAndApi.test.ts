@@ -222,7 +222,7 @@ describe("job lifecycle transitions", () => {
   it("determines valid status transitions per backend contract", () => {
     assert.deepEqual(availableTransitions("DRAFT"), ["publish"]);
     assert.deepEqual(availableTransitions("PUBLISHED"), ["pause", "close"]);
-    assert.deepEqual(availableTransitions("PAUSED"), ["close"]);
+    assert.deepEqual(availableTransitions("PAUSED"), ["publish", "close"]);
     assert.deepEqual(availableTransitions("CLOSED"), []);
     assert.deepEqual(availableTransitions("ARCHIVED"), []);
   });

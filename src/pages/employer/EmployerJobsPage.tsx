@@ -86,7 +86,7 @@ const EmployerJobsPage = () => {
                         {availableTransitions(job.status).map((a) => (
                           <button key={a} type="button" className={ui.btn} disabled={!writes || busyId === job.id} aria-disabled={!writes}
                             title={writes ? undefined : "Thao tác ghi đang tắt"} onClick={() => transition(job, a)}>
-                            {ACTION_LABEL[a]}
+                            {a === "publish" && job.status === "PAUSED" ? "Mở lại tin" : ACTION_LABEL[a]}
                           </button>
                         ))}
                         {job.status === "PUBLISHED" && <Link className={ui.link} to={`/jobs/${job.id}`}>Xem công khai</Link>}

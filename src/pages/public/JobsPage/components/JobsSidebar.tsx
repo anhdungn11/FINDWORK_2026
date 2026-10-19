@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import JobsMarketCard from "./JobsMarketCard";
 
 import styles from "../styles/JobsSidebar.module.css";
@@ -7,31 +8,39 @@ const JobsSidebar = () => {
     <aside className={styles.sidebar}>
       <JobsMarketCard />
 
-      <div className={styles.sideAction}>
+      <Link
+        to="/candidate/profile"
+        className={styles.sideAction}
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
         <div>
           <strong>
-            Nhận việc làm phù hợp
+            Nguyện vọng nghề nghiệp
           </strong>
 
           <span>
-            Đăng ký để nhận việc mới mỗi ngày
+            Thiết lập tiêu chí để nhận cơ hội phù hợp
           </span>
         </div>
 
-        <span>→</span>
-      </div>
+        <span aria-hidden="true">→</span>
+      </Link>
 
-      <div className={styles.sideAction}>
+      <Link
+        to="/candidate/saved-jobs"
+        className={styles.sideAction}
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
         <div>
-          <strong>Việc đã lưu</strong>
+          <strong>Việc làm đã lưu</strong>
 
           <span>
-            Xem danh sách việc bạn đã lưu
+            Xem danh sách các vị trí bạn đang theo dõi
           </span>
         </div>
 
-        <span>→</span>
-      </div>
+        <span aria-hidden="true">→</span>
+      </Link>
     </aside>
   );
 };

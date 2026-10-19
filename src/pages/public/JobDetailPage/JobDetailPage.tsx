@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Link,
+  useLocation,
   useParams,
 } from "react-router-dom";
 
@@ -14,6 +15,7 @@ import {
   WORKPLACE_TYPE_LABEL,
   formatSalary,
 } from "@/services/api/apiTypes";
+import { isDemoFixturesAllowed } from "@/config/featureFlags";
 
 import JobDescriptionPlaceholder from "./components/JobDescriptionPlaceholder";
 import JobDetailHero from "./components/JobDetailHero";
@@ -56,7 +58,7 @@ const BackendJobDetailPage = ({ jobId }: { jobId: string }) => {
             : "Không yêu cầu kinh nghiệm",
           salary: formatSalary(dto),
           postedAt: dto.publishedAt ? new Date(dto.publishedAt).toLocaleDateString("vi-VN") : "Mới đăng",
-          matchScore: 92,
+          matchScore: 0,
           isMock: false,
         };
         setJob(mapped);
@@ -126,6 +128,7 @@ const BackendJobDetailPage = ({ jobId }: { jobId: string }) => {
 
 const JobDetailPage = () => {
   const { id } = useParams();
+  const location = useLocation();
   const parsedJobId = parseJobId(id);
 
   if (parsedJobId.kind === "invalid") {
@@ -134,6 +137,10 @@ const JobDetailPage = () => {
 
   if (parsedJobId.kind === "backend") {
     return <BackendJobDetailPage key={parsedJobId.id} jobId={parsedJobId.id} />;
+  }
+
+  if (!isDemoFixturesAllowed(location.search)) {
+    return <JobDetailNotFound />;
   }
 
   const job = jobs.find((item) => item.id === parsedJobId.id);

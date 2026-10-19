@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 
 import { parseCompanyId } from "@/app/router/companyId";
 import { companies } from "@/data/mock/companies.mock";
 import { publicApi } from "@/services/api/publicApi";
+import { isDemoFixturesAllowed } from "@/config/featureFlags";
 import type { JobDto, PublicCompanyDto } from "@/services/api/apiTypes";
 import type { ApiFailure } from "@/services/api/apiFailure";
 import ApiErrorState from "@/components/ui/ApiErrorState";
@@ -20,6 +21,7 @@ import styles from "./styles/CompanyDetailLayout.module.css";
 
 const CompanyDetailPage = () => {
   const { id } = useParams();
+  const location = useLocation();
   const parsedId = parseCompanyId(id);
 
   if (parsedId.kind === "invalid") {
@@ -27,6 +29,9 @@ const CompanyDetailPage = () => {
   }
 
   if (parsedId.kind === "mock") {
+    if (!isDemoFixturesAllowed(location.search)) {
+      return <CompanyDetailNotFound />;
+    }
     const mockCompany = companies.find((item) => item.id === parsedId.id);
     if (!mockCompany) {
       return <CompanyDetailNotFound />;

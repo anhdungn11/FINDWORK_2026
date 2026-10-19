@@ -1,7 +1,4 @@
-import {
-  JOB_MARKET_TRENDS,
-} from "../jobs-page.constants";
-
+import { Link } from "react-router-dom";
 import styles from "../styles/JobsMarketCard.module.css";
 
 const JobsMarketCard = () => {
@@ -9,57 +6,50 @@ const JobsMarketCard = () => {
     <div className={styles.marketCard}>
       <div className={styles.marketHeader}>
         <span className={styles.eyebrow}>
-          THỊ TRƯỜNG VIỆC LÀM
+          HƯỚNG DẪN ỨNG VIÊN
         </span>
 
-        <span className={styles.trendIcon}>
-          ↗
+        <span className={styles.trendIcon} aria-hidden="true">
+          ★
         </span>
       </div>
 
-      <h3>Xu hướng tuyển dụng</h3>
+      <h3>Mẹo nộp đơn hiệu quả</h3>
 
-      <p
-        className={
-          styles.marketDescription
-        }
-      >
-        Dữ liệu cập nhật tuần này
+      <p className={styles.marketDescription}>
+        Tiêu chuẩn tuyển dụng trên FINDWORK
       </p>
 
       <div className={styles.trendList}>
-        {JOB_MARKET_TRENDS.map(
-          (trend) => (
-            <div
-              key={trend.name}
-              className={
-                styles.trendItem
-              }
-            >
-              <div>
-                <strong>
-                  {trend.name}
-                </strong>
+        <div className={styles.trendItem}>
+          <div>
+            <strong>CV Builder trực tuyến</strong>
+            <span>Được số hóa sẵn sàng nộp trực tiếp không cần chuyển đổi định dạng</span>
+          </div>
+        </div>
 
-                <span>
-                  {trend.description}
-                </span>
-              </div>
+        <div className={styles.trendItem}>
+          <div>
+            <strong>Câu hỏi sàng lọc</strong>
+            <span>Trả lời đầy đủ yêu cầu của nhà tuyển dụng để hồ sơ được ưu tiên duyệt</span>
+          </div>
+        </div>
 
-              <b>{trend.change}</b>
-            </div>
-          ),
-        )}
+        <div className={styles.trendItem}>
+          <div>
+            <strong>Theo dõi minh bạch</strong>
+            <span>Cập nhật tiến trình xét duyệt từ nộp đơn đến phỏng vấn tại Không gian ứng viên</span>
+          </div>
+        </div>
       </div>
 
-      <button
-        type="button"
-        className={
-          styles.analysisButton
-        }
+      <Link
+        to="/cv/create"
+        className={styles.analysisButton}
+        style={{ display: "block", textAlign: "center", textDecoration: "none" }}
       >
-        Xem phân tích chi tiết
-      </button>
+        Tạo hồ sơ CV ngay
+      </Link>
     </div>
   );
 };

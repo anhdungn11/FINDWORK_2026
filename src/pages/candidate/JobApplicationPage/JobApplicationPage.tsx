@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     Link,
+    useLocation,
     useParams,
     useSearchParams,
 } from "react-router-dom";
+import { isDemoFixturesAllowed } from "@/config/featureFlags";
 
 import ApplicationJobSummary from "@/features/applications/components/ApplicationJobSummary/ApplicationJobSummary";
 import ApplicationStepper from "@/features/applications/components/ApplicationStepper/ApplicationStepper";
@@ -79,6 +81,7 @@ const DEMO_SCREENING_QUESTIONS: ScreeningQuestionItem[] = [
 
 const JobApplicationPage = () => {
     const { id } = useParams();
+    const location = useLocation();
 
     const parsedJobId = parseJobId(id);
 
@@ -100,6 +103,18 @@ const JobApplicationPage = () => {
 
     if (parsedJobId.kind === "backend") {
         return <RealJobApplicationPage key={parsedJobId.id} jobId={parsedJobId.id} />;
+    }
+
+    if (!isDemoFixturesAllowed(location.search)) {
+        return (
+            <section className={styles.statePage}>
+                <div>
+                    <h1>Không tìm thấy việc làm</h1>
+                    <p>Tin tuyển dụng không tồn tại hoặc đã hết hạn.</p>
+                    <Link to="/jobs">Quay lại danh sách việc làm</Link>
+                </div>
+            </section>
+        );
     }
 
     return <MockJobApplicationPage key={parsedJobId.id} jobId={parsedJobId.id} />;
