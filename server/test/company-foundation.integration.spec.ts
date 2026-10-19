@@ -91,6 +91,7 @@ describe("Phase 4.3A Company Foundation integration", () => {
     await prisma.companyLocation.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.companyMember.deleteMany({ where: { companyId: { in: companyIds } } });
     await prisma.company.deleteMany({ where: { id: { in: companyIds } } });
+    await prisma.systemUserRole.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.authSession.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await app.close();
@@ -340,5 +341,72 @@ describe("Phase 4.3A Company Foundation integration", () => {
     expect((await authorizationService.resolveRequiredCompanyPermissions(
       userA.id, b1.body.id, ["company.update"],
     )).allowed).toBe(false);
+  });
+
+  it("manages tenant members and completes the verification review with persisted audit", async () => {
+    const owner = await createAuthenticatedUser("manage-owner");
+    const peer = await createAuthenticatedUser("manage-peer");
+    const outsider = await createAuthenticatedUser("manage-outsider");
+    const reviewer = await createAuthenticatedUser("manage-reviewer");
+    const created = await request(app.getHttpServer()).post(API)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ name: "Review Company", slug: slug("review") }).expect(201);
+    const companyId = created.body.id as string;
+    await request(app.getHttpServer()).post(API)
+      .set("Authorization", `Bearer ${outsider.accessToken}`)
+      .send({ name: "Other Company", slug: slug("other") }).expect(201);
+
+    const viewer = await prisma.role.findFirstOrThrow({
+      where: { companyId, normalizedName: "viewer" }, select: { id: true },
+    });
+    const member = await prisma.companyMember.create({
+      data: { companyId, userId: peer.id, status: "ACTIVE" }, select: { id: true },
+    });
+    await prisma.companyMemberRole.create({ data: {
+      companyId, companyMemberId: member.id, roleId: viewer.id, assignedByUserId: owner.id,
+    } });
+    const membersPath = `${API}/${companyId}/members`;
+    await request(app.getHttpServer()).get(membersPath)
+      .set("Authorization", `Bearer ${outsider.accessToken}`).expect(403);
+    await request(app.getHttpServer()).get(membersPath)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(200)
+      .expect((r) => expect(r.body.data).toHaveLength(2));
+    await request(app.getHttpServer()).patch(`${membersPath}/${member.id}/role`)
+      .set("Authorization", `Bearer ${peer.accessToken}`)
+      .send({ role: "RECRUITER" }).expect(403);
+    await request(app.getHttpServer()).patch(`${membersPath}/${member.id}/role`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ role: "RECRUITER" }).expect(200);
+    expect((await prisma.companyMemberRole.findMany({ where: { companyMemberId: member.id },
+      select: { role: { select: { name: true } } } })).map((row) => row.role.name)).toEqual(["RECRUITER"]);
+
+    await request(app.getHttpServer()).post(`${API}/${companyId}/verification-request`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(400);
+    await request(app.getHttpServer()).patch(`${API}/${companyId}/profile`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ legalName: "Review Company LLC", taxCode: "123456789" }).expect(200);
+    await request(app.getHttpServer()).post(`${API}/${companyId}/verification-request`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(200)
+      .expect((r) => expect(r.body.verificationStatus).toBe("PENDING"));
+    const verificationRole = await prisma.role.findFirstOrThrow({
+      where: { kind: "SYSTEM", systemCode: "VERIFICATION_ADMIN", isActive: true }, select: { id: true },
+    });
+    await prisma.systemUserRole.create({ data: { userId: reviewer.id, roleId: verificationRole.id } });
+    await request(app.getHttpServer()).get(`/api/v1/admin/companies?verificationStatus=PENDING&q=Review`)
+      .set("Authorization", `Bearer ${reviewer.accessToken}`).expect(200)
+      .expect((r) => expect(r.body.data.some((row: { id: string }) => row.id === companyId)).toBe(true));
+    await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${companyId}/verification`)
+      .set("Authorization", `Bearer ${reviewer.accessToken}`)
+      .send({ status: "VERIFIED" }).expect(200);
+    await request(app.getHttpServer()).get(`${API}/${companyId}`).expect(200)
+      .expect((r) => expect(r.body.isVerified).toBe(true));
+
+    await request(app.getHttpServer()).delete(`${membersPath}/${member.id}`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(200);
+    expect((await prisma.companyMember.findUniqueOrThrow({ where: { id: member.id } })).status).toBe("REMOVED");
+    expect((await authorizationService.resolveRequiredCompanyPermissions(peer.id, companyId, ["company.view"])).allowed).toBe(false);
+    expect(await prisma.auditLog.count({ where: { companyId, action: { in: [
+      "company.member.role.update", "company.verification.request", "admin.company.verify", "company.member.remove",
+    ] } } })).toBe(4);
   });
 });

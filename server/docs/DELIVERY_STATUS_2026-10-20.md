@@ -8,8 +8,8 @@ Base path: `/api/v1`. Protected routes require `Authorization: Bearer <accessTok
 | --- | --- | --- |
 | Company registration, owner bootstrap, profile and locations | IMPLEMENTED; TESTED in existing integration specs | Existing `company-foundation` and `company-profile-locations` specs; no database test run in this cycle. |
 | Invitations and acceptance | IMPLEMENTED; TESTED in existing integration specs | Acceptance creates active VIEWER membership; no database test run in this cycle. |
-| Member listing, role change, removal | IMPLEMENTED; TESTED at unit level | New member service/controller, 4 focused unit tests; PostgreSQL E2E still BLOCKED by fixture/write/cleanup authorization. |
-| Company verification request and admin review | IMPLEMENTED; TESTED at unit level | Legal name and tax code required; PENDING decision gate; PostgreSQL E2E still BLOCKED by fixture/write/cleanup authorization. |
+| Member listing, role change, removal | IMPLEMENTED; TESTED at unit level | New member service/controller, 4 focused unit tests and an unrun integration scenario; PostgreSQL E2E still BLOCKED by fixture/write/cleanup authorization. |
+| Company verification request and admin review | IMPLEMENTED; TESTED at unit level | Legal name and tax code required; PENDING decision gate; unrun integration scenario; PostgreSQL E2E still BLOCKED by fixture/write/cleanup authorization. |
 | Company jobs, public jobs, candidate applications, recruiter review and candidate status | IMPLEMENTED; TESTED in existing integration spec source | `submission-workflow.integration.spec.ts` covers publish, search, apply, screening answers, duplicate prevention, tenant isolation, review and moderation. It was not run in this cycle. |
 | Admin dashboard, lists, details, moderation and audit | IMPLEMENTED; TESTED at unit level | Dashboard uses PostgreSQL counts; new detail reads and review rules pass unit tests. PostgreSQL E2E still BLOCKED by authorization. |
 | Production database migration / live write smoke | BLOCKED | No approval for fixture setup, real writes or cleanup. No `findwork_dev` write, reset or global seed was run. |
@@ -35,6 +35,7 @@ Existing job/application/admin endpoints and response examples are in `SUBMISSIO
 - `npm.cmd run build`: passed.
 - `npm.cmd run test:unit -- --runInBand`: 16 suites, 158 tests passed.
 - `git diff --check`: passed.
+- `tsc --noEmit -p tsconfig.json`: passed after adding the integration scenario.
 - PostgreSQL integration, fixture CLI, live HTTP write smoke and cleanup: not run because each requires explicit authorization.
 
 Next implementation task: run the existing guarded `submission-workflow.integration.spec.ts` and add database integration coverage for member role changes and verification review after approval for fixture creation, test writes and cleanup against `findwork_test`.
