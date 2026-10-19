@@ -9,6 +9,7 @@ import { AppModule } from "../src/app.module";
 import { ApiExceptionFilter } from "../src/common/exceptions/api-exception.filter";
 import { PrismaService } from "../src/infrastructure/prisma/prisma.service";
 import { TokenService } from "../src/modules/auth/services/token.service";
+import { Prisma } from "../src/generated/prisma/client";
 import { assertSafeIntegrationDatabase } from "./integration-safety";
 
 /** Acceptance workflow. Writes only after the strict findwork_test identity check. Never run without authorization. */
@@ -61,41 +62,85 @@ describe("submission recruitment workflow E2E", () => {
     await db.savedJob.count({ where: { id: run } }); // Verify the additive migration before fixtures.
     await db.$queryRaw`SELECT 'MULTI_SELECT'::"ScreeningQuestionType"`; // Verify the enum migration.
     fixturePreflightPassed = true;
+    process.stdout.write(`Submission integration run ID: ${run}\n`);
   });
 
   afterAll(async () => {
     if (!fixturePreflightPassed) { await app?.close(); return; }
-    const ownedCompanies = await db.company.findMany({
-      where: { slug: { startsWith: `submission-${run}-` } }, select: { id: true },
-    });
-    for (const company of ownedCompanies) if (!companies.includes(company.id)) companies.push(company.id);
-    // Delete only IDs created by this suite, in FK order. No broad reset or seed.
-    await db.applicationStatusHistory.deleteMany({ where: { application: { companyId: { in: companies } } } });
-    await db.applicationAnswer.deleteMany({ where: { application: { companyId: { in: companies } } } });
-    await db.application.deleteMany({ where: { companyId: { in: companies } } });
-    await db.savedJob.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
-    await db.resumeVersion.deleteMany({ where: { resume: { candidateProfile: { userId: { in: users } } } } });
-    await db.resume.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
-    await db.screeningQuestion.deleteMany({ where: { job: { companyId: { in: companies } } } });
-    await db.job.deleteMany({ where: { companyId: { in: companies } } });
-    await db.auditLog.deleteMany({ where: { companyId: { in: companies } } });
-    await db.companyMemberRole.deleteMany({ where: { companyId: { in: companies } } });
-    await db.rolePermission.deleteMany({ where: { role: { companyId: { in: companies } } } });
-    await db.role.deleteMany({ where: { companyId: { in: companies } } });
-    await db.companyMember.deleteMany({ where: { companyId: { in: companies } } });
-    await db.company.deleteMany({ where: { id: { in: companies } } });
-    await db.candidateOnboardingDraft.deleteMany({ where: { userId: { in: users } } });
-    await db.candidateCareerPreference.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
-    await db.candidatePrivacySetting.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
-    await db.candidateProfile.deleteMany({ where: { userId: { in: users } } });
-    await db.systemUserRole.deleteMany({ where: { userId: { in: users } } });
-    await db.authSession.deleteMany({ where: { userId: { in: users } } });
-    await db.user.deleteMany({ where: { id: { in: users } } });
-    const category = categoryId ? { id: categoryId } : await db.jobCategory.findUnique({
-      where: { code: `submission-${run}` }, select: { id: true },
-    });
-    if (category) await db.jobCategory.delete({ where: { id: category.id } });
-    await app.close();
+    try {
+      await db.$transaction(async (tx) => {
+        const ownedCompanies = await tx.company.findMany({
+          where: { slug: { startsWith: `submission-${run}-` } },
+          select: { id: true, createdByUserId: true },
+        });
+        for (const company of ownedCompanies) if (!companies.includes(company.id)) companies.push(company.id);
+        const jobs = await tx.job.findMany({ where: { companyId: { in: companies } }, select: { id: true } });
+        const jobIds = jobs.map((job) => job.id);
+        for (const jobId of jobIds) await tx.$queryRaw`SELECT "id" FROM "Job" WHERE "id" = ${jobId}::uuid FOR UPDATE`;
+        const members = await tx.companyMember.findMany({
+          where: { companyId: { in: companies } }, select: { userId: true },
+        });
+        const applications = await tx.application.findMany({
+          where: { OR: [{ companyId: { in: companies } }, { candidateProfile: { userId: { in: users } } }] },
+          select: { id: true, companyId: true, candidateProfile: { select: { userId: true } } },
+        });
+        const applicationIds = applications.map((application) => application.id);
+        const saved = await tx.savedJob.findMany({
+          where: { OR: [{ jobId: { in: jobIds } }, { candidateProfile: { userId: { in: users } } }] },
+          select: { jobId: true, candidateProfile: { select: { userId: true } } },
+        });
+        const category = categoryId ? { id: categoryId } : await tx.jobCategory.findUnique({
+          where: { code: `submission-${run}` }, select: { id: true },
+        });
+        const unrelated = ownedCompanies.some((company) => !users.includes(company.createdByUserId)) ||
+          members.some((member) => !users.includes(member.userId)) ||
+          applications.some((application) => !companies.includes(application.companyId) ||
+            !users.includes(application.candidateProfile.userId)) ||
+          saved.some((entry) => !jobIds.includes(entry.jobId) || !users.includes(entry.candidateProfile.userId)) ||
+          await tx.company.count({ where: { createdByUserId: { in: users }, id: { notIn: companies } } }) > 0 ||
+          await tx.companyMember.count({ where: { userId: { in: users }, companyId: { notIn: companies } } }) > 0 ||
+          await tx.companyInvitation.count({ where: { companyId: { in: companies } } }) > 0 ||
+          await tx.companyLocation.count({ where: { companyId: { in: companies } } }) > 0 ||
+          await tx.companyMemberPermission.count({ where: { companyId: { in: companies } } }) > 0 ||
+          await tx.companyMemberRole.count({ where: { companyId: { in: companies }, assignedByUserId: { notIn: users } } }) > 0 ||
+          await tx.systemUserPermission.count({ where: { userId: { in: users } } }) > 0 ||
+          await tx.auditLog.count({ where: { companyId: { in: companies },
+            OR: [{ actorUserId: null }, { actorUserId: { notIn: users } }] } }) > 0 ||
+          await tx.applicationStatusHistory.count({ where: { applicationId: { in: applicationIds },
+            OR: [{ changedByUserId: null }, { changedByUserId: { notIn: users } }] } }) > 0 ||
+          await tx.applicationAssignment.count({ where: { applicationId: { in: applicationIds } } }) > 0 ||
+          await tx.interview.count({ where: { applicationId: { in: applicationIds } } }) > 0 ||
+          await tx.jobLocation.count({ where: { jobId: { in: jobIds } } }) > 0 ||
+          await tx.jobSkill.count({ where: { jobId: { in: jobIds } } }) > 0 ||
+          (category ? await tx.job.count({ where: { categoryId: category.id, companyId: { notIn: companies } } }) > 0 : false);
+        if (unrelated) throw new Error("Submission integration cleanup refused: unrelated records reference this run.");
+
+        await tx.applicationStatusHistory.deleteMany({ where: { applicationId: { in: applicationIds } } });
+        await tx.applicationAnswer.deleteMany({ where: { applicationId: { in: applicationIds } } });
+        await tx.application.deleteMany({ where: { id: { in: applicationIds } } });
+        await tx.savedJob.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
+        await tx.resumeVersion.deleteMany({ where: { resume: { candidateProfile: { userId: { in: users } } } } });
+        await tx.resume.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
+        await tx.screeningQuestion.deleteMany({ where: { job: { companyId: { in: companies } } } });
+        await tx.job.deleteMany({ where: { companyId: { in: companies } } });
+        await tx.auditLog.deleteMany({ where: { companyId: { in: companies } } });
+        await tx.companyMemberRole.deleteMany({ where: { companyId: { in: companies } } });
+        await tx.rolePermission.deleteMany({ where: { role: { companyId: { in: companies } } } });
+        await tx.role.deleteMany({ where: { companyId: { in: companies } } });
+        await tx.companyMember.deleteMany({ where: { companyId: { in: companies } } });
+        await tx.company.deleteMany({ where: { id: { in: companies } } });
+        await tx.candidateOnboardingDraft.deleteMany({ where: { userId: { in: users } } });
+        await tx.candidateCareerPreference.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
+        await tx.candidatePrivacySetting.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
+        await tx.candidateProfile.deleteMany({ where: { userId: { in: users } } });
+        await tx.systemUserRole.deleteMany({ where: { userId: { in: users } } });
+        await tx.authSession.deleteMany({ where: { userId: { in: users } } });
+        await tx.user.deleteMany({ where: { id: { in: users } } });
+        if (category) await tx.jobCategory.delete({ where: { id: category.id } });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 });
+    } finally {
+      await app.close();
+    }
   });
 
   async function actor(label: string, expired = false) {
@@ -194,6 +239,8 @@ describe("submission recruitment workflow E2E", () => {
     const published = await request(app.getHttpServer()).post(`${jobs}/${jobId}/publish`)
       .set(bearer(owner.token)).send({ version: configured.body.version }).expect(200);
     expect(published.body.status).toBe("PUBLISHED");
+    expect(await db.job.findUniqueOrThrow({ where: { id: jobId },
+      select: { companyId: true, status: true } })).toEqual({ companyId, status: "PUBLISHED" });
     await request(app.getHttpServer()).post(`${jobs}/${jobId}/pause`)
       .set(bearer(owner.token)).send({ version: draft.body.version }).expect(409);
     await request(app.getHttpServer()).get(api("/jobs?page=1&pageSize=1&q=Submission%20engineer"))
@@ -290,6 +337,8 @@ describe("submission recruitment workflow E2E", () => {
     const submitted = await request(app.getHttpServer()).post(api(`/jobs/${jobId}/applications`))
       .set(bearer(candidate.token)).send(submission).expect(201);
     const applicationId = submitted.body.id as string;
+    expect(await db.user.findUniqueOrThrow({ where: { id: candidate.id },
+      select: { status: true } })).toEqual({ status: "ACTIVE" });
     expect(submitted.body).toMatchObject({ fullNameSnapshot: "Application Candidate", emailSnapshot: "application@example.test",
       phoneSnapshot: "+84901234567", currentLocationSnapshot: "Ho Chi Minh City",
       availability: "WITHIN_2_WEEKS", preferredContactMethod: "PHONE" });
@@ -330,6 +379,13 @@ describe("submission recruitment workflow E2E", () => {
     const reviewed = await request(app.getHttpServer()).patch(`${applications}/${applicationId}/status`)
       .set(bearer(recruiter.token)).send({ version: 1, status: "REVIEWING" }).expect(200);
     expect(reviewed.body.status).toBe("REVIEWING");
+    expect(await db.application.findUniqueOrThrow({ where: { id: applicationId },
+      select: { companyId: true, jobId: true, status: true } })).toEqual({
+      companyId, jobId, status: "REVIEWING",
+    });
+    expect((await db.applicationStatusHistory.findMany({ where: { applicationId },
+      select: { toStatus: true } })).map((row) => row.toStatus).sort())
+      .toEqual(["REVIEWING", "SUBMITTED"]);
     await request(app.getHttpServer()).patch(`${applications}/${applicationId}/status`)
       .set(bearer(recruiter.token)).send({ version: 1, status: "SHORTLISTED" }).expect(409);
     await request(app.getHttpServer()).get(api("/candidate/applications"))

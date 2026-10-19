@@ -10,14 +10,15 @@ import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { ApiExceptionFilter } from "../src/common/exceptions/api-exception.filter";
-import type { Prisma } from "../src/generated/prisma/client";
+import { Prisma } from "../src/generated/prisma/client";
 import { PrismaService } from "../src/infrastructure/prisma/prisma.service";
 import { CompanyRepository } from "../src/modules/company/company.repository";
 import { AuthorizationService } from "../src/modules/authorization/authorization.service";
 import { TokenService } from "../src/modules/auth/services/token.service";
+import { assertSafeIntegrationDatabase } from "./integration-safety";
 
 const API = "/api/v1/companies";
-const PREFIX = `phase43a-${randomUUID().slice(0, 8)}`;
+const PREFIX = `phase43a-${randomUUID()}`;
 const TEST_EMAIL_DOMAIN = "@phase43a.test";
 const EXPECTED_GRANTS: Record<string, string[]> = {
   OWNER: [
@@ -47,17 +48,12 @@ describe("Phase 4.3A Company Foundation integration", () => {
   let tokenService: TokenService;
   let authorizationService: AuthorizationService;
   const userIds: string[] = [];
+  let fixturePreflightPassed = false;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     const config = app.get(ConfigService);
-    const databaseName = new URL(config.getOrThrow<string>("DATABASE_URL"))
-      .pathname.replace(/^\//, "");
-    if (databaseName !== "findwork_test") {
-      throw new Error(`Refusing destructive company tests against ${databaseName}`);
-    }
-
     app.use(cookieParser());
     app.setGlobalPrefix(config.getOrThrow<string>("API_PREFIX"));
     app.useGlobalPipes(new ValidationPipe({
@@ -69,33 +65,57 @@ describe("Phase 4.3A Company Foundation integration", () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    await assertSafeIntegrationDatabase(prisma, config);
+    fixturePreflightPassed = true;
+    process.stdout.write(`Company integration run prefix: ${PREFIX}\n`);
     tokenService = app.get(TokenService);
     authorizationService = app.get(AuthorizationService);
   });
 
   afterAll(async () => {
-    if (!prisma) return;
-    // Identify ONLY this suite's companies/users; never broad-delete company data.
-    const companies = await prisma.company.findMany({
-      where: { slug: { startsWith: PREFIX } },
-      select: { id: true },
-    });
-    const companyIds = companies.map((company) => company.id);
+    if (!fixturePreflightPassed) { await app?.close(); return; }
+    try {
+      await prisma.$transaction(async (tx) => {
+        const companies = await tx.company.findMany({
+          where: { slug: { startsWith: `${PREFIX}-` } },
+          select: { id: true, createdByUserId: true },
+        });
+        const companyIds = companies.map((company) => company.id);
+        const members = await tx.companyMember.findMany({
+          where: { companyId: { in: companyIds } }, select: { userId: true },
+        });
+        const unrelated = companies.some((company) => !userIds.includes(company.createdByUserId)) ||
+          members.some((member) => !userIds.includes(member.userId)) ||
+          await tx.company.count({ where: { createdByUserId: { in: userIds }, id: { notIn: companyIds } } }) > 0 ||
+          await tx.companyMember.count({ where: { userId: { in: userIds }, companyId: { notIn: companyIds } } }) > 0 ||
+          await tx.job.count({ where: { companyId: { in: companyIds } } }) > 0 ||
+          await tx.companyInvitation.count({ where: { companyId: { in: companyIds } } }) > 0 ||
+          await tx.companyLocation.count({ where: { companyId: { in: companyIds } } }) > 0 ||
+          await tx.companyMemberPermission.count({ where: { companyId: { in: companyIds } } }) > 0 ||
+          await tx.companyMemberRole.count({ where: { companyId: { in: companyIds }, assignedByUserId: { notIn: userIds } } }) > 0 ||
+          await tx.systemUserPermission.count({ where: { userId: { in: userIds } } }) > 0 ||
+          await tx.auditLog.count({ where: { companyId: { in: companyIds },
+            OR: [{ actorUserId: null }, { actorUserId: { notIn: userIds } }] } }) > 0 ||
+          await tx.auditLog.count({ where: { actorUserId: { in: userIds }, action: "admin.user.status",
+            targetId: { notIn: userIds } } }) > 0;
+        if (unrelated) throw new Error("Company integration cleanup refused: unrelated records reference this run.");
 
-    await prisma.auditLog.deleteMany({ where: { companyId: { in: companyIds } } });
-    await prisma.companyMemberPermission.deleteMany({ where: { companyId: { in: companyIds } } });
-    await prisma.companyMemberRole.deleteMany({ where: { companyId: { in: companyIds } } });
-    await prisma.rolePermission.deleteMany({ where: { role: { companyId: { in: companyIds } } } });
-    await prisma.role.deleteMany({ where: { companyId: { in: companyIds } } });
-    await prisma.companyInvitation.deleteMany({ where: { companyId: { in: companyIds } } });
-    await prisma.companyLocation.deleteMany({ where: { companyId: { in: companyIds } } });
-    await prisma.companyMember.deleteMany({ where: { companyId: { in: companyIds } } });
-    await prisma.company.deleteMany({ where: { id: { in: companyIds } } });
-    await prisma.systemUserRole.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.auditLog.deleteMany({ where: { actorUserId: { in: userIds }, action: "admin.user.status" } });
-    await prisma.authSession.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
-    await app.close();
+        await tx.auditLog.deleteMany({ where: { companyId: { in: companyIds } } });
+        await tx.companyMemberPermission.deleteMany({ where: { companyId: { in: companyIds } } });
+        await tx.companyMemberRole.deleteMany({ where: { companyId: { in: companyIds } } });
+        await tx.rolePermission.deleteMany({ where: { role: { companyId: { in: companyIds } } } });
+        await tx.role.deleteMany({ where: { companyId: { in: companyIds } } });
+        await tx.companyLocation.deleteMany({ where: { companyId: { in: companyIds } } });
+        await tx.companyMember.deleteMany({ where: { companyId: { in: companyIds } } });
+        await tx.company.deleteMany({ where: { id: { in: companyIds } } });
+        await tx.systemUserRole.deleteMany({ where: { userId: { in: userIds } } });
+        await tx.auditLog.deleteMany({ where: { actorUserId: { in: userIds }, action: "admin.user.status" } });
+        await tx.authSession.deleteMany({ where: { userId: { in: userIds } } });
+        await tx.user.deleteMany({ where: { id: { in: userIds } } });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30_000 });
+    } finally {
+      await app.close();
+    }
   });
 
   async function createAuthenticatedUser(label: string) {
@@ -442,6 +462,24 @@ describe("Phase 4.3A Company Foundation integration", () => {
         verificationStatus: "VERIFIED" }));
     expect(await prisma.company.findUniqueOrThrow({ where: { id: companyId },
       select: { verificationStatus: true } })).toEqual({ verificationStatus: "VERIFIED" });
+
+    const rejectedCompany = await request(app.getHttpServer()).post(API)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ name: "Rejected Review Company", slug: slug("review-rejected") }).expect(201);
+    await request(app.getHttpServer()).patch(`${API}/${rejectedCompany.body.id}/profile`)
+      .set("Authorization", `Bearer ${owner.accessToken}`)
+      .send({ legalName: "Rejected Review Company LLC", taxCode: "987654321" }).expect(200);
+    await request(app.getHttpServer()).post(`${API}/${rejectedCompany.body.id}/verification-request`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(200);
+    await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${rejectedCompany.body.id}/verification`)
+      .set("Authorization", `Bearer ${reviewer.accessToken}`)
+      .send({ status: "REJECTED" }).expect(200);
+    expect(await prisma.company.findUniqueOrThrow({ where: { id: rejectedCompany.body.id },
+      select: { verificationStatus: true, verifiedAt: true } })).toEqual({
+      verificationStatus: "REJECTED", verifiedAt: null,
+    });
+    expect(await prisma.auditLog.count({ where: { companyId: rejectedCompany.body.id,
+      action: "admin.company.verify" } })).toBe(1);
 
     await request(app.getHttpServer()).delete(`${membersPath}/${member.id}`)
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(200);
