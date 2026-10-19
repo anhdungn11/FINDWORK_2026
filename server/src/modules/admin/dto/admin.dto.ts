@@ -22,6 +22,11 @@ export class AdminCompanyQueryDto extends AdminPageQueryDto {
   @ApiPropertyOptional({ enum: ["ACTIVE", "SUSPENDED", "ARCHIVED"] })
   @ValidateIf(present) @IsIn(["ACTIVE", "SUSPENDED", "ARCHIVED"])
   status?: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  @ApiPropertyOptional({ enum: ["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED"] })
+  @ValidateIf(present) @IsIn(["UNVERIFIED", "PENDING", "VERIFIED", "REJECTED"])
+  verificationStatus?: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
+  @ApiPropertyOptional() @Transform(trim) @ValidateIf(present) @IsString() @MinLength(2) @MaxLength(100)
+  q?: string;
 }
 
 export class AdminJobQueryDto extends AdminPageQueryDto {

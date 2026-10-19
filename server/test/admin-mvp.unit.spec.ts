@@ -18,7 +18,7 @@ function fakeDb() {
     auditLog: { create: jest.fn().mockResolvedValue({}) },
   };
   const list = { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) };
-  return { tx, db: { $transaction: jest.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)), user: { ...list }, company: { ...list }, job: { ...list }, application: { count: jest.fn().mockResolvedValue(0) }, auditLog: { ...list } } };
+  return { tx, db: { $transaction: jest.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)), user: { ...list, findUnique: jest.fn().mockResolvedValue({ id: targetId }) }, company: { ...list, findUnique: jest.fn().mockResolvedValue({ id: companyId }) }, job: { ...list, findUnique: jest.fn().mockResolvedValue({ id: jobId }) }, application: { count: jest.fn().mockResolvedValue(0) }, auditLog: { ...list } } };
 }
 
 describe("platform admin MVP security", () => {
@@ -28,6 +28,9 @@ describe("platform admin MVP security", () => {
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.disableUser)).toEqual(["user.disable"]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.closeJob)).toEqual(["job.moderate"]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.audits)).toEqual(["audit.view"]);
+    expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.user)).toEqual(["user.view"]);
+    expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.company)).toEqual(["company.view"]);
+    expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.job)).toEqual(["job.view"]);
   });
 
   it("does not accept a company-scoped ADMIN grant for the platform dashboard", () => {
@@ -49,6 +52,34 @@ describe("platform admin MVP security", () => {
     const select = db.user.findMany.mock.calls[0][0].select;
     expect(select.passwordHash).toBeUndefined();
     expect(select.email).toBe(true);
+  });
+
+  it("requires SYSTEM scope for detail reads and returns 404 for missing records", async () => {
+    const { db } = fakeDb();
+    const controller = new AdminController(new AdminService(db as never));
+    expect(() => controller.user({ authorization: { permissions: { "user.view": { scope: "COMPANY" } } } } as never, targetId))
+      .toThrow(expect.objectContaining({ status: 403 }));
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+    db.user.findUnique.mockResolvedValueOnce(null);
+    await expect(new AdminService(db as never).user(targetId)).rejects.toMatchObject({ status: 404 });
+    await new AdminService(db as never).user(targetId);
+    expect(db.user.findUnique.mock.calls[1][0].select.passwordHash).toBeUndefined();
+    db.company.findUnique.mockResolvedValueOnce(null);
+    await expect(new AdminService(db as never).company(companyId)).rejects.toMatchObject({ status: 404 });
+    db.job.findUnique.mockResolvedValueOnce(null);
+    await expect(new AdminService(db as never).job(jobId)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("allows verification decisions only for pending active companies", async () => {
+    const { tx, db } = fakeDb();
+    tx.company.findUnique.mockResolvedValueOnce({ status: "ACTIVE", verificationStatus: "UNVERIFIED" });
+    await expect(new AdminService(db as never).setCompanyVerification(actorId, companyId, "VERIFIED"))
+      .rejects.toMatchObject({ status: 409 });
+    expect(tx.company.updateMany).not.toHaveBeenCalled();
+    await new AdminService(db as never).setCompanyVerification(actorId, companyId, "VERIFIED");
+    expect(tx.company.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: companyId, status: "ACTIVE", verificationStatus: "PENDING" },
+    }));
   });
 
   it("rejects self status mutation before opening a transaction", async () => {

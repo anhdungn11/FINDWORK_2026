@@ -35,6 +35,13 @@ export class AdminController {
     return this.admin.users(query);
   }
 
+  @Get("users/:userId")
+  @RequirePermissions("user.view")
+  user(@Req() req: AuthorizedRequest, @Param("userId", ParseUUIDPipe) userId: string) {
+    requireSystem(req, "user.view");
+    return this.admin.user(userId);
+  }
+
   @Patch("users/:userId/status")
   @RequirePermissions("user.update")
   setUserStatus(@Req() req: AuthorizedRequest, @CurrentAuth() auth: AuthenticatedPrincipal,
@@ -59,6 +66,13 @@ export class AdminController {
     return this.admin.companies(query);
   }
 
+  @Get("companies/:companyId")
+  @RequirePermissions("company.view")
+  company(@Req() req: AuthorizedRequest, @Param("companyId", ParseUUIDPipe) companyId: string) {
+    requireSystem(req, "company.view");
+    return this.admin.company(companyId);
+  }
+
   @Patch("companies/:companyId/verification")
   @RequirePermissions("company.verify")
   verifyCompany(@Req() req: AuthorizedRequest, @CurrentAuth() auth: AuthenticatedPrincipal,
@@ -80,6 +94,13 @@ export class AdminController {
   jobs(@Req() req: AuthorizedRequest, @Query() query: AdminJobQueryDto) {
     requireSystem(req, "job.view");
     return this.admin.jobs(query);
+  }
+
+  @Get("jobs/:jobId")
+  @RequirePermissions("job.view")
+  job(@Req() req: AuthorizedRequest, @Param("jobId", ParseUUIDPipe) jobId: string) {
+    requireSystem(req, "job.view");
+    return this.admin.job(jobId);
   }
 
   @Post("jobs/:jobId/close")

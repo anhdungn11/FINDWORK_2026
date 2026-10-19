@@ -38,13 +38,36 @@ export class AdminService {
     return page(data, total, query);
   }
 
+  async user(userId: string) {
+    const user = await this.db.user.findUnique({ where: { id: userId }, select: userSelect });
+    if (!user) throw missing("USER");
+    return user;
+  }
+
   async companies(query: AdminCompanyQueryDto) {
-    const where: Prisma.CompanyWhereInput = { ...(query.status && { status: query.status }) };
+    const where: Prisma.CompanyWhereInput = {
+      ...(query.status && { status: query.status }),
+      ...(query.verificationStatus && { verificationStatus: query.verificationStatus }),
+      ...(query.q && { name: { contains: query.q, mode: "insensitive" } }),
+    };
     const [data, total] = await Promise.all([
       this.db.company.findMany({ where, select: companySelect, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
       this.db.company.count({ where }),
     ]);
     return page(data, total, query);
+  }
+
+  async company(companyId: string) {
+    const company = await this.db.company.findUnique({
+      where: { id: companyId },
+      select: { ...companySelect, createdByUserId: true, legalName: true, taxCode: true,
+        industryId: true, description: true, website: true, employeeSizeRange: true,
+        foundedYear: true, locations: { select: { id: true, countryCode: true, provinceId: true,
+          wardId: true, addressLine: true, isHeadquarters: true } },
+        _count: { select: { members: true, jobs: true, applications: true } } },
+    });
+    if (!company) throw missing("COMPANY");
+    return company;
   }
 
   async jobs(query: AdminJobQueryDto) {
@@ -54,6 +77,20 @@ export class AdminService {
       this.db.job.count({ where }),
     ]);
     return page(data, total, query);
+  }
+
+  async job(jobId: string) {
+    const job = await this.db.job.findUnique({
+      where: { id: jobId },
+      select: { ...jobSelect, description: true, employmentType: true, workplaceType: true,
+        experienceMinMonths: true, experienceMaxMonths: true, salaryMin: true, salaryMax: true,
+        currency: true, salaryPeriod: true, salaryNegotiable: true, showSalary: true, expiresAt: true,
+        company: { select: { id: true, name: true, status: true, verificationStatus: true } },
+        category: { select: { id: true, code: true, name: true } },
+        _count: { select: { applications: true } } },
+    });
+    if (!job) throw missing("JOB");
+    return job;
   }
 
   async audits(query: AdminPageQueryDto) {
@@ -82,8 +119,8 @@ export class AdminService {
     return this.db.$transaction(async (tx) => {
       const current = await tx.company.findUnique({ where: { id: companyId }, select: { status: true, verificationStatus: true } });
       if (!current) throw missing("COMPANY");
-      if (current.status !== "ACTIVE" || current.verificationStatus === status) throw conflict("COMPANY");
-      const updated = await tx.company.updateMany({ where: { id: companyId, status: "ACTIVE", verificationStatus: current.verificationStatus },
+      if (current.status !== "ACTIVE" || current.verificationStatus !== "PENDING") throw conflict("COMPANY");
+      const updated = await tx.company.updateMany({ where: { id: companyId, status: "ACTIVE", verificationStatus: "PENDING" },
         data: { verificationStatus: status, verifiedAt: status === "VERIFIED" ? new Date() : null } });
       if (updated.count !== 1) throw conflict("COMPANY");
       await tx.auditLog.create({ data: { actorUserId, companyId, action: "admin.company.verify", targetType: "Company", targetId: companyId,
