@@ -1,20 +1,19 @@
 # Platform administration permission boundary
 
-The table records the existing approved seed policy. Every listed administrative grant has `SYSTEM` scope; Candidate grants have `OWN` scope. Company roles have no SYSTEM grants. HTTP admin routes enforce both an active access token and the required SYSTEM scope through `AccessTokenGuard`, `PermissionGuard`, and `requireSystem`.
+`server/prisma/seed-data/system-roles.ts` defines the proposed protected SYSTEM roles. `server/prisma/seed.ts` upserts these roles and synchronizes their grants idempotently. The seed also manages a separate protected `SUPER_ADMIN` role with every registered SYSTEM permission. No role or grant changes have been applied to PostgreSQL in this sprint; applying the seed requires explicit authorization and a review of current assignees.
 
-| Existing role | SYSTEM grants | Available admin operations |
+| Role | SYSTEM grants | Admin API access |
 | --- | --- | --- |
-| CANDIDATE | None | None |
-| SUPPORT_ADMIN | `user.view`, `company.view`, `job.view` | Dashboard; user, company and job lists/details |
-| VERIFICATION_ADMIN | `company.view`, `company.verify`, `company.suspend` | Company list/detail, pending verification decisions, suspend/reactivate |
-| MODERATION_ADMIN | `company.view`, `job.view`, `job.moderate` | Company and job list/detail; close published or paused jobs |
+| CANDIDATE | None; candidate grants are OWN scoped | None |
+| SUPPORT_ADMIN | `user.view`, `company.view`, `job.view` | Dashboard and user, company, job reads |
+| USER_ADMIN (proposed) | `user.view`, `user.update` | User reads and ACTIVE/SUSPENDED changes to ordinary accounts |
+| AUDIT_VIEWER (proposed) | `audit.view` | Audit metadata list only |
+| VERIFICATION_ADMIN | `company.view`, `company.verify`, `company.suspend` | Company reads, verification and company status |
+| MODERATION_ADMIN | `company.view`, `job.view`, `job.moderate` | Company/job reads and job closure |
+| SUPER_ADMIN (existing, separately seeded) | All registered permissions at SYSTEM scope | All guarded admin operations |
 
-`user.update`, `user.disable`, and `audit.view` exist in the permission registry and their guarded endpoints are implemented, but **no default role grants them**. This is intentional in the existing seed policy and handoff. No registration, company ownership, invitation, or role change API grants SYSTEM permissions. Admin mutations write audit records in the same transaction as their state change. Admin user responses explicitly select safe fields; the audit list excludes payload columns.
+`user.disable` remains limited to existing SUPER_ADMIN authority or a separately approved direct grant. The new USER_ADMIN role cannot permanently disable accounts, assign roles, assign permissions or update its own account status. Any active system administrator or account with a live direct SYSTEM grant is protected from account status mutation through the current admin endpoint; this includes the last administrator. A separate higher-authority workflow would be required to moderate privileged accounts.
 
-## Policy decision needed before account moderation is available by default
+Admin HTTP routes require an active token and their specific SYSTEM permission. Failed authentication returns 401; missing authority returns 403. Mutations audit their state changes in the same transaction. User responses select only safe fields, and audit list responses exclude payloads that might contain secrets. Company roles and candidate registration do not confer SYSTEM grants.
 
-The minimal role change to enable account moderation for the existing `SUPPORT_ADMIN` role is to add `user.update:SYSTEM` and `user.disable:SYSTEM` to that role's seed grants. This would authorize **every current and future SUPPORT_ADMIN assignee** to suspend/reactivate and disable other users. `audit.view:SYSTEM` should be approved separately for an explicitly designated administrator because it exposes platform audit metadata. Confirm the intended assignees and whether audit access belongs to `SUPPORT_ADMIN` or requires a separate protected role or direct grant.
-
-Do not provision any of these grants until the product owner approves that authority. This delivery does not modify `SYSTEM_ROLES`, assign `SystemUserRole`, write `SystemUserPermission`, run a seed, or change PostgreSQL grants. Candidate, company OWNER, RECRUITER, and current administrative roles retain exactly the permissions in the table above.
-
-Operationally, `GET /admin/audit`, `PATCH /admin/users/:userId/status`, and `POST /admin/users/:userId/disable` remain unavailable to default roles. They return 403 to authenticated callers without a separately authorized SYSTEM grant and 401 without authentication.
+To activate the proposed roles after approval, review existing `SystemUserRole` and `SystemUserPermission` assignees, then apply the existing idempotent role seed through the approved database procedure and assign the two roles only to named platform staff. Do not run a global seed as a shortcut: the current seed also synchronizes existing roles and other reference data. Existing role assignees receive no new grants from these additive definitions.

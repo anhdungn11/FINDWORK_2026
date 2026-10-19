@@ -9,6 +9,8 @@ import { PermissionGuard } from "../src/modules/authorization/guards/permission.
 const expected: Record<string, string[]> = {
   CANDIDATE: [],
   SUPPORT_ADMIN: ["user.view", "company.view", "job.view"],
+  USER_ADMIN: ["user.view", "user.update"],
+  AUDIT_VIEWER: ["audit.view"],
   VERIFICATION_ADMIN: ["company.view", "company.verify", "company.suspend"],
   MODERATION_ADMIN: ["company.view", "job.view", "job.moderate"],
 };
@@ -24,6 +26,7 @@ function context(handler: (...args: never[]) => unknown, auth?: { userId: string
 describe("approved platform admin role boundary", () => {
   it("keeps each seeded administrative role least privileged and all grants SYSTEM scoped", () => {
     const registry = new Set(PERMISSIONS.map((permission) => permission.code));
+    expect(new Set(SYSTEM_ROLES.map((role) => role.systemCode)).size).toBe(SYSTEM_ROLES.length);
     for (const role of SYSTEM_ROLES) {
       const adminGrants = role.permissions.filter((grant) => grant.scope === "SYSTEM");
       expect(adminGrants.map((grant) => grant.code).sort()).toEqual(expected[role.systemCode]?.sort());
@@ -32,7 +35,12 @@ describe("approved platform admin role boundary", () => {
     expect(SYSTEM_ROLES.find((role) => role.systemCode === "CANDIDATE")?.permissions
       .every((grant) => grant.scope === "OWN")).toBe(true);
     const assigned = new Set(SYSTEM_ROLES.flatMap((role) => role.permissions.map((grant) => grant.code)));
-    for (const code of ["user.update", "user.disable", "audit.view"]) expect(assigned.has(code)).toBe(false);
+    expect(assigned.has("user.update")).toBe(true);
+    expect(assigned.has("audit.view")).toBe(true);
+    expect(assigned.has("user.disable")).toBe(false);
+    expect(SYSTEM_ROLES.every((role) => role.isProtected)).toBe(true);
+    expect(SYSTEM_ROLES.find((role) => role.systemCode === "USER_ADMIN")?.permissions
+      .some((grant) => grant.code === "role.assign" || grant.code === "permission.assign")).toBe(false);
   });
 
   it("returns 401 without authentication and 403 without a required SYSTEM grant", async () => {

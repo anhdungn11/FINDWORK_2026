@@ -39,6 +39,18 @@ describe("admin PostgreSQL read contracts", () => {
     expect(db.company.count).toHaveBeenCalledWith({ where });
   });
 
+  it("uses the dashboard's actionable ACTIVE/PENDING predicate for the pending queue", async () => {
+    const { db, service } = dbFixture();
+    db.company.count.mockResolvedValue(4);
+    await expect(service.companies({ page: 1, pageSize: 2, verificationStatus: "PENDING" }))
+      .resolves.toEqual({ data: [], pagination: { page: 1, pageSize: 2, total: 4, totalPages: 2 } });
+    const where = { status: "ACTIVE", verificationStatus: "PENDING" };
+    expect(db.company.findMany).toHaveBeenCalledWith(expect.objectContaining({ where, skip: 0, take: 2 }));
+    expect(db.company.count).toHaveBeenCalledWith({ where });
+    await service.companies({ page: 1, pageSize: 2, status: "SUSPENDED", verificationStatus: "PENDING" });
+    expect(db.company.count).toHaveBeenLastCalledWith({ where: { status: "SUSPENDED", verificationStatus: "PENDING" } });
+  });
+
   it("filters user and job lists in PostgreSQL and never selects account secrets", async () => {
     const { db, service } = dbFixture();
     await service.users({ page: 1, pageSize: 5, q: "user", status: "ACTIVE" });

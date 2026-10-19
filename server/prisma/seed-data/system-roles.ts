@@ -43,6 +43,21 @@ export const SYSTEM_ROLES: SystemRoleSeed[] = [
     ],
   },
   {
+    systemCode: "USER_ADMIN",
+    name: "User Admin",
+    isProtected: true,
+    permissions: [
+      { code: "user.view", scope: "SYSTEM" },
+      { code: "user.update", scope: "SYSTEM" },
+    ],
+  },
+  {
+    systemCode: "AUDIT_VIEWER",
+    name: "Audit Viewer",
+    isProtected: true,
+    permissions: [{ code: "audit.view", scope: "SYSTEM" }],
+  },
+  {
     systemCode: "VERIFICATION_ADMIN",
     name: "Verification Admin",
     isProtected: true,

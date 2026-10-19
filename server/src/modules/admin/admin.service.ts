@@ -46,7 +46,9 @@ export class AdminService {
 
   async companies(query: AdminCompanyQueryDto) {
     const where: Prisma.CompanyWhereInput = {
-      ...(query.status && { status: query.status }),
+      // The pending queue contains only companies eligible for a verification decision.
+      ...((query.status || query.verificationStatus === "PENDING") &&
+        { status: query.status ?? "ACTIVE" }),
       ...(query.verificationStatus && { verificationStatus: query.verificationStatus }),
       ...(query.q && { name: { contains: query.q, mode: "insensitive" } }),
     };
@@ -107,6 +109,23 @@ export class AdminService {
       const current = await tx.user.findUnique({ where: { id: userId }, select: { status: true } });
       if (!current) throw missing("USER");
       if (current.status === "DISABLED" || current.status === status) throw conflict("USER");
+      // System role holders and users with direct SYSTEM grants require a separate,
+      // higher-authority workflow. This also protects the last platform administrator.
+      const [systemRole, systemGrant] = await Promise.all([
+        tx.systemUserRole.findFirst({
+          where: { userId, role: { is: { kind: "SYSTEM", isActive: true, systemCode: { not: "CANDIDATE" } } } },
+          select: { roleId: true },
+        }),
+        tx.systemUserPermission.findFirst({
+          where: { userId, effect: "ALLOW", dataScope: "SYSTEM",
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+          select: { permissionId: true },
+        }),
+      ]);
+      if (systemRole || systemGrant) {
+        throw new ForbiddenException({ code: "ADMIN_PRIVILEGED_TARGET_FORBIDDEN",
+          message: "This account has platform authority and cannot be moderated through this endpoint." });
+      }
       const updated = await tx.user.updateMany({ where: { id: userId, status: current.status }, data: { status } });
       if (updated.count !== 1) throw conflict("USER");
       await tx.auditLog.create({ data: { actorUserId, action: "admin.user.status", targetType: "User", targetId: userId,

@@ -13,6 +13,8 @@ const jobId = "44444444-4444-4444-8444-444444444444";
 function fakeDb() {
   const tx = {
     user: { findUnique: jest.fn().mockResolvedValue({ status: "ACTIVE" }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: targetId, status: "SUSPENDED" }) },
+    systemUserRole: { findFirst: jest.fn().mockResolvedValue(null) },
+    systemUserPermission: { findFirst: jest.fn().mockResolvedValue(null) },
     company: { findUnique: jest.fn().mockResolvedValue({ status: "ACTIVE", verificationStatus: "PENDING" }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: companyId }) },
     job: { findUnique: jest.fn().mockResolvedValue({ companyId, status: "PUBLISHED", version: 1 }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: jobId }) },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
@@ -26,6 +28,7 @@ describe("platform admin MVP security", () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, AdminController)).toEqual([AccessTokenGuard, PermissionGuard]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.dashboard)).toEqual(["user.view", "company.view", "job.view"]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.disableUser)).toEqual(["user.disable"]);
+    expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.setUserStatus)).toEqual(["user.update"]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.closeJob)).toEqual(["job.moderate"]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.audits)).toEqual(["audit.view"]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, AdminController.prototype.user)).toEqual(["user.view"]);
@@ -101,6 +104,46 @@ describe("platform admin MVP security", () => {
     await new AdminService(db as never).setUserStatus(actorId, targetId, "SUSPENDED");
     expect(tx.user.updateMany).toHaveBeenCalledWith({ where: { id: targetId, status: "ACTIVE" }, data: { status: "SUSPENDED" } });
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ actorUserId: actorId, action: "admin.user.status", targetId }) }));
+  });
+
+  it("rejects moderation of system role holders, including the last administrator", async () => {
+    const { tx, db } = fakeDb();
+    tx.systemUserRole.findFirst.mockResolvedValueOnce({ roleId: "platform-role" });
+    await expect(new AdminService(db as never).setUserStatus(actorId, targetId, "SUSPENDED"))
+      .rejects.toMatchObject({ status: 403 });
+    expect(tx.user.updateMany).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+    expect(tx.systemUserRole.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: targetId, role: { is: { kind: "SYSTEM", isActive: true, systemCode: { not: "CANDIDATE" } } } },
+    }));
+  });
+
+  it("rejects moderation of accounts with live direct SYSTEM grants", async () => {
+    const { tx, db } = fakeDb();
+    tx.systemUserPermission.findFirst.mockResolvedValueOnce({ permissionId: "platform-grant" });
+    await expect(new AdminService(db as never).setUserStatus(actorId, targetId, "DISABLED"))
+      .rejects.toMatchObject({ status: 403 });
+    expect(tx.user.updateMany).not.toHaveBeenCalled();
+    expect(tx.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("reactivates suspended ordinary accounts and audits the transition", async () => {
+    const { tx, db } = fakeDb();
+    tx.user.findUnique.mockResolvedValueOnce({ status: "SUSPENDED" });
+    await new AdminService(db as never).setUserStatus(actorId, targetId, "ACTIVE");
+    expect(tx.user.updateMany).toHaveBeenCalledWith({ where: { id: targetId, status: "SUSPENDED" }, data: { status: "ACTIVE" } });
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      beforeData: { status: "SUSPENDED" }, afterData: { status: "ACTIVE" },
+    }) }));
+  });
+
+  it("returns 404 for a missing account and rejects a terminal DISABLED account", async () => {
+    const { tx, db } = fakeDb();
+    tx.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ status: "DISABLED" });
+    const service = new AdminService(db as never);
+    await expect(service.setUserStatus(actorId, targetId, "ACTIVE")).rejects.toMatchObject({ status: 404 });
+    await expect(service.setUserStatus(actorId, targetId, "ACTIVE")).rejects.toMatchObject({ status: 409 });
+    expect(tx.user.updateMany).not.toHaveBeenCalled();
   });
 
   it("closes a job with version check and audit in one transaction", async () => {
