@@ -90,6 +90,31 @@ const EmployerMembersPage = () => {
     }
   };
 
+  const handleTransferOwnership = async (member: CompanyMemberDto) => {
+    const targetName = member.user?.email || member.id;
+    if (
+      !window.confirm(
+        `Xác nhận chuyển toàn bộ quyền Chủ sở hữu (Owner) của công ty "${active.name}" cho "${targetName}"?\nSau khi chuyển, vai trò của bạn sẽ chuyển thành Quản trị viên (Admin).`
+      )
+    )
+      return;
+
+    setBusyMemberId(member.id);
+    setNotice(null);
+    try {
+      await companyWorkspaceApi.transferOwnership(active.id, member.id);
+      setNotice({
+        tone: "ok",
+        text: `Đã chuyển thành công quyền Chủ sở hữu công ty cho "${targetName}".`,
+      });
+      members.reload();
+    } catch (err) {
+      setNotice({ tone: "error", text: toApiFailure(err).message });
+    } finally {
+      setBusyMemberId(null);
+    }
+  };
+
   const handleRevokeInvitation = async (inv: CompanyInvitationDto) => {
     if (!window.confirm(`Xác nhận thu hồi lời mời gửi tới "${inv.emailNormalized}"?`)) return;
 
@@ -197,6 +222,9 @@ const EmployerMembersPage = () => {
                 <tbody>
                   {members.data.map((m) => {
                     const isSelf = currentUser?.id && m.user?.id === currentUser.id;
+                    const isCurrentOwner = Boolean(
+                      members.data?.some((mem) => mem.isOwner && currentUser?.id && mem.user?.id === currentUser.id),
+                    );
                     const canModify = writes && !m.isOwner && !isSelf;
                     const primaryRole = m.roles?.[0]?.role?.name || "VIEWER";
 
@@ -253,15 +281,29 @@ const EmployerMembersPage = () => {
                         </td>
                         <td>
                           {canModify ? (
-                            <button
-                              type="button"
-                              className={`${ui.btn} ${ui.btnDanger}`}
-                              style={{ padding: "4px 10px", fontSize: "0.85rem" }}
-                              disabled={busyMemberId === m.id}
-                              onClick={() => handleRemoveMember(m)}
-                            >
-                              {busyMemberId === m.id ? "Đang xử lý..." : "Xóa"}
-                            </button>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {isCurrentOwner && (
+                                <button
+                                  type="button"
+                                  className={ui.btn}
+                                  style={{ padding: "4px 8px", fontSize: "0.8rem" }}
+                                  disabled={busyMemberId === m.id}
+                                  onClick={() => handleTransferOwnership(m)}
+                                  title="Chuyển quyền Chủ sở hữu cho thành viên này"
+                                >
+                                  Chuyển Owner
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnDanger}`}
+                                style={{ padding: "4px 10px", fontSize: "0.85rem" }}
+                                disabled={busyMemberId === m.id}
+                                onClick={() => handleRemoveMember(m)}
+                              >
+                                {busyMemberId === m.id ? "Đang xử lý..." : "Xóa"}
+                              </button>
+                            </div>
                           ) : (
                             <span style={{ color: "var(--color-text-secondary)", fontSize: "0.85rem" }}>
                               {m.isOwner ? "Bảo vệ (Owner)" : isSelf ? "Tài khoản hiện tại" : "—"}

@@ -139,6 +139,17 @@ export const companyWorkspaceApi = {
     });
   },
 
+  transferOwnership: (
+    companyId: string,
+    memberId: string,
+  ): Promise<{ companyId: string; previousOwnerMemberId: string; ownerMemberId: string }> => {
+    guardWrite("chuyển quyền chủ sở hữu");
+    return run(async () => {
+      const res = await apiClient.post(`/companies/${companyId}/members/ownership-transfer`, { memberId });
+      return unwrapData(res.data) as { companyId: string; previousOwnerMemberId: string; ownerMemberId: string };
+    });
+  },
+
   listInvitations: (companyId: string, signal?: AbortSignal): Promise<CompanyInvitationDto[]> =>
     run(async () => items((await apiClient.get(`/companies/${companyId}/invitations`, { signal })).data).map(normalizeCompanyInvitation)),
 
