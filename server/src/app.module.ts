@@ -18,6 +18,7 @@ import { ReferenceModule } from "./modules/reference/reference.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { ApplicationsModule } from "./modules/applications/applications.module";
 import { AdminModule } from "./modules/admin/admin.module";
+import { CareerDiscoveryModule } from "./modules/career-discovery/career-discovery.module";
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AdminModule } from "./modules/admin/admin.module";
     PrismaModule,
     HealthModule,
     ReferenceModule,
+    CareerDiscoveryModule,
     AuthModule,
     AuthorizationModule,
     CandidateModule,
