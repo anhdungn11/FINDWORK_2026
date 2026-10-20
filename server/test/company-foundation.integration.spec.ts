@@ -26,17 +26,19 @@ const EXPECTED_GRANTS: Record<string, string[]> = {
     "company.member.invite", "company.member.update", "company.member.remove",
     "company.role.view", "company.role.manage", "company.audit.view",
     "company.ownership.transfer",
+    "application.view", "application.review",
   ],
   ADMIN: [
     "company.view", "company.update", "company.member.view",
     "company.member.invite", "company.member.update", "company.member.remove",
     "company.role.view", "company.role.manage",
+    "application.view", "application.review",
   ],
   HR_MANAGER: [
     "company.view", "company.member.view", "company.member.invite",
-    "company.role.view",
+    "company.role.view", "application.view", "application.review",
   ],
-  RECRUITER: ["company.view"],
+  RECRUITER: ["company.view", "application.view", "application.review"],
   HIRING_MANAGER: ["company.view"],
   VIEWER: ["company.view"],
 };
@@ -555,7 +557,7 @@ describe("Phase 4.3A Company Foundation integration", () => {
     const nextB = await createAuthenticatedUser("race-b");
     const created = await request(app.getHttpServer()).post(API)
       .set("Authorization", `Bearer ${original.accessToken}`)
-      .send({ name: "Race Company", slug: slug("race") }).expect(201);
+      .send({ name: "Race Company", slug: slug("ownership-race") }).expect(201);
     const companyId = created.body.id as string;
     const viewer = await prisma.role.findFirstOrThrow({
       where: { companyId, normalizedName: "viewer" }, select: { id: true },
@@ -620,7 +622,15 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .send({ status: "ACTIVE" }).expect(200)
       .expect((r) => expect(r.body.status).toBe("ACTIVE"));
     await request(app.getHttpServer()).get("/api/v1/auth/me")
-      .set("Authorization", `Bearer ${ordinary.accessToken}`).expect(200);
+      .set("Authorization", `Bearer ${ordinary.accessToken}`).expect(401);
+    const freshSessionId = randomUUID();
+    await prisma.authSession.create({ data: {
+      id: freshSessionId, userId: ordinary.id, refreshTokenHash: `phase43a-${freshSessionId}`,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    } });
+    const freshAccessToken = await tokenService.signAccessToken(ordinary.id, freshSessionId);
+    await request(app.getHttpServer()).get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${freshAccessToken}`).expect(200);
     await request(app.getHttpServer()).patch(`/api/v1/admin/users/${privileged.id}/status`)
       .set("Authorization", `Bearer ${admin.accessToken}`)
       .send({ status: "SUSPENDED" }).expect(403);
