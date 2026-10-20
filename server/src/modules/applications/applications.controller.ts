@@ -8,7 +8,7 @@ import { RequirePermissions } from "../authorization/decorators/require-permissi
 import { CompanyPermissionGuard, type CompanyAuthorizedRequest } from "../authorization/guards/company-permission.guard";
 import { PermissionGuard, type AuthorizedRequest } from "../authorization/guards/permission.guard";
 import { ApplicationsService } from "./applications.service";
-import { ApplicationPageQueryDto, ReviewApplicationDto, SubmitApplicationDto } from "./dto/application.dto";
+import { ApplicationPageQueryDto, AssignApplicationDto, ReviewApplicationDto, SubmitApplicationDto } from "./dto/application.dto";
 
 function requireOwn(req: AuthorizedRequest, code: "application.create" | "application.view") {
   if (req.authorization?.permissions[code]?.scope !== "OWN") {
@@ -82,5 +82,14 @@ export class CompanyApplicationsController {
     @Req() req: CompanyAuthorizedRequest, @Body() dto: ReviewApplicationDto) {
     requireCompany(req, "application.review");
     return this.applications.review(companyId, jobId, applicationId, auth.userId, dto);
+  }
+
+  @Patch(":applicationId/assignment")
+  @RequireCompanyPermissions("application.review")
+  assign(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
+    @Param("applicationId", ParseUUIDPipe) applicationId: string, @CurrentAuth() auth: AuthenticatedPrincipal,
+    @Req() req: CompanyAuthorizedRequest, @Body() dto: AssignApplicationDto) {
+    requireCompany(req, "application.review");
+    return this.applications.assign(companyId, jobId, applicationId, auth.userId, dto);
   }
 }

@@ -40,6 +40,10 @@ function fakeDb() {
     },
     companyMember: { findFirst: jest.fn().mockResolvedValue({ id: "member" }) },
     applicationStatusHistory: { create: jest.fn().mockResolvedValue({}) },
+    applicationAssignment: {
+      findFirst: jest.fn().mockResolvedValue(null), updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      create: jest.fn().mockResolvedValue({ id: "assignment", companyMemberId: "target" }),
+    },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
     resume: { create: jest.fn().mockResolvedValue({ id: resumeId }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: resumeId }) },
   };
@@ -72,6 +76,7 @@ describe("applications MVP security", () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, CompanyApplicationsController)).toEqual([AccessTokenGuard, CompanyPermissionGuard]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, CandidateApplicationsController.prototype.submit)).toEqual(["application.create"]);
     expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyApplicationsController.prototype.review)).toEqual(["application.review"]);
+    expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyApplicationsController.prototype.assign)).toEqual(["application.review"]);
   });
 
   it("submits only to an available job with an owned ready builder version and status history", async () => {
@@ -110,8 +115,12 @@ describe("applications MVP security", () => {
     const service = new ApplicationsService(db as never);
     await expect(service.getCandidate(userId, applicationId)).rejects.toMatchObject({ status: 404 });
     expect(db.application.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: applicationId, candidateProfile: { userId } } }));
+    const candidateSelect = db.application.findFirst.mock.calls[0][0].select;
+    expect(candidateSelect.statusHistory.select).not.toHaveProperty("note");
+    expect(candidateSelect.statusHistory.select).not.toHaveProperty("changedByUserId");
     await expect(service.getCompany(companyId, jobId, applicationId)).rejects.toMatchObject({ status: 404 });
     expect(db.application.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: applicationId, companyId, jobId } }));
+    expect(db.application.findFirst.mock.calls[1][0].select.statusHistory.select.note).toBe(true);
   });
 
   it("rejects inactive membership and uses company/job scoped compare-and-swap with audit", async () => {
@@ -124,6 +133,52 @@ describe("applications MVP security", () => {
     expect(tx.application.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: applicationId, companyId, jobId, status: "SUBMITTED", version: 1 } }));
     expect(tx.applicationStatusHistory.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fromStatus: "SUBMITTED", toStatus: "REVIEWING", changedByUserId: userId }) }));
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "application.review", companyId }) }));
+  });
+
+  it("supports quick offer after HR review and keeps the review note internal", async () => {
+    const { tx, db } = fakeDb();
+    tx.application.findFirst.mockResolvedValue({ status: "REVIEWING", version: 2 });
+    const service = new ApplicationsService(db as never);
+    await service.review(companyId, jobId, applicationId, userId,
+      { version: 2, status: "OFFERED", note: "Approved by HR" });
+    expect(tx.application.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: applicationId, companyId, jobId, status: "REVIEWING", version: 2 },
+      data: { status: "OFFERED", version: { increment: 1 } },
+    }));
+    expect(tx.applicationStatusHistory.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ fromStatus: "REVIEWING", toStatus: "OFFERED", note: "Approved by HR" }),
+    }));
+    await expect(service.review(companyId, jobId, applicationId, userId,
+      { version: 2, status: "INTERVIEW" })).rejects.toMatchObject({
+      status: 409, response: { code: "APPLICATION_STATE_CONFLICT" },
+    });
+  });
+
+  it("assigns only an active member in the application tenant and audits reassignment", async () => {
+    const { tx, db } = fakeDb();
+    const service = new ApplicationsService(db as never);
+    tx.companyMember.findFirst.mockResolvedValueOnce({ id: "actor" }).mockResolvedValueOnce(null);
+    await expect(service.assign(companyId, jobId, applicationId, userId,
+      { assignmentType: "REVIEWER", companyMemberId: resumeId })).rejects.toMatchObject({ status: 404 });
+    expect(tx.applicationAssignment.create).not.toHaveBeenCalled();
+
+    tx.companyMember.findFirst.mockResolvedValueOnce({ id: "actor" }).mockResolvedValueOnce({ id: "target" });
+    tx.applicationAssignment.findFirst.mockResolvedValueOnce({ id: "previous", companyMemberId: "old" });
+    await service.assign(companyId, jobId, applicationId, userId,
+      { assignmentType: "REVIEWER", companyMemberId: resumeId });
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(tx.companyMember.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: resumeId, companyId, status: "ACTIVE", removedAt: null, user: { status: "ACTIVE" } },
+    }));
+    expect(tx.applicationAssignment.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { applicationId, companyId, assignmentType: "REVIEWER", removedAt: null },
+    }));
+    expect(tx.applicationAssignment.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: { applicationId, companyId, companyMemberId: "target", assignmentType: "REVIEWER", assignedByMemberId: "actor" },
+    }));
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "application.assign", companyId, targetId: applicationId }),
+    }));
   });
 
   it("persists builder content under the authenticated candidate profile", async () => {

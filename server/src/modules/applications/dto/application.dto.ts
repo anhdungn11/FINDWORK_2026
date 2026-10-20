@@ -6,6 +6,7 @@ export const REVIEW_STATUSES = ["REVIEWING", "SHORTLISTED", "INTERVIEW", "OFFERE
 export const APPLICATION_STATUSES = ["SUBMITTED", ...REVIEW_STATUSES, "WITHDRAWN"] as const;
 export const APPLICATION_AVAILABILITIES = ["immediately", "within-1-week", "within-2-weeks", "within-1-month", "negotiable"] as const;
 export const APPLICATION_CONTACT_METHODS = ["email", "phone"] as const;
+export const APPLICATION_ASSIGNMENT_TYPES = ["PRIMARY_RECRUITER", "REVIEWER", "INTERVIEWER"] as const;
 
 export class ApplicationContactDto {
   @Transform(({ value }: { value: unknown }) => typeof value === "string" ? value.trim() : value)
@@ -80,4 +81,16 @@ export class ApplicationPageQueryDto {
 export class ReviewApplicationDto {
   @IsInt() @Min(1) version!: number;
   @IsIn(REVIEW_STATUSES) status!: (typeof REVIEW_STATUSES)[number];
+  @ApiPropertyOptional({ maxLength: 5000, description: "Internal review note; never returned to candidates." })
+  @Transform(({ value }: { value: unknown }) => typeof value === "string" ? value.trim() : value)
+  @ValidateIf((_, value) => value !== undefined) @IsString() @MaxLength(5000)
+  note?: string;
+}
+
+export class AssignApplicationDto {
+  @IsIn(APPLICATION_ASSIGNMENT_TYPES)
+  assignmentType!: (typeof APPLICATION_ASSIGNMENT_TYPES)[number];
+
+  @IsUUID("4")
+  companyMemberId!: string;
 }

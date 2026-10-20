@@ -78,13 +78,18 @@ describe("submission recruitment workflow E2E", () => {
         const jobIds = jobs.map((job) => job.id);
         for (const jobId of jobIds) await tx.$queryRaw`SELECT "id" FROM "Job" WHERE "id" = ${jobId}::uuid FOR UPDATE`;
         const members = await tx.companyMember.findMany({
-          where: { companyId: { in: companies } }, select: { userId: true },
+          where: { companyId: { in: companies } }, select: { id: true, userId: true },
         });
+        const memberIds = members.map((member) => member.id);
         const applications = await tx.application.findMany({
           where: { OR: [{ companyId: { in: companies } }, { candidateProfile: { userId: { in: users } } }] },
           select: { id: true, companyId: true, candidateProfile: { select: { userId: true } } },
         });
         const applicationIds = applications.map((application) => application.id);
+        const assignments = await tx.applicationAssignment.findMany({
+          where: { applicationId: { in: applicationIds } },
+          select: { applicationId: true, companyId: true, companyMemberId: true, assignedByMemberId: true },
+        });
         const saved = await tx.savedJob.findMany({
           where: { OR: [{ jobId: { in: jobIds } }, { candidateProfile: { userId: { in: users } } }] },
           select: { jobId: true, candidateProfile: { select: { userId: true } } },
@@ -108,7 +113,9 @@ describe("submission recruitment workflow E2E", () => {
             OR: [{ actorUserId: null }, { actorUserId: { notIn: users } }] } }) > 0 ||
           await tx.applicationStatusHistory.count({ where: { applicationId: { in: applicationIds },
             OR: [{ changedByUserId: null }, { changedByUserId: { notIn: users } }] } }) > 0 ||
-          await tx.applicationAssignment.count({ where: { applicationId: { in: applicationIds } } }) > 0 ||
+          assignments.some((assignment) => !applicationIds.includes(assignment.applicationId) ||
+            !companies.includes(assignment.companyId) || !memberIds.includes(assignment.companyMemberId) ||
+            !memberIds.includes(assignment.assignedByMemberId)) ||
           await tx.interview.count({ where: { applicationId: { in: applicationIds } } }) > 0 ||
           await tx.jobLocation.count({ where: { jobId: { in: jobIds } } }) > 0 ||
           await tx.jobSkill.count({ where: { jobId: { in: jobIds } } }) > 0 ||
@@ -116,6 +123,7 @@ describe("submission recruitment workflow E2E", () => {
         if (unrelated) throw new Error("Submission integration cleanup refused: unrelated records reference this run.");
 
         await tx.applicationStatusHistory.deleteMany({ where: { applicationId: { in: applicationIds } } });
+        await tx.applicationAssignment.deleteMany({ where: { applicationId: { in: applicationIds } } });
         await tx.applicationAnswer.deleteMany({ where: { applicationId: { in: applicationIds } } });
         await tx.application.deleteMany({ where: { id: { in: applicationIds } } });
         await tx.savedJob.deleteMany({ where: { candidateProfile: { userId: { in: users } } } });
@@ -376,6 +384,18 @@ describe("submission recruitment workflow E2E", () => {
         .toMatchObject({ answerValue: ["Node", "SQL"], questionSnapshot: { label: "Core skills?" } }));
     await request(app.getHttpServer()).get(api(`/companies/${otherCompanyId}/jobs/${jobId}/applications/${applicationId}`))
       .set(bearer(otherOwner.token)).expect(404);
+    const otherCompanyMember = await db.companyMember.findFirstOrThrow({
+      where: { companyId: otherCompanyId, userId: otherOwner.id }, select: { id: true },
+    });
+    await request(app.getHttpServer()).patch(`${applications}/${applicationId}/assignment`)
+      .set(bearer(recruiter.token)).send({ assignmentType: "PRIMARY_RECRUITER", companyMemberId: otherCompanyMember.id }).expect(404);
+    await request(app.getHttpServer()).patch(`${applications}/${applicationId}/assignment`)
+      .set(bearer(recruiter.token)).send({ assignmentType: "PRIMARY_RECRUITER", companyMemberId: recruiterMember.id }).expect(200);
+    await request(app.getHttpServer()).get(`${applications}/${applicationId}`)
+      .set(bearer(recruiter.token)).expect(200)
+      .expect((r) => expect(r.body.assignments).toEqual([expect.objectContaining({
+        assignmentType: "PRIMARY_RECRUITER", companyMemberId: recruiterMember.id,
+      })]));
     const reviewed = await request(app.getHttpServer()).patch(`${applications}/${applicationId}/status`)
       .set(bearer(recruiter.token)).send({ version: 1, status: "REVIEWING" }).expect(200);
     expect(reviewed.body.status).toBe("REVIEWING");
@@ -388,9 +408,21 @@ describe("submission recruitment workflow E2E", () => {
       .toEqual(["REVIEWING", "SUBMITTED"]);
     await request(app.getHttpServer()).patch(`${applications}/${applicationId}/status`)
       .set(bearer(recruiter.token)).send({ version: 1, status: "SHORTLISTED" }).expect(409);
+    const offered = await request(app.getHttpServer()).patch(`${applications}/${applicationId}/status`)
+      .set(bearer(recruiter.token)).send({ version: reviewed.body.version, status: "OFFERED", note: "HR approved" }).expect(200);
+    expect(offered.body.status).toBe("OFFERED");
+    await request(app.getHttpServer()).get(`${applications}/${applicationId}`)
+      .set(bearer(recruiter.token)).expect(200)
+      .expect((r) => expect(r.body.statusHistory.at(-1)).toMatchObject({ toStatus: "OFFERED", note: "HR approved" }));
+    await request(app.getHttpServer()).get(api(`/candidate/applications/${applicationId}`))
+      .set(bearer(candidate.token)).expect(200).expect((r) => {
+        expect(r.body.status).toBe("OFFERED");
+        expect(r.body.statusHistory.at(-1)).toMatchObject({ toStatus: "OFFERED" });
+        expect(r.body.statusHistory.at(-1)).not.toHaveProperty("note");
+      });
     await request(app.getHttpServer()).get(api("/candidate/applications"))
       .set(bearer(candidate.token)).expect(200)
-      .expect((r) => expect(r.body.data.find((x: { id: string }) => x.id === applicationId).status).toBe("REVIEWING"));
+      .expect((r) => expect(r.body.data.find((x: { id: string }) => x.id === applicationId).status).toBe("OFFERED"));
     await request(app.getHttpServer()).get(api("/admin/dashboard")).set(bearer(admin.token))
       .expect(200).expect((r) => expect(r.body.applications).toBeGreaterThanOrEqual(1));
     await request(app.getHttpServer()).get(api("/admin/users")) .set(bearer(admin.token)).expect(200);
