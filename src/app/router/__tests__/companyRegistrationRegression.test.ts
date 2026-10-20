@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { getReturnDestination } from "../returnDestination";
 import { resolveWorkspaceAccess } from "../../guards/accessPolicy";
+import { companyWorkspaceApi } from "../../../services/api/companyWorkspaceApi";
+import { publicApi } from "../../../services/api/publicApi";
+import { apiClient } from "../../../services/http/apiClient";
 
 test("Task 1 Regression: login return destination allows employer private routes", () => {
   // Employer routes must be preserved after login, not dropped to /candidate
@@ -53,7 +56,7 @@ test("Task 1 Regression: EmployerRoute access policy handles all authentication 
   assert.equal(resolveWorkspaceAccess("employer", "loading", null, null), "loading");
   assert.equal(resolveWorkspaceAccess("employer", "loggingOut", null, null), "loading");
 
-  // 2. Anonymous user
+  // 2. Anonymous user -> unauthenticated (redirect to login)
   assert.equal(resolveWorkspaceAccess("employer", "unauthenticated", null, null), "unauthenticated");
 
   // 3. Authenticated Candidate user (has user and token) -> allowed into employer onboarding flow
@@ -74,6 +77,24 @@ test("Task 1 Regression: EmployerRoute access policy handles all authentication 
   assert.equal(resolveWorkspaceAccess("admin", "authenticated", candidateUser, "test-token"), "forbidden");
   assert.equal(resolveWorkspaceAccess("admin", "authenticated", employerUser, "test-token"), "forbidden");
   assert.equal(resolveWorkspaceAccess("admin", "authenticated", { role: "SUPER_ADMIN" }, "test-token"), "allowed");
+});
+
+test("Task 1 Regression: companyWorkspaceApi.listMine uses GET /companies/me and handles empty array", async () => {
+  const originalGet = apiClient.get;
+  let recordedUrl = "";
+
+  try {
+    apiClient.get = (async (url: string) => {
+      recordedUrl = url;
+      return { data: { data: [] } };
+    }) as never;
+
+    const companies = await companyWorkspaceApi.listMine();
+    assert.equal(recordedUrl, "/companies/me", "Must call GET /companies/me, NEVER /companies/mine");
+    assert.deepEqual(companies, [], "Empty company list must resolve to empty array []");
+  } finally {
+    apiClient.get = originalGet;
+  }
 });
 
 test("Task 1 Regression: AppRouter declares /employer/onboarding, /employer/register, and /career routes", () => {
@@ -179,11 +200,11 @@ test("Task 1 Regression: EmployerOnboardingPage handles empty, existing, and for
   );
 });
 
-test("Task 2 Regression: CareerPage connects to publicApi.listJobCategories and avoids fabricated data", () => {
+test("Task 2 Regression: CareerPage connects to publicApi.listCareerCategories and avoids fabricated data", async () => {
   const careerSrc = readFileSync(new URL("../../../pages/public/CareerPage/CareerPage.tsx", import.meta.url), "utf8");
   assert.ok(
-    careerSrc.includes("publicApi.listJobCategories"),
-    "CareerPage must load real categories from publicApi.listJobCategories"
+    careerSrc.includes("publicApi.listCareerCategories"),
+    "CareerPage must load real categories from publicApi.listCareerCategories"
   );
   assert.ok(
     careerSrc.includes("to={`/jobs?categoryCode="),
@@ -201,6 +222,41 @@ test("Task 2 Regression: CareerPage connects to publicApi.listJobCategories and 
     careerSrc.includes("ApiErrorState"),
     "CareerPage must display retryable ApiErrorState on failure"
   );
+
+  // Test publicApi.listCareerCategories contract
+  const originalGet = apiClient.get;
+  let recordedUrl = "";
+  let recordedParams: unknown = null;
+
+  try {
+    apiClient.get = (async (url: string, config?: { params?: unknown }) => {
+      recordedUrl = url;
+      recordedParams = config?.params;
+      return {
+        data: {
+          data: [
+            {
+              id: "550e8400-e29b-41d4-a716-446655440000",
+              code: "software-development",
+              name: "Phát triển phần mềm",
+              isActive: true,
+              sortOrder: 0,
+              publishedJobCount: 5,
+            },
+          ],
+          pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+        },
+      };
+    }) as never;
+
+    const res = await publicApi.listCareerCategories({ page: 1, pageSize: 20 });
+    assert.equal(recordedUrl, "/career/categories");
+    assert.deepEqual(recordedParams, { pageSize: 20 });
+    assert.equal(res.data.length, 1);
+    assert.equal(res.data[0].publishedJobCount, 5);
+  } finally {
+    apiClient.get = originalGet;
+  }
 });
 
 test("Task 3 Regression: FeaturedJobs and FeaturedCompanies present retryable error state on connection failure", () => {

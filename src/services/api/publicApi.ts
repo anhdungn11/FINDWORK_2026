@@ -2,9 +2,15 @@ import { apiClient } from "../http/apiClient";
 import { toApiFailure } from "./apiFailure";
 import {
   normalizeCategory,
+  normalizeCareerCategory,
+  normalizeSkillCategory,
+  normalizeSkill,
   normalizeJob,
   normalizePaged,
   normalizePublicCompany,
+  type CareerCategoryDto,
+  type SkillCategoryDto,
+  type SkillDto,
   type JobCategoryDto,
   type JobDto,
   type Paged,
@@ -12,7 +18,7 @@ import {
   type PublicCompanyQuery,
 } from "./apiTypes";
 
-export { type PublicCompanyQuery };
+export { type PublicCompanyQuery, type CareerCategoryDto, type SkillCategoryDto, type SkillDto };
 
 export interface PublicJobQuery {
   page?: number;
@@ -48,7 +54,7 @@ export const buildCompanyQueryParams = (query: PublicCompanyQuery): Record<strin
   return out;
 };
 
-/** API công khai: GET /jobs, GET /jobs/:id, GET /companies, GET /companies/:id, GET /reference/job-categories. */
+/** API công khai: GET /jobs, GET /jobs/:id, GET /companies, GET /companies/:id, GET /reference/job-categories, GET /career/categories. */
 export const publicApi = {
   async listJobs(query: PublicJobQuery = {}, signal?: AbortSignal): Promise<Paged<JobDto>> {
     try {
@@ -91,6 +97,51 @@ export const publicApi = {
     try {
       const res = await apiClient.get("/reference/job-categories", { signal });
       return normalizePaged(res.data, normalizeCategory).data.filter((c) => c.id && c.name);
+    } catch (e) {
+      throw toApiFailure(e);
+    }
+  },
+  async listCareerCategories(
+    query: { page?: number; pageSize?: number; q?: string } = {},
+    signal?: AbortSignal
+  ): Promise<Paged<CareerCategoryDto>> {
+    try {
+      const params: Record<string, string | number> = {};
+      if (query.page && query.page > 1) params.page = query.page;
+      if (query.pageSize) params.pageSize = query.pageSize;
+      if (query.q && query.q.trim()) params.q = query.q.trim();
+      const res = await apiClient.get("/career/categories", { params, signal });
+      return normalizePaged(res.data, normalizeCareerCategory);
+    } catch (e) {
+      throw toApiFailure(e);
+    }
+  },
+  async listSkillCategories(
+    query: { parentCode?: string; page?: number; pageSize?: number } = {},
+    signal?: AbortSignal
+  ): Promise<Paged<SkillCategoryDto>> {
+    try {
+      const params: Record<string, string | number> = {};
+      if (query.parentCode && query.parentCode.trim()) params.parentCode = query.parentCode.trim();
+      if (query.page && query.page > 1) params.page = query.page;
+      if (query.pageSize) params.pageSize = query.pageSize;
+      const res = await apiClient.get("/reference/skill-categories", { params, signal });
+      return normalizePaged(res.data, normalizeSkillCategory);
+    } catch (e) {
+      throw toApiFailure(e);
+    }
+  },
+  async listSkills(
+    query: { categoryCode?: string; page?: number; pageSize?: number } = {},
+    signal?: AbortSignal
+  ): Promise<Paged<SkillDto>> {
+    try {
+      const params: Record<string, string | number> = {};
+      if (query.categoryCode && query.categoryCode.trim()) params.categoryCode = query.categoryCode.trim();
+      if (query.page && query.page > 1) params.page = query.page;
+      if (query.pageSize) params.pageSize = query.pageSize;
+      const res = await apiClient.get("/reference/skills", { params, signal });
+      return normalizePaged(res.data, normalizeSkill);
     } catch (e) {
       throw toApiFailure(e);
     }

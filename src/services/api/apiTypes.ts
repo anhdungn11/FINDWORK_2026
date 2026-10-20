@@ -77,6 +77,34 @@ export interface JobCategoryDto {
   name: string;
 }
 
+export interface CareerCategoryDto {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  publishedJobCount: number;
+}
+
+export interface SkillCategoryDto {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  parentCode: string | null;
+}
+
+export interface SkillDto {
+  id: string;
+  code: string;
+  name: string;
+  aliases: string[];
+  isActive: boolean;
+  sortOrder: number;
+  categoryCode: string;
+}
+
 export interface MyCompanyDto {
   id: string;
   name: string;
@@ -331,6 +359,43 @@ export function normalizePaged<T>(value: unknown, mapItem: (v: unknown) => T): P
 export function normalizeCategory(value: unknown): JobCategoryDto {
   const r = obj(value);
   return { id: str(r.id) ?? "", code: str(r.code) ?? "", name: str(r.name) ?? "" };
+}
+
+export function normalizeCareerCategory(value: unknown): CareerCategoryDto {
+  const r = obj(value);
+  return {
+    id: str(r.id) ?? "",
+    code: str(r.code) ?? "",
+    name: str(r.name) ?? "",
+    isActive: typeof r.isActive === "boolean" ? r.isActive : true,
+    sortOrder: num(r.sortOrder) ?? 0,
+    publishedJobCount: num(r.publishedJobCount) ?? 0,
+  };
+}
+
+export function normalizeSkillCategory(value: unknown): SkillCategoryDto {
+  const r = obj(value);
+  return {
+    id: str(r.id) ?? "",
+    code: str(r.code) ?? "",
+    name: str(r.name) ?? "",
+    isActive: typeof r.isActive === "boolean" ? r.isActive : true,
+    sortOrder: num(r.sortOrder) ?? 0,
+    parentCode: str(r.parentCode),
+  };
+}
+
+export function normalizeSkill(value: unknown): SkillDto {
+  const r = obj(value);
+  return {
+    id: str(r.id) ?? "",
+    code: str(r.code) ?? "",
+    name: str(r.name) ?? "",
+    aliases: Array.isArray(r.aliases) ? (r.aliases as unknown[]).filter((x): x is string => typeof x === "string") : [],
+    isActive: typeof r.isActive === "boolean" ? r.isActive : true,
+    sortOrder: num(r.sortOrder) ?? 0,
+    categoryCode: str(r.categoryCode) ?? "",
+  };
 }
 
 export function normalizeMyCompany(value: unknown): MyCompanyDto {

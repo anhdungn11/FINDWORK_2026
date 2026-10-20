@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { publicApi } from "@/services/api/publicApi";
+import { publicApi, type CareerCategoryDto, type SkillCategoryDto } from "@/services/api/publicApi";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { useAuthStore } from "@/store/authStore";
 import { LoadingBlock } from "@/components/ui";
@@ -34,18 +34,37 @@ const CATEGORY_SCOPES: Record<string, string> = {
 };
 
 const CareerPage = () => {
+  const [activeTab, setActiveTab] = useState<"categories" | "skills">("categories");
   const [search, setSearch] = useState("");
   const authStatus = useAuthStore((s) => s.status);
   const user = useAuthStore((s) => s.user);
 
-  const { data, error, loading, reload } = useAsyncData(
-    (signal) => publicApi.listJobCategories(signal),
+  // Consume real GET /api/v1/career/categories API
+  const {
+    data: careerData,
+    error: careerError,
+    loading: careerLoading,
+    reload: reloadCareers,
+  } = useAsyncData(
+    (signal) => publicApi.listCareerCategories({ page: 1, pageSize: 100 }, signal),
     []
   );
 
-  const categories = data ?? [];
+  // Consume real GET /api/v1/reference/skill-categories API
+  const {
+    data: skillData,
+    error: skillError,
+    loading: skillLoading,
+    reload: reloadSkills,
+  } = useAsyncData(
+    (signal) => publicApi.listSkillCategories({ page: 1, pageSize: 100 }, signal),
+    []
+  );
 
-  const filtered = useMemo(() => {
+  const categories: CareerCategoryDto[] = careerData?.data ?? [];
+  const skillCategories: SkillCategoryDto[] = skillData?.data ?? [];
+
+  const filteredCategories = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return categories;
     return categories.filter(
@@ -56,6 +75,18 @@ const CareerPage = () => {
     );
   }, [categories, search]);
 
+  const filteredSkills = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return skillCategories;
+    return skillCategories.filter(
+      (s) => s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q)
+    );
+  }, [skillCategories, search]);
+
+  const isLoading = activeTab === "categories" ? careerLoading : skillLoading;
+  const currentError = activeTab === "categories" ? careerError : skillError;
+  const currentReload = activeTab === "categories" ? reloadCareers : reloadSkills;
+
   return (
     <div className={styles.page}>
       <div className="container">
@@ -63,7 +94,8 @@ const CareerPage = () => {
           <span className={styles.eyebrow}>ĐỊNH HƯỚNG NGHỀ NGHIỆP</span>
           <h1 className={styles.title}>Khám phá các lĩnh vực nghề nghiệp</h1>
           <p className={styles.description}>
-            Tìm hiểu các nhóm ngành nghề chuyên môn chuẩn hóa trên FINDWORK và khám phá những cơ hội việc làm phù hợp với định hướng của bạn.
+            Khám phá danh mục ngành nghề và danh mục kỹ năng chuẩn hóa từ hệ thống FINDWORK.
+            Tra cứu số lượng tin tuyển dụng thực tế đang được xuất bản trên thị trường.
           </p>
 
           <div className={styles.searchBar}>
@@ -81,10 +113,14 @@ const CareerPage = () => {
             <input
               type="text"
               className={styles.searchInput}
-              placeholder="Tìm kiếm theo tên ngành nghề hoặc lĩnh vực..."
+              placeholder={
+                activeTab === "categories"
+                  ? "Tìm kiếm ngành nghề hoặc lĩnh vực..."
+                  : "Tìm kiếm nhóm kỹ năng chuyên môn..."
+              }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              aria-label="Tìm kiếm ngành nghề"
+              aria-label="Tìm kiếm ngành nghề hoặc kỹ năng"
             />
           </div>
         </header>
@@ -101,57 +137,126 @@ const CareerPage = () => {
           </aside>
         )}
 
-        <section className={styles.categoriesSection} aria-label="Danh mục ngành nghề">
+        <div className={styles.tabBar} role="tablist" aria-label="Lựa chọn khám phá">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "categories"}
+            className={`${styles.tabBtn} ${activeTab === "categories" ? styles.tabBtnActive : ""}`}
+            onClick={() => setActiveTab("categories")}
+          >
+            Nhóm ngành nghề ({categories.length})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "skills"}
+            className={`${styles.tabBtn} ${activeTab === "skills" ? styles.tabBtnActive : ""}`}
+            onClick={() => setActiveTab("skills")}
+          >
+            Nhóm kỹ năng chuyên môn ({skillCategories.length})
+          </button>
+        </div>
+
+        <section className={styles.categoriesSection} aria-label="Nội dung khám phá">
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>
-              {search.trim() ? "Kết quả tìm kiếm" : "Tất cả lĩnh vực nghề nghiệp"}
+              {activeTab === "categories"
+                ? search.trim() ? "Kết quả tìm kiếm ngành nghề" : "Tất cả lĩnh vực nghề nghiệp"
+                : search.trim() ? "Kết quả tìm kiếm kỹ năng" : "Tất cả nhóm kỹ năng chuyên môn"}
             </h2>
             <span className={styles.categoryCount}>
-              {filtered.length} nhóm ngành
+              {activeTab === "categories"
+                ? `${filteredCategories.length} nhóm ngành`
+                : `${filteredSkills.length} nhóm kỹ năng`}
             </span>
           </div>
 
-          {loading ? (
-            <LoadingBlock rows={4} label="Đang nạp danh mục ngành nghề..." />
-          ) : error ? (
-            <ApiErrorState error={error as ApiFailure} onRetry={reload} />
-          ) : filtered.length === 0 ? (
-            <div className={styles.emptyState}>
-              <h3 className={styles.emptyStateTitle}>Không tìm thấy ngành nghề phù hợp</h3>
-              <p className={styles.emptyStateText}>
-                Không có ngành nghề nào khớp với từ khóa &ldquo;{search}&rdquo;. Bạn có thể thử tìm kiếm bằng từ khóa khác.
-              </p>
-              <button
-                type="button"
-                className={styles.clearSearchBtn}
-                onClick={() => setSearch("")}
-              >
-                Xóa bộ lọc tìm kiếm
-              </button>
-            </div>
+          {isLoading ? (
+            <LoadingBlock
+              rows={4}
+              label={activeTab === "categories" ? "Đang nạp danh mục ngành nghề..." : "Đang nạp danh mục kỹ năng..."}
+            />
+          ) : currentError ? (
+            <ApiErrorState error={currentError as ApiFailure} onRetry={currentReload} />
+          ) : activeTab === "categories" ? (
+            filteredCategories.length === 0 ? (
+              <div className={styles.emptyState}>
+                <h3 className={styles.emptyStateTitle}>Không tìm thấy ngành nghề phù hợp</h3>
+                <p className={styles.emptyStateText}>
+                  Không có ngành nghề nào khớp với từ khóa &ldquo;{search}&rdquo;. Bạn có thể thử tìm kiếm bằng từ khóa khác.
+                </p>
+                <button
+                  type="button"
+                  className={styles.clearSearchBtn}
+                  onClick={() => setSearch("")}
+                >
+                  Xóa bộ lọc tìm kiếm
+                </button>
+              </div>
+            ) : (
+              <div className={styles.grid}>
+                {filteredCategories.map((category) => {
+                  const scope = CATEGORY_SCOPES[category.code] || "Các vị trí chuyên môn thuộc lĩnh vực " + category.name;
+                  return (
+                    <article key={category.id || category.code} className={styles.card}>
+                      <div className={styles.cardTop}>
+                        <span className={styles.badge}>{category.code}</span>
+                        <span
+                          className={`${styles.jobCountBadge} ${
+                            category.publishedJobCount > 0 ? styles.jobCountActive : styles.jobCountZero
+                          }`}
+                        >
+                          {category.publishedJobCount > 0
+                            ? `${category.publishedJobCount} việc làm đang tuyển`
+                            : "0 việc làm đang tuyển"}
+                        </span>
+                      </div>
+                      <h3 className={styles.cardName}>{category.name}</h3>
+                      <p className={styles.cardHint}>{scope}</p>
+                      <div className={styles.cardFooter}>
+                        <Link
+                          to={`/jobs?categoryCode=${encodeURIComponent(category.code)}`}
+                          className={styles.viewJobsLink}
+                        >
+                          Xem việc làm liên quan →
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )
           ) : (
-            <div className={styles.grid}>
-              {filtered.map((category) => {
-                const scope = CATEGORY_SCOPES[category.code] || "Các vị trí chuyên môn thuộc lĩnh vực " + category.name;
-                return (
-                  <article key={category.id || category.code} className={styles.card}>
+            filteredSkills.length === 0 ? (
+              <div className={styles.emptyState}>
+                <h3 className={styles.emptyStateTitle}>Không tìm thấy nhóm kỹ năng phù hợp</h3>
+                <p className={styles.emptyStateText}>
+                  Không có nhóm kỹ năng nào khớp với từ khóa &ldquo;{search}&rdquo;. Bạn có thể thử tìm kiếm bằng từ khóa khác.
+                </p>
+                <button
+                  type="button"
+                  className={styles.clearSearchBtn}
+                  onClick={() => setSearch("")}
+                >
+                  Xóa bộ lọc tìm kiếm
+                </button>
+              </div>
+            ) : (
+              <div className={styles.skillsGrid}>
+                {filteredSkills.map((skill) => (
+                  <article key={skill.id || skill.code} className={styles.skillCard}>
                     <div className={styles.cardTop}>
-                      <span className={styles.badge}>{category.code}</span>
+                      <span className={styles.badge}>{skill.code}</span>
                     </div>
-                    <h3 className={styles.cardName}>{category.name}</h3>
-                    <p className={styles.cardHint}>{scope}</p>
-                    <div className={styles.cardFooter}>
-                      <Link
-                        to={`/jobs?categoryCode=${encodeURIComponent(category.code)}`}
-                        className={styles.viewJobsLink}
-                      >
-                        Khám phá việc làm →
-                      </Link>
-                    </div>
+                    <h3 className={styles.skillName}>{skill.name}</h3>
+                    <p className={styles.skillMeta}>
+                      Mã tham chiếu chuẩn hóa FINDWORK
+                    </p>
                   </article>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )
           )}
         </section>
       </div>
