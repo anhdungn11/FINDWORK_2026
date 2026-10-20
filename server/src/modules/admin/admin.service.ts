@@ -128,6 +128,14 @@ export class AdminService {
       }
       const updated = await tx.user.updateMany({ where: { id: userId, status: current.status }, data: { status } });
       if (updated.count !== 1) throw conflict("USER");
+      // A suspension or disable must remain effective after later reactivation.
+      // Revoke sessions in the same transaction as the status change and audit.
+      if (status !== "ACTIVE") {
+        await tx.authSession.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
       await tx.auditLog.create({ data: { actorUserId, action: "admin.user.status", targetType: "User", targetId: userId,
         beforeData: { status: current.status }, afterData: { status } } });
       return tx.user.findUniqueOrThrow({ where: { id: userId }, select: userSelect });

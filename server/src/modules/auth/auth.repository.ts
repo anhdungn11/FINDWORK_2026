@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 
 interface CreateRegisteredUserInput {
@@ -103,15 +103,29 @@ export class AuthRepository {
   }
 
   createSession(input: CreateSessionInput) {
-    return this.prisma.authSession.create({
-      data: {
-        id: input.id,
-        userId: input.userId,
-        refreshTokenHash: input.refreshTokenHash,
-        expiresAt: input.expiresAt,
-        userAgent: input.userAgent,
-        ipAddress: input.ipAddress,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      // Serialize session creation with AdminService.setUserStatus, which locks
+      // the same User row before revoking every session on suspension.
+      const users = await tx.$queryRaw<Array<{ status: string }>>`
+        SELECT "status"::text AS status FROM "User"
+        WHERE "id" = ${input.userId}::uuid FOR UPDATE
+      `;
+      if (users[0]?.status !== "ACTIVE") {
+        throw new ForbiddenException({
+          code: "AUTH_ACCOUNT_UNAVAILABLE",
+          message: "This account is not available for authentication.",
+        });
+      }
+      return tx.authSession.create({
+        data: {
+          id: input.id,
+          userId: input.userId,
+          refreshTokenHash: input.refreshTokenHash,
+          expiresAt: input.expiresAt,
+          userAgent: input.userAgent,
+          ipAddress: input.ipAddress,
+        },
+      });
     });
   }
 

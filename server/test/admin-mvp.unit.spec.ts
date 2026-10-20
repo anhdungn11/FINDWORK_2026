@@ -15,6 +15,7 @@ function fakeDb() {
     user: { findUnique: jest.fn().mockResolvedValue({ status: "ACTIVE" }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: targetId, status: "SUSPENDED" }) },
     systemUserRole: { findFirst: jest.fn().mockResolvedValue(null) },
     systemUserPermission: { findFirst: jest.fn().mockResolvedValue(null) },
+    authSession: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
     company: { findUnique: jest.fn().mockResolvedValue({ status: "ACTIVE", verificationStatus: "PENDING" }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: companyId }) },
     job: { findUnique: jest.fn().mockResolvedValue({ companyId, status: "PUBLISHED", version: 1 }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: jobId }) },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
@@ -103,6 +104,10 @@ describe("platform admin MVP security", () => {
     const { tx, db } = fakeDb();
     await new AdminService(db as never).setUserStatus(actorId, targetId, "SUSPENDED");
     expect(tx.user.updateMany).toHaveBeenCalledWith({ where: { id: targetId, status: "ACTIVE" }, data: { status: "SUSPENDED" } });
+    expect(tx.authSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: targetId, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ actorUserId: actorId, action: "admin.user.status", targetId }) }));
   });
 
@@ -112,6 +117,7 @@ describe("platform admin MVP security", () => {
     await expect(new AdminService(db as never).setUserStatus(actorId, targetId, "SUSPENDED"))
       .rejects.toMatchObject({ status: 403 });
     expect(tx.user.updateMany).not.toHaveBeenCalled();
+    expect(tx.authSession.updateMany).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
     expect(tx.systemUserRole.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId: targetId, role: { is: { kind: "SYSTEM", isActive: true, systemCode: { not: "CANDIDATE" } } } },
@@ -124,6 +130,7 @@ describe("platform admin MVP security", () => {
     await expect(new AdminService(db as never).setUserStatus(actorId, targetId, "DISABLED"))
       .rejects.toMatchObject({ status: 403 });
     expect(tx.user.updateMany).not.toHaveBeenCalled();
+    expect(tx.authSession.updateMany).not.toHaveBeenCalled();
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });
 
@@ -132,6 +139,7 @@ describe("platform admin MVP security", () => {
     tx.user.findUnique.mockResolvedValueOnce({ status: "SUSPENDED" });
     await new AdminService(db as never).setUserStatus(actorId, targetId, "ACTIVE");
     expect(tx.user.updateMany).toHaveBeenCalledWith({ where: { id: targetId, status: "SUSPENDED" }, data: { status: "ACTIVE" } });
+    expect(tx.authSession.updateMany).not.toHaveBeenCalled();
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
       beforeData: { status: "SUSPENDED" }, afterData: { status: "ACTIVE" },
     }) }));
