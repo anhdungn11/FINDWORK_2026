@@ -1,5 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import {
+  Users,
+  Briefcase,
+  Calendar,
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  FileText,
+  CheckCircle2,
+  XCircle,
+  HelpCircle,
+  ArrowRight,
+  X,
+  Filter,
+} from "lucide-react";
 import {
   Badge,
   Card,
@@ -8,6 +24,7 @@ import {
   PageHeader,
   Pagination,
   ui,
+  JOB_STATUS_LABEL,
 } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
@@ -27,23 +44,31 @@ import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 import { WritesDisabledNotice } from "./EmployerDashboardPage";
 
-const STATUS_FILTERS = [
-  "",
-  "SUBMITTED",
-  "REVIEWING",
-  "SHORTLISTED",
-  "INTERVIEW",
-  "OFFERED",
-  "REJECTED",
+const STATUS_FILTERS: Array<{ value: string; label: string }> = [
+  { value: "", label: "Tất cả trạng thái xét duyệt" },
+  { value: "SUBMITTED", label: "Mới nộp (Chờ xem xét)" },
+  { value: "REVIEWING", label: "Đang xem xét (Reviewing)" },
+  { value: "SHORTLISTED", label: "Sơ tuyển / Phù hợp (Shortlisted)" },
+  { value: "INTERVIEW", label: "Phỏng vấn chuyên môn (Interview)" },
+  { value: "OFFERED", label: "Đề nghị tuyển dụng (Offered)" },
+  { value: "REJECTED", label: "Không phù hợp (Rejected)" },
 ];
 
 const TRANSITION_LABEL: Record<ApplicationReviewStatus, string> = {
-  REVIEWING: "Xem xét",
-  SHORTLISTED: "Sơ tuyển",
-  INTERVIEW: "Phỏng vấn",
-  OFFERED: "Gửi Offer",
-  REJECTED: "Từ chối",
+  REVIEWING: "Bắt đầu xem xét",
+  SHORTLISTED: "Chọn vào sơ tuyển",
+  INTERVIEW: "Mời phỏng vấn",
+  OFFERED: "Gửi đề nghị (Offer)",
+  REJECTED: "Từ chối hồ sơ",
 };
+
+const STAGES = [
+  { key: "SUBMITTED", label: "Mới nộp" },
+  { key: "REVIEWING", label: "Xem xét" },
+  { key: "SHORTLISTED", label: "Sơ tuyển" },
+  { key: "INTERVIEW", label: "Phỏng vấn" },
+  { key: "OFFERED", label: "Offer" },
+];
 
 const EmployerApplicantsPage = () => {
   const { active } = useCompanyWorkspace();
@@ -53,7 +78,6 @@ const EmployerApplicantsPage = () => {
   const page = Math.max(1, Number(params.get("page")) || 1);
 
   const [activeApplication, setActiveApplication] = useState<CompanyApplicationDto | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
@@ -82,6 +106,16 @@ const EmployerApplicantsPage = () => {
     [active.id, currentJobId, page, status],
   );
 
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!activeApplication) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveApplication(null);
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [activeApplication]);
+
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -91,14 +125,11 @@ const EmployerApplicantsPage = () => {
   };
 
   const openDetail = async (app: CompanyApplicationDto) => {
-    setDetailLoading(true);
     try {
       const full = await companyWorkspaceApi.getApplication(active.id, currentJobId, app.id);
       setActiveApplication(full);
     } catch {
       setActiveApplication(app);
-    } finally {
-      setDetailLoading(false);
     }
   };
 
@@ -128,11 +159,13 @@ const EmployerApplicantsPage = () => {
     }
   };
 
+  const currentJobObj = jobs.data?.data.find((j) => j.id === currentJobId);
+
   return (
     <>
       <PageHeader
         title="Quản lý hồ sơ ứng viên"
-        subtitle="Theo dõi và đánh giá ứng viên theo từng tin tuyển dụng theo quy trình chuẩn."
+        subtitle="Tiếp nhận, đánh giá câu trả lời sàng lọc và chuyển tiếp quy trình tuyển dụng ứng viên theo từng vị trí."
       />
       <WritesDisabledNotice />
 
@@ -140,16 +173,29 @@ const EmployerApplicantsPage = () => {
         <div
           className={`${ui.notice} ${notice.tone === "error" ? ui.noticeWarn : ""}`}
           role={notice.tone === "error" ? "alert" : "status"}
+          style={{ marginBottom: 16 }}
         >
           {notice.text}
         </div>
       )}
 
-      {/* Filter panel */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
-        <div className={ui.field} style={{ minWidth: 260, maxWidth: 380, flex: 1 }}>
+      {/* FILTER CONTROLS */}
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          flexWrap: "wrap",
+          alignItems: "flex-end",
+          marginBottom: 20,
+          padding: "16px",
+          background: "var(--color-surface, #ffffff)",
+          border: "1px solid var(--color-border, #e2e8f0)",
+          borderRadius: 10,
+        }}
+      >
+        <div className={ui.field} style={{ minWidth: 280, maxWidth: 440, flex: "1 1 280px", margin: 0 }}>
           <label className={ui.label} htmlFor="job-select">
-            Tin tuyển dụng
+            Chọn tin tuyển dụng
           </label>
           {jobs.loading ? (
             <LoadingBlock rows={1} />
@@ -162,16 +208,19 @@ const EmployerApplicantsPage = () => {
               value={currentJobId}
               onChange={(e) => setFilter("jobId", e.target.value)}
             >
-              {jobs.data.data.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.title} ({j.status})
-                </option>
-              ))}
+              {jobs.data.data.map((j) => {
+                const stLabel = JOB_STATUS_LABEL[j.status]?.label ?? j.status;
+                return (
+                  <option key={j.id} value={j.id}>
+                    {j.title} ({stLabel})
+                  </option>
+                );
+              })}
             </select>
           )}
         </div>
 
-        <div className={ui.field} style={{ minWidth: 200, maxWidth: 260 }}>
+        <div className={ui.field} style={{ minWidth: 220, maxWidth: 300, margin: 0 }}>
           <label className={ui.label} htmlFor="status-filter">
             Trạng thái xét duyệt
           </label>
@@ -182,29 +231,39 @@ const EmployerApplicantsPage = () => {
             onChange={(e) => setFilter("status", e.target.value)}
           >
             {STATUS_FILTERS.map((s) => (
-              <option key={s} value={s}>
-                {s === "" ? "Tất cả trạng thái" : APPLICATION_STATUS_LABEL[s as keyof typeof APPLICATION_STATUS_LABEL] || s}
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
         </div>
+
+        {applications.data && (
+          <div style={{ marginLeft: "auto", alignSelf: "center", fontSize: "0.875rem", color: "var(--color-text-secondary, #64748b)" }}>
+            Có <strong>{applications.data.pagination.total}</strong> ứng viên cho vị trí này
+          </div>
+        )}
       </div>
 
       {!currentJobId ? (
         <EmptyState
           title="Chưa chọn tin tuyển dụng"
           text="Vui lòng tạo hoặc chọn một tin tuyển dụng để xem danh sách hồ sơ ứng tuyển."
-          actionLabel="Đăng tin tuyển dụng"
+          actionLabel="Đăng tin tuyển dụng mới"
           actionTo="/employer/jobs/new"
         />
       ) : applications.loading ? (
-        <LoadingBlock rows={4} label="Đang tải danh sách ứng viên" />
+        <LoadingBlock rows={4} label="Đang tải danh sách hồ sơ ứng viên..." />
       ) : applications.error ? (
         <ApiErrorState error={applications.error} onRetry={applications.reload} />
       ) : !applications.data || applications.data.data.length === 0 ? (
         <EmptyState
-          title="Chưa có hồ sơ ứng tuyển"
-          text={status ? "Không tìm thấy hồ sơ nào phù hợp với bộ lọc trạng thái." : "Hiện chưa có ứng viên nào nộp hồ sơ vào vị trí này."}
+          title="Chưa có hồ sơ ứng tuyển nào"
+          text={
+            status
+              ? "Không có ứng viên nào ở trạng thái xét duyệt này."
+              : `Hiện chưa có ứng viên nào nộp hồ sơ vào vị trí “${currentJobObj?.title || "này"}”.`
+          }
         />
       ) : (
         <>
@@ -214,22 +273,24 @@ const EmployerApplicantsPage = () => {
               <thead>
                 <tr>
                   <th scope="col">Ứng viên</th>
-                  <th scope="col">Liên hệ</th>
-                  <th scope="col">Ngày nộp</th>
-                  <th scope="col">Trạng thái</th>
-                  <th scope="col">Thao tác</th>
+                  <th scope="col">Thông tin liên hệ</th>
+                  <th scope="col">Thời gian nộp</th>
+                  <th scope="col">Trạng thái xét duyệt</th>
+                  <th scope="col">Thao tác & Chuyển bước</th>
                 </tr>
               </thead>
               <tbody>
                 {applications.data.data.map((app) => (
                   <tr key={app.id}>
                     <td>
-                      <strong>{app.fullNameSnapshot || "Chưa cập nhật tên"}</strong>
-                      <div className={ui.hint}>ID: {app.id.slice(0, 8)}…</div>
+                      <div style={{ fontWeight: 600, fontSize: "0.9375rem" }}>
+                        {app.fullNameSnapshot || "Ứng viên (Chưa cập nhật tên)"}
+                      </div>
+                      <div className={ui.hint}>Mã hồ sơ: {app.id.slice(0, 8)}…</div>
                     </td>
                     <td>
                       <div>{app.emailSnapshot || "—"}</div>
-                      <div className={ui.hint}>{app.phoneSnapshot || "—"}</div>
+                      <div className={ui.hint}>{app.phoneSnapshot || "Chưa có SĐT"}</div>
                     </td>
                     <td>{app.submittedAt ? new Date(app.submittedAt).toLocaleDateString("vi-VN") : "—"}</td>
                     <td>
@@ -248,13 +309,14 @@ const EmployerApplicantsPage = () => {
                       </Badge>
                     </td>
                     <td>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                         <button
                           type="button"
-                          className={ui.btn}
+                          className={`${ui.btn} ${ui.btnPrimary}`}
                           onClick={() => openDetail(app)}
+                          style={{ fontSize: "0.85rem", padding: "5px 12px" }}
                         >
-                          Chi tiết
+                          Xem hồ sơ
                         </button>
                         {availableReviewTransitions(app.status).map((nextSt) => (
                           <button
@@ -265,6 +327,7 @@ const EmployerApplicantsPage = () => {
                             aria-disabled={!writes}
                             title={writes ? undefined : "Thao tác ghi đang bị khóa"}
                             onClick={() => handleReview(app, nextSt)}
+                            style={{ fontSize: "0.85rem", padding: "5px 10px" }}
                           >
                             {TRANSITION_LABEL[nextSt]}
                           </button>
@@ -285,7 +348,7 @@ const EmployerApplicantsPage = () => {
         </>
       )}
 
-      {/* Applicant Detail Drawer/Modal */}
+      {/* APPLICANT DETAIL MODAL / DRAWER */}
       {activeApplication && (
         <div
           role="dialog"
@@ -297,7 +360,8 @@ const EmployerApplicantsPage = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0,0,0,0.5)",
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(2px)",
             zIndex: 1000,
             display: "flex",
             alignItems: "center",
@@ -308,79 +372,172 @@ const EmployerApplicantsPage = () => {
         >
           <div
             style={{
-              background: "var(--color-surface, #fff)",
-              borderRadius: "var(--radius-lg, 12px)",
-              maxWidth: 680,
+              background: "var(--color-surface, #ffffff)",
+              borderRadius: 14,
+              maxWidth: 720,
               width: "100%",
-              maxHeight: "90vh",
+              maxHeight: "92vh",
               overflowY: "auto",
-              padding: 24,
+              padding: 28,
+              boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            {/* MODAL HEADER */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                borderBottom: "1px solid var(--color-border, #e2e8f0)",
+                paddingBottom: 16,
+                marginBottom: 20,
+              }}
+            >
               <div>
-                <h2 id="applicant-modal-title" style={{ margin: "0 0 4px" }}>
+                <h2 id="applicant-modal-title" style={{ margin: "0 0 6px", fontSize: "1.35rem", fontWeight: 700 }}>
                   {activeApplication.fullNameSnapshot || "Hồ sơ ứng viên"}
                 </h2>
-                <span className={ui.hint}>
-                  Nộp ngày {activeApplication.submittedAt ? new Date(activeApplication.submittedAt).toLocaleDateString("vi-VN") : "—"}
-                </span>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: "0.85rem", color: "var(--color-text-secondary, #64748b)" }}>
+                  <span>Nộp ngày {activeApplication.submittedAt ? new Date(activeApplication.submittedAt).toLocaleDateString("vi-VN") : "—"}</span>
+                  <span>•</span>
+                  <span>Mã hồ sơ: {activeApplication.id}</span>
+                </div>
               </div>
+
               <button
                 type="button"
                 className={ui.btn}
+                style={{ padding: 6, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                 onClick={() => setActiveApplication(null)}
+                aria-label="Đóng bảng chi tiết ứng viên"
               >
-                Đóng
+                <X size={20} />
               </button>
             </div>
 
-            <div style={{ display: "grid", gap: 16 }}>
-              <Card title="Thông tin liên hệ & Làm việc">
-                <p style={{ margin: "0 0 6px" }}>
-                  <strong>Email:</strong> {activeApplication.emailSnapshot || "—"}
-                </p>
-                <p style={{ margin: "0 0 6px" }}>
-                  <strong>Số điện thoại:</strong> {activeApplication.phoneSnapshot || "—"}
-                </p>
-                <p style={{ margin: "0 0 6px" }}>
-                  <strong>Địa điểm hiện tại:</strong> {activeApplication.currentLocationSnapshot || "—"}
-                </p>
-                <p style={{ margin: "0 0 6px" }}>
-                  <strong>Thời gian bắt đầu:</strong> {formatAvailability(activeApplication.availability)}
-                </p>
-                <p style={{ margin: "0 0 6px" }}>
-                  <strong>Phương thức liên hệ ưu tiên:</strong> {formatContactMethod(activeApplication.preferredContactMethod)}
-                </p>
-                <p style={{ margin: 0 }}>
-                  <strong>Trạng thái hồ sơ:</strong>{" "}
-                  <Badge tone="info">
-                    {APPLICATION_STATUS_LABEL[activeApplication.status] || activeApplication.status}
+            {/* STAGE STEPPER */}
+            <div
+              style={{
+                marginBottom: 20,
+                padding: "14px 16px",
+                background: "var(--color-surface-soft, #f8fafc)",
+                borderRadius: 10,
+                border: "1px solid var(--color-border, #e2e8f0)",
+              }}
+            >
+              <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-secondary, #64748b)", marginBottom: 8 }}>
+                Tiến trình tuyển dụng:
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {STAGES.map((s, idx) => {
+                  const isCurrent = activeApplication.status === s.key;
+                  const isRejected = activeApplication.status === "REJECTED";
+                  return (
+                    <div key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <span
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          fontSize: "0.8125rem",
+                          fontWeight: isCurrent ? 700 : 500,
+                          background: isCurrent
+                            ? "var(--color-primary, #4f6ef7)"
+                            : "var(--color-surface, #ffffff)",
+                          color: isCurrent ? "#ffffff" : "var(--color-text-secondary, #64748b)",
+                          border: isCurrent
+                            ? "1px solid var(--color-primary, #4f6ef7)"
+                            : "1px solid var(--color-border, #cbd5e1)",
+                        }}
+                      >
+                        {idx + 1}. {s.label}
+                      </span>
+                      {idx < STAGES.length - 1 && <span style={{ color: "#94a3b8" }}>→</span>}
+                    </div>
+                  );
+                })}
+                {activeApplication.status === "REJECTED" && (
+                  <Badge tone="danger" style={{ marginLeft: 8 }}>
+                    Đã từ chối
                   </Badge>
-                </p>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 18 }}>
+              {/* CONTACT DETAILS CARD */}
+              <Card title="Thông tin liên hệ & Thời gian làm việc">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                  <div>
+                    <span className={ui.hint}>Địa chỉ Email:</span>
+                    <div style={{ fontWeight: 600 }}>{activeApplication.emailSnapshot || "—"}</div>
+                  </div>
+                  <div>
+                    <span className={ui.hint}>Số điện thoại:</span>
+                    <div style={{ fontWeight: 600 }}>{activeApplication.phoneSnapshot || "—"}</div>
+                  </div>
+                  <div>
+                    <span className={ui.hint}>Địa điểm hiện tại:</span>
+                    <div style={{ fontWeight: 600 }}>{activeApplication.currentLocationSnapshot || "—"}</div>
+                  </div>
+                  <div>
+                    <span className={ui.hint}>Thời điểm có thể nhận việc:</span>
+                    <div style={{ fontWeight: 600 }}>{formatAvailability(activeApplication.availability)}</div>
+                  </div>
+                  <div>
+                    <span className={ui.hint}>Phương thức liên hệ ưu tiên:</span>
+                    <div style={{ fontWeight: 600 }}>{formatContactMethod(activeApplication.preferredContactMethod)}</div>
+                  </div>
+                  <div>
+                    <span className={ui.hint}>Trạng thái xét duyệt hiện tại:</span>
+                    <div>
+                      <Badge
+                        tone={
+                          activeApplication.status === "OFFERED"
+                            ? "success"
+                            : activeApplication.status === "REJECTED"
+                            ? "danger"
+                            : activeApplication.status === "INTERVIEW"
+                            ? "warning"
+                            : "info"
+                        }
+                      >
+                        {APPLICATION_STATUS_LABEL[activeApplication.status] || activeApplication.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
               </Card>
 
+              {/* SCREENING ANSWERS CARD */}
               {activeApplication.answers && activeApplication.answers.length > 0 && (
-                <Card title="Câu hỏi sàng lọc đã trả lời">
+                <Card title="Câu trả lời cho Bộ câu hỏi sàng lọc">
                   <div style={{ display: "grid", gap: 12 }}>
                     {activeApplication.answers.map((ans, idx) => {
                       const qSnap = ans.questionSnapshot as { label?: string; type?: string } | undefined;
-                      const qLabel = qSnap?.label || `Câu hỏi ${idx + 1}`;
+                      const qLabel = qSnap?.label || `Câu hỏi #${idx + 1}`;
                       let answerText = "—";
                       if (typeof ans.answerValue === "boolean") {
-                        answerText = ans.answerValue ? "Có" : "Không";
+                        answerText = ans.answerValue ? "Có (Yes)" : "Không (No)";
                       } else if (Array.isArray(ans.answerValue)) {
                         answerText = ans.answerValue.join(", ");
                       } else if (ans.answerValue !== undefined && ans.answerValue !== null) {
                         answerText = String(ans.answerValue);
                       }
                       return (
-                        <div key={ans.id || idx} style={{ borderBottom: "1px solid var(--color-border, #e2e8f0)", paddingBottom: 8 }}>
-                          <div style={{ fontWeight: 600, fontSize: "0.875rem", marginBottom: 4 }}>
+                        <div
+                          key={ans.id || idx}
+                          style={{
+                            padding: "10px 12px",
+                            background: "var(--color-surface-soft, #f8fafc)",
+                            borderRadius: 8,
+                            border: "1px solid var(--color-border, #e2e8f0)",
+                          }}
+                        >
+                          <div style={{ fontWeight: 600, fontSize: "0.875rem", marginBottom: 4, color: "var(--color-text-primary, #1e293b)" }}>
                             {idx + 1}. {qLabel}
                           </div>
-                          <div style={{ color: "var(--color-text-secondary, #475569)", fontSize: "0.875rem" }}>
+                          <div style={{ color: "var(--color-primary, #4f6ef7)", fontWeight: 600, fontSize: "0.9375rem" }}>
                             {answerText}
                           </div>
                         </div>
@@ -390,51 +547,124 @@ const EmployerApplicantsPage = () => {
                 </Card>
               )}
 
+              {/* COVER LETTER */}
               {activeApplication.coverLetter && (
                 <Card title="Thư giới thiệu (Cover Letter)">
-                  <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+                  <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6, color: "var(--color-text-primary, #1e293b)" }}>
                     {activeApplication.coverLetter}
                   </p>
                 </Card>
               )}
 
-              {activeApplication.resumeVersion?.builderContent ? (
-                <Card title="Nội dung CV Builder">
-                  <pre
-                    style={{
-                      margin: 0,
-                      background: "var(--color-surface-soft, #f8fafc)",
-                      padding: 12,
-                      borderRadius: 8,
-                      fontSize: "0.8125rem",
-                      overflowX: "auto",
-                      maxHeight: 280,
-                    }}
-                  >
-                    {JSON.stringify(activeApplication.resumeVersion.builderContent, null, 2)}
-                  </pre>
-                </Card>
-              ) : (
-                <Card title="Nội dung CV">
-                  <p style={{ margin: 0, color: "var(--color-text-secondary)" }}>
-                    Hồ sơ CV Builder liên kết (Phiên bản v{activeApplication.resumeVersion?.versionNumber ?? 1}).
-                  </p>
-                </Card>
-              )}
+              {/* CV DETAILS */}
+              <Card title="Hồ sơ CV ứng viên">
+                {activeApplication.resumeVersion ? (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <FileText size={18} color="var(--color-primary, #4f6ef7)" />
+                      <span style={{ fontWeight: 600 }}>
+                        Bản CV điện tử chuẩn hóa (Phiên bản v{activeApplication.resumeVersion.versionNumber ?? 1})
+                      </span>
+                    </div>
 
-              {/* Review transitions inside modal */}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 8 }}>
+                    {activeApplication.resumeVersion.builderContent ? (
+                      <div
+                        style={{
+                          background: "var(--color-surface-soft, #f8fafc)",
+                          padding: 14,
+                          borderRadius: 8,
+                          border: "1px solid var(--color-border, #e2e8f0)",
+                          maxHeight: 260,
+                          overflowY: "auto",
+                        }}
+                      >
+                        {(() => {
+                          const bc = activeApplication.resumeVersion.builderContent as Record<string, unknown>;
+                          return (
+                            <div style={{ display: "grid", gap: 10, fontSize: "0.85rem" }}>
+                              {bc.summary && (
+                                <div>
+                                  <strong style={{ color: "#475569" }}>Tóm tắt chuyên môn:</strong>
+                                  <div style={{ marginTop: 2 }}>{String(bc.summary)}</div>
+                                </div>
+                              )}
+                              {Array.isArray(bc.experiences) && bc.experiences.length > 0 && (
+                                <div>
+                                  <strong style={{ color: "#475569" }}>Kinh nghiệm làm việc:</strong>
+                                  <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                                    {bc.experiences.map((exp: any, i: number) => (
+                                      <li key={i}>
+                                        <strong>{exp.position || exp.role}</strong> tại {exp.company}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {Array.isArray(bc.skills) && bc.skills.length > 0 && (
+                                <div>
+                                  <strong style={{ color: "#475569" }}>Kỹ năng chuyên môn:</strong>
+                                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                                    {bc.skills.map((sk: any, i: number) => (
+                                      <Badge key={i} tone="neutral">
+                                        {typeof sk === "string" ? sk : sk.name || sk.label}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <p style={{ margin: 0, color: "var(--color-text-secondary, #64748b)", fontSize: "0.875rem" }}>
+                        Hồ sơ CV được kết nối từ kho CV ứng viên.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, color: "var(--color-text-secondary, #64748b)", fontSize: "0.875rem" }}>
+                    Không có thông tin phiên bản CV đính kèm.
+                  </p>
+                )}
+              </Card>
+
+              {/* REVIEW WORKFLOW ACTIONS */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--color-border, #e2e8f0)",
+                }}
+              >
+                <span style={{ fontSize: "0.85rem", color: "var(--color-text-secondary, #64748b)", marginRight: "auto" }}>
+                  Chuyển trạng thái xét duyệt:
+                </span>
+
                 {availableReviewTransitions(activeApplication.status).map((st) => (
                   <button
                     key={st}
                     type="button"
-                    className={`${ui.btn} ${st === "REJECTED" ? "" : ui.btnPrimary}`}
+                    className={`${ui.btn} ${st === "REJECTED" ? ui.btnDanger : ui.btnPrimary}`}
                     disabled={!writes || busyId === activeApplication.id}
                     onClick={() => handleReview(activeApplication, st)}
+                    style={{ fontSize: "0.875rem", padding: "6px 14px" }}
                   >
-                    Chuyển: {TRANSITION_LABEL[st]}
+                    {TRANSITION_LABEL[st]}
                   </button>
                 ))}
+
+                <button
+                  type="button"
+                  className={ui.btn}
+                  onClick={() => setActiveApplication(null)}
+                >
+                  Đóng
+                </button>
               </div>
             </div>
           </div>

@@ -1,5 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  Briefcase,
+  Award,
+  DollarSign,
+  Calendar,
+  HelpCircle,
+  Plus,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import { Card, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
@@ -8,7 +20,13 @@ import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import { publicApi } from "@/services/api/publicApi";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
-import { EMPTY_JOB_FORM, formToPayload, validateJobForm, type JobFormErrors, type JobFormValues } from "@/services/api/jobForm";
+import {
+  EMPTY_JOB_FORM,
+  formToPayload,
+  validateJobForm,
+  type JobFormErrors,
+  type JobFormValues,
+} from "@/services/api/jobForm";
 import {
   EMPLOYMENT_TYPE_LABEL,
   WORKPLACE_TYPE_LABEL,
@@ -53,12 +71,34 @@ interface EditableQuestion {
   optionsText: string;
 }
 
-const Field = ({ id, label, error, hint, children }: { id: string; label: string; error?: string; hint?: string; children: React.ReactNode }) => (
+const Field = ({
+  id,
+  label,
+  error,
+  hint,
+  children,
+}: {
+  id: string;
+  label: string;
+  error?: string;
+  hint?: string;
+  children: React.ReactNode;
+}) => (
   <div className={ui.field}>
-    <label className={ui.label} htmlFor={id}>{label}</label>
+    <label className={ui.label} htmlFor={id}>
+      {label}
+    </label>
     {children}
-    {hint && !error && <span className={ui.hint} id={`${id}-hint`}>{hint}</span>}
-    {error && <span className={ui.fieldError} id={`${id}-err`} role="alert">{error}</span>}
+    {hint && !error && (
+      <span className={ui.hint} id={`${id}-hint`}>
+        {hint}
+      </span>
+    )}
+    {error && (
+      <span className={ui.fieldError} id={`${id}-err`} role="alert">
+        {error}
+      </span>
+    )}
   </div>
 );
 
@@ -105,15 +145,23 @@ const EmployerJobFormPage = () => {
     }
   }, [screeningData.data]);
 
-  const set = <K extends keyof JobFormValues>(key: K, value: JobFormValues[K]) => setValues((v) => ({ ...v, [key]: value }));
-  const ariaFor = (key: keyof JobFormValues) => ({ "aria-invalid": Boolean(errors[key]) || undefined, "aria-describedby": errors[key] ? `f-${key}-err` : undefined });
+  const set = <K extends keyof JobFormValues>(key: K, value: JobFormValues[K]) =>
+    setValues((v) => ({ ...v, [key]: value }));
+
+  const ariaFor = (key: keyof JobFormValues) => ({
+    "aria-invalid": Boolean(errors[key]) || undefined,
+    "aria-describedby": errors[key] ? `f-${key}-err` : undefined,
+  });
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
     const found = validateJobForm(values);
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     setSaving(true);
     try {
       const payload = formToPayload(values);
@@ -160,9 +208,7 @@ const EmployerJobFormPage = () => {
   };
 
   const handleQuestionChange = <K extends keyof EditableQuestion>(idx: number, key: K, val: EditableQuestion[K]) => {
-    setQuestions((prev) =>
-      prev.map((q, i) => (i === idx ? { ...q, [key]: val } : q)),
-    );
+    setQuestions((prev) => prev.map((q, i) => (i === idx ? { ...q, [key]: val } : q)));
   };
 
   const handleSaveQuestions = async () => {
@@ -180,7 +226,10 @@ const EmployerJobFormPage = () => {
         return;
       }
       if (q.type === "SELECT" || q.type === "MULTI_SELECT") {
-        const rawOpts = q.optionsText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+        const rawOpts = q.optionsText
+          .split(/[\n,]/)
+          .map((s) => s.trim())
+          .filter(Boolean);
         if (rawOpts.length < 2) {
           setQuestionsNotice({
             tone: "error",
@@ -215,7 +264,7 @@ const EmployerJobFormPage = () => {
       const res = await companyWorkspaceApi.replaceScreeningQuestions(active.id, jobId!, currentVer, payload);
       setQuestionsNotice({
         tone: "ok",
-        text: `Đã lưu thành công ${res.questions.length} câu hỏi sàng lọc ứng viên.`,
+        text: `Đã lưu thành công ${res.questions.length} câu hỏi sàng lọc ứng viên vào tin tuyển dụng.`,
       });
       existing.reload();
       screeningData.reload();
@@ -226,111 +275,356 @@ const EmployerJobFormPage = () => {
     }
   };
 
-  if (isEdit && existing.loading) return <LoadingBlock rows={3} />;
+  if (isEdit && existing.loading) return <LoadingBlock rows={3} label="Đang tải dữ liệu tin tuyển dụng..." />;
   if (isEdit && existing.error) return <ApiErrorState error={existing.error} onRetry={existing.reload} />;
   if (isEdit && existing.data && existing.data.status !== "DRAFT") {
-    return <div className={ui.notice} role="alert">Chỉ tin ở trạng thái “Bản nháp” mới được chỉnh sửa. <Link to="/employer/jobs">Quay lại danh sách</Link></div>;
+    return (
+      <div className={ui.notice} role="alert">
+        Chỉ tin ở trạng thái “Bản nháp” mới có thể chỉnh sửa nội dung.{" "}
+        <Link to="/employer/jobs" className={ui.link}>
+          Quay lại danh sách tin
+        </Link>
+      </div>
+    );
   }
 
   return (
     <>
+      <div style={{ marginBottom: 12 }}>
+        <Link
+          to="/employer/jobs"
+          className={ui.link}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.875rem" }}
+        >
+          <ArrowLeft size={16} />
+          <span>Quay lại danh sách tin tuyển dụng</span>
+        </Link>
+      </div>
+
       <PageHeader
-        title={isEdit ? "Chỉnh sửa tin tuyển dụng" : "Đăng tin tuyển dụng mới"}
-        subtitle="Tin mới luôn được lưu ở trạng thái bản nháp; bạn đăng công khai ở bước sau."
+        title={isEdit ? `Chỉnh sửa: “${existing.data?.title || "Tin tuyển dụng"}”` : "Tạo tin tuyển dụng mới"}
+        subtitle="Tin mới tạo luôn bắt đầu ở trạng thái Bản nháp (DRAFT). Bạn có thể kiểm tra đầy đủ nội dung trước khi bấm xuất bản."
       />
       <WritesDisabledNotice />
-      {submitError && <div className={`${ui.notice} ${ui.noticeWarn}`} role="alert">{submitError}</div>}
 
-      <form onSubmit={submit} noValidate>
-        <Card title="Thông tin chính">
-          <Field id="f-title" label="Tiêu đề *" error={errors.title}>
-            <input id="f-title" className={ui.input} value={values.title} onChange={(e) => set("title", e.target.value)} maxLength={220} {...ariaFor("title")} />
+      {submitError && (
+        <div className={`${ui.notice} ${ui.noticeWarn}`} role="alert" style={{ marginBottom: 16 }}>
+          {submitError}
+        </div>
+      )}
+
+      <form onSubmit={submit} noValidate style={{ display: "grid", gap: 24 }}>
+        {/* SECTION 1: JOB INFORMATION */}
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <Briefcase size={20} color="var(--color-primary, #4f6ef7)" />
+            <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700 }}>
+              1. Thông tin vị trí tuyển dụng (Job Information)
+            </h2>
+          </div>
+
+          <Field id="f-title" label="Tiêu đề vị trí tuyển dụng *" error={errors.title}>
+            <input
+              id="f-title"
+              className={ui.input}
+              placeholder="Ví dụ: Senior Frontend Engineer (React/TypeScript)"
+              value={values.title}
+              onChange={(e) => set("title", e.target.value)}
+              maxLength={220}
+              {...ariaFor("title")}
+            />
           </Field>
-          <div className={ui.formGrid}>
-            <Field id="f-categoryId" label="Ngành nghề *" error={errors.categoryId} hint={categories.error ? "Không tải được danh mục ngành nghề." : undefined}>
-              <select id="f-categoryId" className={ui.select} value={values.categoryId} onChange={(e) => set("categoryId", e.target.value)} {...ariaFor("categoryId")}>
-                <option value="">{categories.loading ? "Đang tải…" : "Chọn ngành nghề"}</option>
-                {(categories.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+
+          <div className={ui.formGrid} style={{ marginTop: 12 }}>
+            <Field
+              id="f-categoryId"
+              label="Ngành nghề tuyển dụng *"
+              error={errors.categoryId}
+              hint={categories.error ? "Không tải được danh mục ngành nghề từ máy chủ." : undefined}
+            >
+              <select
+                id="f-categoryId"
+                className={ui.select}
+                value={values.categoryId}
+                onChange={(e) => set("categoryId", e.target.value)}
+                {...ariaFor("categoryId")}
+              >
+                <option value="">{categories.loading ? "Đang tải danh mục…" : "Chọn ngành nghề phù hợp"}</option>
+                {(categories.data ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
             </Field>
-            <Field id="f-employmentType" label="Loại hình *" error={errors.employmentType}>
-              <select id="f-employmentType" className={ui.select} value={values.employmentType} onChange={(e) => set("employmentType", e.target.value as JobFormValues["employmentType"])} {...ariaFor("employmentType")}>
+
+            <Field id="f-employmentType" label="Loại hình công việc *" error={errors.employmentType}>
+              <select
+                id="f-employmentType"
+                className={ui.select}
+                value={values.employmentType}
+                onChange={(e) => set("employmentType", e.target.value as JobFormValues["employmentType"])}
+                {...ariaFor("employmentType")}
+              >
                 <option value="">Chọn loại hình</option>
-                {Object.entries(EMPLOYMENT_TYPE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                {Object.entries(EMPLOYMENT_TYPE_LABEL).map(([k, l]) => (
+                  <option key={k} value={k}>
+                    {l}
+                  </option>
+                ))}
               </select>
             </Field>
+
             <Field id="f-workplaceType" label="Hình thức làm việc *" error={errors.workplaceType}>
-              <select id="f-workplaceType" className={ui.select} value={values.workplaceType} onChange={(e) => set("workplaceType", e.target.value as JobFormValues["workplaceType"])} {...ariaFor("workplaceType")}>
+              <select
+                id="f-workplaceType"
+                className={ui.select}
+                value={values.workplaceType}
+                onChange={(e) => set("workplaceType", e.target.value as JobFormValues["workplaceType"])}
+                {...ariaFor("workplaceType")}
+              >
                 <option value="">Chọn hình thức</option>
-                {Object.entries(WORKPLACE_TYPE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                {Object.entries(WORKPLACE_TYPE_LABEL).map(([k, l]) => (
+                  <option key={k} value={k}>
+                    {l}
+                  </option>
+                ))}
               </select>
             </Field>
           </div>
-          <Field id="f-description" label="Mô tả công việc *" error={errors.description} hint="Tối thiểu 20 ký tự.">
-            <textarea id="f-description" className={ui.textarea} value={values.description} onChange={(e) => set("description", e.target.value)} {...ariaFor("description")} />
-          </Field>
+
+          <div style={{ marginTop: 12 }}>
+            <Field
+              id="f-description"
+              label="Mô tả công việc chi tiết *"
+              error={errors.description}
+              hint="Tối thiểu 20 ký tự. Nêu rõ trách nhiệm công việc, yêu cầu kỹ năng và các đãi ngộ chính."
+            >
+              <textarea
+                id="f-description"
+                className={ui.textarea}
+                rows={7}
+                placeholder="Nêu chi tiết trách nhiệm công việc hàng ngày, môi trường làm việc, công nghệ áp dụng..."
+                value={values.description}
+                onChange={(e) => set("description", e.target.value)}
+                {...ariaFor("description")}
+              />
+            </Field>
+          </div>
         </Card>
 
-        <div style={{ height: 16 }} />
-        <Card title="Kinh nghiệm, lương và hạn nộp">
+        {/* SECTION 2: REQUIREMENTS & EXPERIENCE */}
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <Award size={20} color="var(--color-primary, #4f6ef7)" />
+            <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700 }}>
+              2. Yêu cầu & Kinh nghiệm làm việc (Requirements)
+            </h2>
+          </div>
+
           <div className={ui.formGrid}>
-            <Field id="f-experienceMinMonths" label="Kinh nghiệm tối thiểu (tháng)" error={errors.experienceMinMonths}>
-              <input id="f-experienceMinMonths" className={ui.input} inputMode="numeric" value={values.experienceMinMonths} onChange={(e) => set("experienceMinMonths", e.target.value)} {...ariaFor("experienceMinMonths")} />
+            <Field
+              id="f-experienceMinMonths"
+              label="Kinh nghiệm tối thiểu (tháng)"
+              error={errors.experienceMinMonths}
+              hint="Ví dụ: 12 (tương đương 1 năm), 24 (2 năm)"
+            >
+              <input
+                id="f-experienceMinMonths"
+                className={ui.input}
+                inputMode="numeric"
+                placeholder="12"
+                value={values.experienceMinMonths}
+                onChange={(e) => set("experienceMinMonths", e.target.value)}
+                {...ariaFor("experienceMinMonths")}
+              />
             </Field>
-            <Field id="f-experienceMaxMonths" label="Kinh nghiệm tối đa (tháng)" error={errors.experienceMaxMonths}>
-              <input id="f-experienceMaxMonths" className={ui.input} inputMode="numeric" value={values.experienceMaxMonths} onChange={(e) => set("experienceMaxMonths", e.target.value)} {...ariaFor("experienceMaxMonths")} />
-            </Field>
-            <Field id="f-salaryMin" label="Lương tối thiểu (VND)" error={errors.salaryMin}>
-              <input id="f-salaryMin" className={ui.input} inputMode="numeric" value={values.salaryMin} onChange={(e) => set("salaryMin", e.target.value)} {...ariaFor("salaryMin")} />
-            </Field>
-            <Field id="f-salaryMax" label="Lương tối đa (VND)" error={errors.salaryMax}>
-              <input id="f-salaryMax" className={ui.input} inputMode="numeric" value={values.salaryMax} onChange={(e) => set("salaryMax", e.target.value)} {...ariaFor("salaryMax")} />
-            </Field>
-            <Field id="f-salaryPeriod" label="Kỳ lương">
-              <select id="f-salaryPeriod" className={ui.select} value={values.salaryPeriod} onChange={(e) => set("salaryPeriod", e.target.value as JobFormValues["salaryPeriod"])}>
-                {Object.entries(SALARY_PERIOD_LABEL).map(([k, l]) => <option key={k} value={k}>Theo {l}</option>)}
-              </select>
-            </Field>
-            <Field id="f-applicationDeadline" label="Hạn nộp hồ sơ" error={errors.applicationDeadline}>
-              <input id="f-applicationDeadline" type="datetime-local" className={ui.input} value={values.applicationDeadline} onChange={(e) => set("applicationDeadline", e.target.value)} {...ariaFor("applicationDeadline")} />
+
+            <Field
+              id="f-experienceMaxMonths"
+              label="Kinh nghiệm tối đa (tháng)"
+              error={errors.experienceMaxMonths}
+              hint="Để trống nếu không giới hạn kinh nghiệm tối đa"
+            >
+              <input
+                id="f-experienceMaxMonths"
+                className={ui.input}
+                inputMode="numeric"
+                placeholder="36"
+                value={values.experienceMaxMonths}
+                onChange={(e) => set("experienceMaxMonths", e.target.value)}
+                {...ariaFor("experienceMaxMonths")}
+              />
             </Field>
           </div>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-            <input type="checkbox" checked={values.salaryNegotiable} onChange={(e) => set("salaryNegotiable", e.target.checked)} /> Lương thương lượng
-          </label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input type="checkbox" checked={values.showSalary} onChange={(e) => set("showSalary", e.target.checked)} /> Hiển thị lương công khai
-          </label>
-          {errors.showSalary && <span className={ui.fieldError} role="alert">{errors.showSalary}</span>}
         </Card>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 20, flexWrap: "wrap" }}>
-          <button type="submit" className={`${ui.btn} ${ui.btnPrimary}`} disabled={saving || !writes} aria-disabled={!writes} title={writes ? undefined : "Thao tác ghi đang tắt"}>
-            {saving ? "Đang lưu…" : isEdit ? "Lưu thay đổi nội dung tin" : "Lưu bản nháp"}
+        {/* SECTION 3: SALARY & EMPLOYMENT TERMS */}
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <DollarSign size={20} color="var(--color-primary, #4f6ef7)" />
+            <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700 }}>
+              3. Mức lương & Chế độ đãi ngộ (Salary & Terms)
+            </h2>
+          </div>
+
+          <div className={ui.formGrid}>
+            <Field
+              id="f-salaryMin"
+              label="Mức lương tối thiểu (VND)"
+              error={errors.salaryMin}
+              hint="Ví dụ: 15000000 cho 15 triệu VND"
+            >
+              <input
+                id="f-salaryMin"
+                className={ui.input}
+                inputMode="numeric"
+                placeholder="15000000"
+                value={values.salaryMin}
+                onChange={(e) => set("salaryMin", e.target.value)}
+                {...ariaFor("salaryMin")}
+              />
+            </Field>
+
+            <Field
+              id="f-salaryMax"
+              label="Mức lương tối đa (VND)"
+              error={errors.salaryMax}
+              hint="Ví dụ: 30000000 cho 30 triệu VND"
+            >
+              <input
+                id="f-salaryMax"
+                className={ui.input}
+                inputMode="numeric"
+                placeholder="30000000"
+                value={values.salaryMax}
+                onChange={(e) => set("salaryMax", e.target.value)}
+                {...ariaFor("salaryMax")}
+              />
+            </Field>
+
+            <Field id="f-salaryPeriod" label="Kỳ chi trả lương">
+              <select
+                id="f-salaryPeriod"
+                className={ui.select}
+                value={values.salaryPeriod}
+                onChange={(e) => set("salaryPeriod", e.target.value as JobFormValues["salaryPeriod"])}
+              >
+                {Object.entries(SALARY_PERIOD_LABEL).map(([k, l]) => (
+                  <option key={k} value={k}>
+                    Theo {l}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 12 }}>
+            <label style={{ display: "inline-flex", gap: 8, alignItems: "center", cursor: "pointer", fontSize: "0.9rem" }}>
+              <input
+                type="checkbox"
+                checked={values.salaryNegotiable}
+                onChange={(e) => set("salaryNegotiable", e.target.checked)}
+              />
+              <span>Lương thương lượng khi phỏng vấn</span>
+            </label>
+
+            <label style={{ display: "inline-flex", gap: 8, alignItems: "center", cursor: "pointer", fontSize: "0.9rem" }}>
+              <input
+                type="checkbox"
+                checked={values.showSalary}
+                onChange={(e) => set("showSalary", e.target.checked)}
+              />
+              <span>Hiển thị mức lương công khai trên tin đăng</span>
+            </label>
+          </div>
+          {errors.showSalary && <span className={ui.fieldError} role="alert" style={{ marginTop: 4 }}>{errors.showSalary}</span>}
+        </Card>
+
+        {/* SECTION 4: PUBLICATION SETTINGS */}
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <Calendar size={20} color="var(--color-primary, #4f6ef7)" />
+            <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700 }}>
+              4. Hạn nộp & Cài đặt công khai (Publication Settings)
+            </h2>
+          </div>
+
+          <div className={ui.formGrid}>
+            <Field
+              id="f-applicationDeadline"
+              label="Hạn cuối nhận hồ sơ ứng tuyển"
+              error={errors.applicationDeadline}
+              hint="Để trống nếu không giới hạn thời hạn nhận hồ sơ"
+            >
+              <input
+                id="f-applicationDeadline"
+                type="datetime-local"
+                className={ui.input}
+                value={values.applicationDeadline}
+                onChange={(e) => set("applicationDeadline", e.target.value)}
+                {...ariaFor("applicationDeadline")}
+              />
+            </Field>
+          </div>
+
+          <div
+            style={{
+              marginTop: 16,
+              padding: 12,
+              borderRadius: 8,
+              background: "var(--color-surface-soft, #f8fafc)",
+              fontSize: "0.85rem",
+              color: "var(--color-text-secondary, #64748b)",
+              lineHeight: 1.6,
+            }}
+          >
+            💡 <strong>Quy trình đăng tin tiêu chuẩn:</strong> Sau khi lưu bản nháp ban đầu, bạn có thể bổ sung Bộ câu hỏi sàng lọc ứng viên ở mục bên dưới trước khi chuyển trạng thái sang <strong>Đang tuyển dụng</strong> để bắt đầu tiếp nhận hồ sơ trên toàn sàn.
+          </div>
+        </Card>
+
+        {/* SUBMIT BUTTONS */}
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="submit"
+            className={`${ui.btn} ${ui.btnPrimary}`}
+            disabled={saving || !writes}
+            aria-disabled={!writes}
+            title={writes ? undefined : "Cổng ghi dữ liệu đang khóa"}
+          >
+            {saving ? "Đang lưu tin..." : isEdit ? "Lưu thay đổi nội dung tin" : "Lưu tin tuyển dụng (Bản nháp)"}
           </button>
-          <Link to="/employer/jobs" className={ui.btn}>Hủy</Link>
+          <Link to="/employer/jobs" className={ui.btn}>
+            Hủy thao tác
+          </Link>
         </div>
       </form>
 
-      {/* Screening Questions Manager (available when editing a draft job) */}
+      {/* SECTION 5: SCREENING QUESTIONS MANAGER (Available when editing draft job) */}
       {isEdit && (
-        <div style={{ marginTop: 24 }}>
-          <Card
-            title="Bộ câu hỏi sàng lọc ứng viên (Screening Questions)"
-            action={
+        <div style={{ marginTop: 28 }}>
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <HelpCircle size={20} color="var(--color-primary, #4f6ef7)" />
+                <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700 }}>
+                  5. Bộ câu hỏi sàng lọc ứng viên (Screening Questions)
+                </h2>
+              </div>
               <button
                 type="button"
                 className={`${ui.btn} ${ui.btnPrimary}`}
-                style={{ fontSize: "0.875rem", padding: "6px 12px" }}
+                style={{ fontSize: "0.85rem", padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}
                 disabled={!writes || questions.length >= 20}
                 onClick={handleAddQuestion}
               >
-                + Thêm câu hỏi ({questions.length}/20)
+                <Plus size={15} />
+                <span>Thêm câu hỏi ({questions.length}/20)</span>
               </button>
-            }
-          >
-            <p style={{ margin: "0 0 16px", color: "var(--color-text-secondary)", fontSize: "0.875rem" }}>
-              Thiết lập các câu hỏi để ứng viên trả lời trong quá trình nộp hồ sơ ứng tuyển. Hỗ trợ câu hỏi văn bản, Có/Không hoặc câu hỏi trắc nghiệm một/nhiều lựa chọn.
+            </div>
+
+            <p style={{ margin: "0 0 16px", color: "var(--color-text-secondary, #64748b)", fontSize: "0.875rem" }}>
+              Thiết lập các câu hỏi để ứng viên trả lời khi nộp hồ sơ. Giúp chuyên viên tuyển dụng sơ tuyển nhanh chóng theo tiêu chí năng lực, kinh nghiệm hoặc bằng cấp.
             </p>
 
             {questionsNotice && (
@@ -348,15 +642,27 @@ const EmployerJobFormPage = () => {
             ) : screeningData.error ? (
               <ApiErrorState error={screeningData.error} onRetry={screeningData.reload} />
             ) : questions.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "24px 0", color: "var(--color-text-secondary)" }}>
-                <p style={{ margin: "0 0 8px" }}>Chưa có câu hỏi sàng lọc nào cho tin tuyển dụng này.</p>
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "32px 16px",
+                  border: "1px dashed var(--color-border, #cbd5e1)",
+                  borderRadius: 10,
+                  color: "var(--color-text-secondary, #64748b)",
+                }}
+              >
+                <p style={{ margin: "0 0 10px", fontSize: "0.9375rem" }}>
+                  Tin tuyển dụng này hiện chưa có câu hỏi sàng lọc nào.
+                </p>
                 <button
                   type="button"
                   className={ui.btn}
                   disabled={!writes}
                   onClick={handleAddQuestion}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
-                  Thêm câu hỏi đầu tiên
+                  <Plus size={15} />
+                  <span>Thêm câu hỏi đầu tiên</span>
                 </button>
               </div>
             ) : (
@@ -369,41 +675,52 @@ const EmployerJobFormPage = () => {
                       style={{
                         padding: 16,
                         border: "1px solid var(--color-border, #e2e8f0)",
-                        borderRadius: 8,
-                        background: "var(--color-surface, #fff)",
+                        borderRadius: 10,
+                        background: "var(--color-surface, #ffffff)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                        <strong style={{ fontSize: "0.95rem" }}>Câu hỏi #{idx + 1}</strong>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 12,
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--color-text-primary, #1e293b)" }}>
+                          Câu hỏi #{idx + 1}
+                        </span>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button
                             type="button"
                             className={ui.btn}
-                            style={{ padding: "2px 8px", fontSize: "0.8rem" }}
+                            style={{ padding: "4px 8px" }}
                             disabled={idx === 0}
                             onClick={() => handleMoveQuestion(idx, "up")}
-                            title="Di chuyển lên"
+                            title="Di chuyển lên trên"
                           >
-                            ↑
+                            <ChevronUp size={15} />
                           </button>
                           <button
                             type="button"
                             className={ui.btn}
-                            style={{ padding: "2px 8px", fontSize: "0.8rem" }}
+                            style={{ padding: "4px 8px" }}
                             disabled={idx === questions.length - 1}
                             onClick={() => handleMoveQuestion(idx, "down")}
-                            title="Di chuyển xuống"
+                            title="Di chuyển xuống dưới"
                           >
-                            ↓
+                            <ChevronDown size={15} />
                           </button>
                           <button
                             type="button"
                             className={`${ui.btn} ${ui.btnDanger}`}
-                            style={{ padding: "2px 8px", fontSize: "0.8rem" }}
+                            style={{ padding: "4px 8px", display: "inline-flex", alignItems: "center", gap: 4 }}
                             onClick={() => handleRemoveQuestion(idx)}
-                            title="Xóa câu hỏi"
+                            title="Xóa câu hỏi này"
                           >
-                            Xóa
+                            <Trash2 size={14} />
+                            <span style={{ fontSize: "0.75rem" }}>Xóa</span>
                           </button>
                         </div>
                       </div>
@@ -411,13 +728,15 @@ const EmployerJobFormPage = () => {
                       <div className={ui.formGrid}>
                         <div className={ui.field}>
                           <label className={ui.label} htmlFor={`sq-type-${idx}`}>
-                            Loại câu hỏi
+                            Định dạng câu trả lời
                           </label>
                           <select
                             id={`sq-type-${idx}`}
                             className={ui.select}
                             value={q.type}
-                            onChange={(e) => handleQuestionChange(idx, "type", e.target.value as ScreeningQuestionType)}
+                            onChange={(e) =>
+                              handleQuestionChange(idx, "type", e.target.value as ScreeningQuestionType)
+                            }
                           >
                             {SCREENING_QUESTION_TYPES.map((t) => (
                               <option key={t} value={t}>
@@ -444,30 +763,38 @@ const EmployerJobFormPage = () => {
                       </div>
 
                       {isChoice && (
-                        <div className={ui.field} style={{ marginTop: 8 }}>
+                        <div className={ui.field} style={{ marginTop: 10 }}>
                           <label className={ui.label} htmlFor={`sq-options-${idx}`}>
-                            Các tùy chọn câu trả lời * (cách nhau bởi dấu phẩy)
+                            Các lựa chọn câu trả lời (phân tách bởi dấu phẩy) *
                           </label>
                           <input
                             id={`sq-options-${idx}`}
                             type="text"
                             className={ui.input}
-                            placeholder="Ví dụ: Dưới 1 năm, 1 - 3 năm, Trên 3 năm"
+                            placeholder="Dưới 1 năm, 1 - 3 năm, Trên 3 năm"
                             value={q.optionsText}
                             onChange={(e) => handleQuestionChange(idx, "optionsText", e.target.value)}
                           />
-                          <span className={ui.hint}>Nhập ít nhất 2 tùy chọn riêng biệt, phân tách bằng dấu phẩy.</span>
+                          <span className={ui.hint}>Nhập ít nhất 2 phương án trả lời khác nhau, ngăn cách bằng dấu phẩy.</span>
                         </div>
                       )}
 
-                      <div style={{ marginTop: 8 }}>
-                        <label style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: "0.875rem", cursor: "pointer" }}>
+                      <div style={{ marginTop: 10 }}>
+                        <label
+                          style={{
+                            display: "inline-flex",
+                            gap: 8,
+                            alignItems: "center",
+                            fontSize: "0.875rem",
+                            cursor: "pointer",
+                          }}
+                        >
                           <input
                             type="checkbox"
                             checked={q.isRequired}
                             onChange={(e) => handleQuestionChange(idx, "isRequired", e.target.checked)}
                           />
-                          Bắt buộc ứng viên phải trả lời
+                          <span>Bắt buộc ứng viên phải trả lời khi nộp hồ sơ</span>
                         </label>
                       </div>
                     </div>
@@ -481,22 +808,16 @@ const EmployerJobFormPage = () => {
                     disabled={!writes || savingQuestions}
                     onClick={handleSaveQuestions}
                   >
-                    {savingQuestions ? "Đang lưu bộ câu hỏi..." : "Lưu bộ câu hỏi sàng lọc"}
+                    {savingQuestions ? "Đang lưu bộ câu hỏi..." : "Lưu bộ câu hỏi sàng lọc vào tin"}
                   </button>
-                  <span style={{ fontSize: "0.85rem", color: "var(--color-text-secondary)" }}>
-                    {questions.length} câu hỏi đã được cấu hình
+                  <span style={{ fontSize: "0.85rem", color: "var(--color-text-secondary, #64748b)" }}>
+                    Đã cấu hình {questions.length} câu hỏi
                   </span>
                 </div>
               </div>
             )}
           </Card>
         </div>
-      )}
-
-      {!isEdit && (
-        <p style={{ marginTop: 16, color: "var(--color-text-secondary)", fontSize: "0.875rem" }}>
-          * Gợi ý: Sau khi lưu bản nháp ban đầu, bạn có thể thiết lập thêm Bộ câu hỏi sàng lọc ứng viên (Screening Questions) trước khi công khai tin.
-        </p>
       )}
     </>
   );
