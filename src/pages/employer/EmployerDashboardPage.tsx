@@ -6,11 +6,7 @@ import { CompanyWorkspaceProvider, useCompanyWorkspace } from "@/features/compan
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 
-export const EmployerWorkspaceOutlet = () => (
-  <CompanyWorkspaceProvider>
-    <Outlet />
-  </CompanyWorkspaceProvider>
-);
+export const EmployerWorkspaceOutlet = () => <Outlet />;
 
 export const WritesDisabledNotice = () =>
   isWorkspaceWritesEnabled() ? null : (
@@ -19,7 +15,16 @@ export const WritesDisabledNotice = () =>
     </div>
   );
 
-const ROLE_LABEL = (r: string) => r.replace(/_/g, " ");
+const ROLE_LABEL: Record<string, string> = {
+  COMPANY_OWNER: "Chủ sở hữu",
+  ADMIN: "Quản trị viên",
+  HR_MANAGER: "Trưởng phòng nhân sự",
+  RECRUITER: "Chuyên viên tuyển dụng",
+  HIRING_MANAGER: "Quản lý tuyển dụng",
+  VIEWER: "Người xem",
+};
+
+const formatRole = (r: string) => ROLE_LABEL[r] || r.replace(/_/g, " ");
 
 const EmployerDashboardPage = () => {
   const { active, companies } = useCompanyWorkspace();
@@ -50,7 +55,9 @@ const EmployerDashboardPage = () => {
         {/* Company Overview */}
         <Card title="Hồ sơ doanh nghiệp">
           <p style={{ margin: "0 0 8px" }}>
-            <Badge tone={active.status === "ACTIVE" ? "success" : "warning"}>{active.status || "—"}</Badge>{" "}
+            <Badge tone={active.status === "ACTIVE" ? "success" : "warning"}>
+              {active.status === "ACTIVE" ? "Đang hoạt động" : active.status || "—"}
+            </Badge>{" "}
             <Badge tone={active.verificationStatus === "VERIFIED" ? "success" : "neutral"}>
               {active.verificationStatus === "VERIFIED"
                 ? "Đã xác minh"
@@ -62,7 +69,7 @@ const EmployerDashboardPage = () => {
             </Badge>
           </p>
           <p className={ui.hint} style={{ margin: "0 0 12px" }}>
-            Vai trò của bạn: {active.memberRoleNames.length ? active.memberRoleNames.map(ROLE_LABEL).join(", ") : "Chưa xác định"}
+            Vai trò của bạn: {active.memberRoleNames.length ? active.memberRoleNames.map(formatRole).join(", ") : "Chưa xác định"}
           </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Link className={ui.link} to="/employer/profile">

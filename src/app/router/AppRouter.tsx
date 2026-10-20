@@ -24,6 +24,7 @@ import JobDetailPage from "@/pages/public/JobDetailPage/JobDetailPage";
 import JobsPage from "@/pages/public/JobsPage";
 
 import EmployerDashboardPage, { EmployerWorkspaceOutlet } from "@/pages/employer/EmployerDashboardPage";
+import { CompanyWorkspaceProvider } from "@/features/company/CompanyWorkspaceContext";
 
 // Lazy-loaded routes for performance & code-splitting
 const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPasswordPage/ForgotPasswordPage"));
@@ -200,7 +201,11 @@ const AppRouter = () => {
 
             <Route
               path="employer"
-              element={<EmployerLayout />}
+              element={
+                <CompanyWorkspaceProvider>
+                  <EmployerLayout />
+                </CompanyWorkspaceProvider>
+              }
             >
               <Route element={<EmployerWorkspaceOutlet />}>
                 <Route
