@@ -33,7 +33,8 @@ export const useLoginForm = () => {
     try {
       await login({ email: normalizedEmail, password });
       const requestedPath = (location.state as { from?: unknown } | null)?.from;
-      const destination = getReturnDestination(requestedPath);
+      const isEmployer = location.pathname.startsWith("/employer");
+      const destination = getReturnDestination(requestedPath, isEmployer ? "/employer" : undefined);
       navigate(destination, { replace: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Đăng nhập thất bại. Vui lòng thử lại.");

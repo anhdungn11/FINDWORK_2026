@@ -48,15 +48,13 @@ const JobsPage = () => {
   const [isLoadingLive, setIsLoadingLive] = useState(true);
   const [liveError, setLiveError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const fetchLiveJobs = () => {
     setIsLoadingLive(true);
     setLiveError(null);
 
     publicApi
       .listJobs({ page: 1, pageSize: 50 })
       .then((paged) => {
-        if (!active) return;
         const mapped: JobRecord[] = paged.data.map((dto) => ({
           id: dto.id,
           title: dto.title,
@@ -78,14 +76,13 @@ const JobsPage = () => {
         setIsLoadingLive(false);
       })
       .catch((err) => {
-        if (!active) return;
         setLiveError(err?.message || "Không thể kết nối đến máy chủ tin tuyển dụng.");
         setIsLoadingLive(false);
       });
+  };
 
-    return () => {
-      active = false;
-    };
+  useEffect(() => {
+    fetchLiveJobs();
   }, []);
 
   const activeJobs = useMemo(() => {
@@ -240,7 +237,7 @@ const JobsPage = () => {
                 type="button"
                 className={styles.sourceToggleBtnActive}
                 style={{ padding: "10px 20px", borderRadius: "10px", cursor: "pointer", border: "none", fontWeight: 700 }}
-                onClick={() => window.location.reload()}
+                onClick={() => fetchLiveJobs()}
               >
                 Thử lại
               </button>
@@ -257,7 +254,7 @@ const JobsPage = () => {
                 type="button"
                 className={styles.sourceToggleBtnActive}
                 style={{ padding: "10px 20px", borderRadius: "10px", cursor: "pointer", border: "none", fontWeight: 700 }}
-                onClick={() => window.location.reload()}
+                onClick={() => fetchLiveJobs()}
               >
                 Tải lại danh sách
               </button>

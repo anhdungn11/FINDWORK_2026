@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-
 import styles from "./Footer.module.css";
 
 const Footer = () => {
@@ -8,9 +7,11 @@ const Footer = () => {
       <div className="container">
         <div className={styles.top}>
           <div className={styles.brand}>
-            <Link to="/" className={styles.logo}>
-              FINDWORK
-            </Link>
+            <span className={styles.logo}>FINDWORK</span>
+
+            <p className={styles.tagline}>
+              Kết nối nhân tài — Khởi nguồn cơ hội
+            </p>
 
             <p className={styles.description}>
               Nền tảng kết nối ứng viên và doanh nghiệp, giúp quá trình tìm việc
@@ -39,7 +40,7 @@ const Footer = () => {
               <Link to="/employer">Đăng tin tuyển dụng</Link>
               <Link to="/employer">Tìm ứng viên</Link>
               <Link to="/employer">Quản lý tuyển dụng</Link>
-              <Link to="/register">Đăng ký doanh nghiệp</Link>
+              <Link to="/employer/register">Đăng ký doanh nghiệp</Link>
             </div>
 
             <div className={styles.column}>
@@ -53,14 +54,13 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className={styles.divider} />
-
         <div className={styles.bottom}>
-          <p>© 2026 FINDWORK. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} FINDWORK. Tất cả quyền được bảo lưu.</p>
 
           <div className={styles.bottomLinks}>
-            <span>Việt Nam</span>
-            <span>Tiếng Việt</span>
+            <Link to="/privacy">Bảo mật</Link>
+            <Link to="/terms">Điều khoản</Link>
+            <Link to="/contact">Liên hệ</Link>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { publicApi } from "@/services/api/publicApi";
 import type { PublicCompanyDto } from "@/services/api/apiTypes";
@@ -10,26 +10,27 @@ import styles from "./FeaturedCompanies.module.css";
 const FeaturedCompanies = () => {
   const [companiesList, setCompaniesList] = useState<PublicCompanyDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const fetchCompanies = useCallback(() => {
+    setLoading(true);
+    setError(null);
     publicApi
       .listCompanies({ page: 1, pageSize: 6 })
       .then((paged) => {
-        if (!active) return;
         setCompaniesList(paged.data);
         setLoading(false);
       })
-      .catch(() => {
-        if (!active) return;
+      .catch((err) => {
+        setError(err?.message || "Không thể kết nối đến máy chủ danh sách doanh nghiệp.");
         setCompaniesList([]);
         setLoading(false);
       });
-
-    return () => {
-      active = false;
-    };
   }, []);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
 
   return (
     <section className={styles.section}>
@@ -51,6 +52,19 @@ const FeaturedCompanies = () => {
 
         {loading ? (
           <LoadingBlock rows={3} label="Đang nạp doanh nghiệp nổi bật..." />
+        ) : error ? (
+          <div style={{ padding: "36px 20px", textAlign: "center", background: "var(--color-surface)", borderRadius: "12px", border: "1px solid var(--color-border)" }}>
+            <p style={{ margin: "0 0 12px", color: "var(--color-danger, #ef4444)", fontWeight: 600 }}>
+              {error}
+            </p>
+            <button
+              type="button"
+              style={{ padding: "8px 18px", borderRadius: "8px", cursor: "pointer", border: "1px solid var(--color-border)", background: "var(--color-surface)", fontWeight: 600, color: "var(--color-text-primary)" }}
+              onClick={fetchCompanies}
+            >
+              Thử lại
+            </button>
+          </div>
         ) : companiesList.length === 0 ? (
           <EmptyState
             title="Chưa có công ty nổi bật"

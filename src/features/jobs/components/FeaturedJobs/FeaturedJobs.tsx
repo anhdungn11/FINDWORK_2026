@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { publicApi } from "@/services/api/publicApi";
 import {
@@ -15,13 +15,14 @@ import styles from "./FeaturedJobs.module.css";
 const FeaturedJobs = () => {
   const [jobsList, setJobsList] = useState<JobRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  const fetchJobs = useCallback(() => {
+    setLoading(true);
+    setError(null);
     publicApi
       .listJobs({ page: 1, pageSize: 6 })
       .then((paged) => {
-        if (!active) return;
         const mapped: JobRecord[] = paged.data.map((dto) => ({
           id: dto.id,
           title: dto.title,
@@ -42,16 +43,16 @@ const FeaturedJobs = () => {
         setJobsList(mapped);
         setLoading(false);
       })
-      .catch(() => {
-        if (!active) return;
+      .catch((err) => {
+        setError(err?.message || "Không thể kết nối đến máy chủ tin tuyển dụng.");
         setJobsList([]);
         setLoading(false);
       });
-
-    return () => {
-      active = false;
-    };
   }, []);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
 
   return (
     <section className={styles.section}>
@@ -73,6 +74,19 @@ const FeaturedJobs = () => {
 
         {loading ? (
           <LoadingBlock rows={3} label="Đang nạp việc làm nổi bật..." />
+        ) : error ? (
+          <div style={{ padding: "36px 20px", textAlign: "center", background: "var(--color-surface)", borderRadius: "12px", border: "1px solid var(--color-border)" }}>
+            <p style={{ margin: "0 0 12px", color: "var(--color-danger, #ef4444)", fontWeight: 600 }}>
+              {error}
+            </p>
+            <button
+              type="button"
+              style={{ padding: "8px 18px", borderRadius: "8px", cursor: "pointer", border: "1px solid var(--color-border)", background: "var(--color-surface)", fontWeight: 600, color: "var(--color-text-primary)" }}
+              onClick={fetchJobs}
+            >
+              Thử lại
+            </button>
+          </div>
         ) : jobsList.length === 0 ? (
           <EmptyState
             title="Chưa có việc làm nổi bật"

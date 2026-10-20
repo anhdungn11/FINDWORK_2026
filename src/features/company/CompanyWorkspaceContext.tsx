@@ -1,11 +1,11 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { Navigate } from "react-router-dom";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import type { MyCompanyDto } from "@/services/api/apiTypes";
 import type { ApiFailure } from "@/services/api/apiFailure";
 import { LoadingBlock } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
-import { CompanyRegistrationOnboarding } from "./components/CompanyRegistrationOnboarding";
 
 interface CompanyWorkspaceValue {
   companies: MyCompanyDto[];
@@ -30,7 +30,7 @@ export const CompanyWorkspaceProvider = ({ children }: { children: ReactNode }) 
   if (loading) return <LoadingBlock rows={3} label="Đang tải không gian doanh nghiệp" />;
   if (error) return <ApiErrorState error={error as ApiFailure} onRetry={reload} />;
   if (!value || !value.active) {
-    return <CompanyRegistrationOnboarding onCreated={reload} />;
+    return <Navigate to="/employer/onboarding" replace />;
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

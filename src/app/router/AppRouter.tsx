@@ -41,6 +41,9 @@ const JobApplicationPage = lazy(() => import("@/pages/candidate/JobApplicationPa
 const ResumeBuilderPage = lazy(() => import("@/pages/candidate/ResumeBuilderPage"));
 const ResumePreviewPage = lazy(() => import("@/pages/candidate/ResumePreviewPage"));
 
+const CareerPage = lazy(() => import("@/pages/public/CareerPage/CareerPage"));
+const EmployerRegisterPage = lazy(() => import("@/pages/employer/EmployerRegisterPage"));
+const EmployerOnboardingPage = lazy(() => import("@/pages/employer/EmployerOnboardingPage"));
 const EmployerJobsPage = lazy(() => import("@/pages/employer/EmployerJobsPage"));
 const EmployerJobFormPage = lazy(() => import("@/pages/employer/EmployerJobFormPage"));
 const EmployerProfilePage = lazy(() => import("@/pages/employer/EmployerProfilePage"));
@@ -108,7 +111,7 @@ const AppRouter = () => {
 
             <Route
               path="career"
-              element={<h1>Career Discovery Page</h1>}
+              element={<CareerPage />}
             />
           </Route>
 
@@ -151,7 +154,7 @@ const AppRouter = () => {
 
             <Route
               path="employer/register"
-              element={<RegisterPage />}
+              element={<EmployerRegisterPage />}
             />
           </Route>
 
@@ -190,6 +193,11 @@ const AppRouter = () => {
 
           {/* EMPLOYER / COMPANY WORKSPACE */}
           <Route element={<EmployerRoute />}>
+            <Route
+              path="employer/onboarding"
+              element={<EmployerOnboardingPage />}
+            />
+
             <Route
               path="employer"
               element={<EmployerLayout />}
