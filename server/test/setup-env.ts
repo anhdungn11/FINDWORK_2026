@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 
 const result = config({
-  path: ".env.test",
+  path: process.env.FINDWORK_TEST_ENV_FILE || ".env.test",
   override: true,
 });
 

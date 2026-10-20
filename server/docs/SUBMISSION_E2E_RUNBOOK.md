@@ -17,7 +17,7 @@ From `D:\DACSN\Find-Work-Submission-Backend-MVP\server` in PowerShell:
 node .\test\preflight-submission-db.cjs
 ```
 
-Until the current worktree has `.env.test`, the same read-only check can use the verified previous configuration without copying it:
+The current worktree can use the verified external test configuration without copying secrets:
 
 ```powershell
 node .\test\preflight-submission-db.cjs --env-file D:\DACSN\Find-Work\server\.env.test
@@ -29,11 +29,14 @@ The preflight reads only the named test environment file (default `server/.env.t
 
 From the same `server` directory:
 
+The prepared acceptance set is the existing Company Foundation suite (11 cases) plus the Submission workflow suite (1 case): 12 integration tests. Company/Admin cases require Scope A to provision `USER_ADMIN`, `AUDIT_VIEWER`, and their three SYSTEM grants. Both writing suites require separate Scope B authorization.
+
 ```powershell
-node --experimental-vm-modules .\node_modules\jest\bin\jest.js --config jest.config.cjs --runInBand --runTestsByPath test/submission-workflow.integration.spec.ts
+$env:FINDWORK_TEST_ENV_FILE = 'D:\DACSN\Find-Work\server\.env.test'
+node --experimental-vm-modules .\node_modules\jest\bin\jest.js --config jest.config.cjs --runInBand --runTestsByPath test/company-foundation.integration.spec.ts test/submission-workflow.integration.spec.ts
 ```
 
-Do not use `npm test` for this gate: the default Jest configuration may select other integration specs. The command above executes the one workflow against the `.env.test` URL. The Jest setup loads that file; before fixture writes the suite also checks `NODE_ENV=test`, the URL and actual connected database identity. The suite reads shared permission/role registry records and writes only run-prefixed fixtures. It deletes only recorded fixture user/company IDs (or recovers companies by the run UUID prefix) plus its uniquely coded category. If the identity check fails, cleanup is skipped. A hard process termination can leave fixtures; inspect their unique `submission-<run UUID>` prefix and remove them only under a separate reviewed cleanup procedure. Never run broad cleanup against existing records.
+Do not use `npm test` for this gate: the default Jest configuration may select other integration specs. The command above executes only the two prepared suites against the named test URL. The Jest setup reads `FINDWORK_TEST_ENV_FILE` when set, otherwise `.env.test`; before fixture writes each suite checks `NODE_ENV=test`, the URL and actual connected database identity. Fixtures have unique run prefixes and guarded cleanup. If an identity check fails, cleanup is skipped. A hard process termination can leave fixtures; inspect their unique run prefixes and remove them only under a separate reviewed cleanup procedure. Never run broad cleanup against existing records.
 
 ## Expected acceptance coverage
 
