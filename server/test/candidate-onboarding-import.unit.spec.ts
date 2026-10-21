@@ -249,7 +249,9 @@ describe("Candidate onboarding import", () => {
     const invalid = harness(content); invalid.tx.province.findFirst.mockResolvedValue(null as never);
     await expect(invalid.service.import("self", { version: 3, confirmPrivacy: true })).rejects.toBeInstanceOf(BadRequestException);
     const missing = harness(content); missing.tx.province.findFirst.mockResolvedValue(null as never); missing.tx.province.count.mockResolvedValue(0);
-    await expect(missing.service.import("self", { version: 3, confirmPrivacy: true })).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(missing.service.import("self", { version: 3, confirmPrivacy: true })).rejects.toMatchObject({
+      response: { code: "CANDIDATE_REFERENCE_CATALOG_UNAVAILABLE", details: { catalog: "province" } },
+    });
     expect(missing.tx.candidateProfile.create).not.toHaveBeenCalled();
   });
 

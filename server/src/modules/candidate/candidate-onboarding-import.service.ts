@@ -152,11 +152,11 @@ export class CandidateOnboardingImportService {
       : catalog === "languageCertificateType" ? await tx.languageCertificateType.count()
       : catalog === "province" ? await tx.province.count()
       : await tx.ward.count();
-    if (!count) throw new ServiceUnavailableException({ code: "CANDIDATE_REFERENCE_CATALOG_UNAVAILABLE", catalog, message: `${catalog} catalog is not loaded.` });
+    if (!count) throw new ServiceUnavailableException({ code: "CANDIDATE_REFERENCE_CATALOG_UNAVAILABLE", catalog, message: `${catalog} catalog is not loaded.`, details: { catalog } });
     this.invalidReference(catalog);
   }
   private invalidReference(catalog: Catalog): never {
-    throw new BadRequestException({ code: "CANDIDATE_REFERENCE_INVALID", catalog, message: `Invalid or inactive ${catalog} reference in onboarding draft.` });
+    throw new BadRequestException({ code: "CANDIDATE_REFERENCE_INVALID", catalog, message: `Invalid or inactive ${catalog} reference in onboarding draft.`, details: { catalog } });
   }
   private validateCertificate(type: { supportsLevel: boolean; supportsOverallScore: boolean; levelOptions: string[]; scoreFields: Prisma.JsonValue }, certificate: ParsedCandidateDraft["languages"][number]["certificates"][number]) {
     if ((certificate.level && !type.supportsLevel) || (certificate.level && type.levelOptions.length > 0 && !type.levelOptions.includes(certificate.level)) || (certificate.overallScore && !type.supportsOverallScore)) this.invalidReference("languageCertificateType");
