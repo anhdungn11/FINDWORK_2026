@@ -285,4 +285,61 @@ test("Task 3 Regression: FeaturedJobs and FeaturedCompanies present retryable er
     featuredCompaniesSrc.includes("Thử lại"),
     "FeaturedCompanies must render retry button on error"
   );
+  assert.ok(
+    featuredCompaniesSrc.includes("listFeaturedCompanies({ page: 1, pageSize: 12 })"),
+    "FeaturedCompanies must call publicApi.listFeaturedCompanies with page 1, pageSize 12"
+  );
+});
+
+test("Featured Companies Real-Data API & URL Preview Regression", async () => {
+  // 1. Verify CompanyRegistrationOnboarding does not advertise fake domain/route
+  const onboardingFormSrc = readFileSync(
+    new URL("../../../features/company/components/CompanyRegistrationOnboarding.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.ok(
+    !onboardingFormSrc.includes("findwork.vn/companies/"),
+    "Must not advertise unsupported findwork.vn/companies/{slug} URL"
+  );
+
+  // 2. Verify publicApi.listFeaturedCompanies calls GET /companies/featured
+  const originalGet = apiClient.get;
+  let recordedUrl = "";
+  let recordedParams: unknown = null;
+
+  try {
+    apiClient.get = (async (url: string, config?: { params?: unknown }) => {
+      recordedUrl = url;
+      recordedParams = config?.params;
+      return {
+        data: {
+          data: [
+            {
+              id: "5d97b614-78d6-490f-b554-7d249c926c45",
+              name: "Acme Corp",
+              slug: "acme-corp",
+              isVerified: true,
+              jobsCount: 3,
+            },
+          ],
+          pagination: { page: 1, pageSize: 12, total: 1, totalPages: 1 },
+        },
+      };
+    }) as never;
+
+    const featured = await publicApi.listFeaturedCompanies({ page: 1, pageSize: 12 });
+    assert.equal(recordedUrl, "/companies/featured");
+    assert.deepEqual(recordedParams, { page: 1, pageSize: 12 });
+    assert.equal(featured.data.length, 1);
+    assert.equal(featured.data[0].id, "5d97b614-78d6-490f-b554-7d249c926c45");
+    assert.equal(featured.data[0].name, "Acme Corp");
+    assert.equal(featured.data[0].isVerified, true);
+    assert.equal(featured.data[0].jobsCount, 3);
+
+    // 3. Verify publicApi.listCompanies still calls GET /companies for general directory
+    await publicApi.listCompanies({ page: 1, pageSize: 12 });
+    assert.equal(recordedUrl, "/companies");
+  } finally {
+    apiClient.get = originalGet;
+  }
 });

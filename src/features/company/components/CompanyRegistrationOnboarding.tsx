@@ -137,7 +137,7 @@ export const CompanyRegistrationOnboarding = ({ onCreated }: { onCreated: () => 
         <div className={ui.field}>
           <label className={ui.label} htmlFor="company-slug" style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Globe size={15} color="var(--color-primary, #4f6ef7)" />
-            <span>Đường dẫn định danh thương hiệu (Slug) *</span>
+            <span>Mã định danh doanh nghiệp (Slug) *</span>
           </label>
           <input
             id="company-slug"
@@ -162,9 +162,9 @@ export const CompanyRegistrationOnboarding = ({ onCreated }: { onCreated: () => 
               wordBreak: "break-all",
             }}
           >
-            <span>Trang công khai:</span>
+            <span>Định danh hệ thống:</span>
             <code style={{ color: "var(--color-primary, #4f6ef7)", fontWeight: 600 }}>
-              findwork.vn/companies/{slug || "slug-cua-ban"}
+              @{slug || "slug-doanh-nghiep"}
             </code>
           </div>
           {fieldErrors.slug && (

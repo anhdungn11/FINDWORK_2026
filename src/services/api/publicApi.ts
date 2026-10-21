@@ -81,6 +81,22 @@ export const publicApi = {
       throw toApiFailure(e);
     }
   },
+  async listFeaturedCompanies(
+    query: { page?: number; pageSize?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<Paged<PublicCompanyDto>> {
+    try {
+      const page = query.page && query.page > 0 ? query.page : 1;
+      const pageSize = query.pageSize && query.pageSize > 0 ? query.pageSize : 12;
+      const res = await apiClient.get("/companies/featured", {
+        params: { page, pageSize },
+        signal,
+      });
+      return normalizePaged(res.data, normalizePublicCompany);
+    } catch (e) {
+      throw toApiFailure(e);
+    }
+  },
   async getCompany(companyId: string, signal?: AbortSignal): Promise<PublicCompanyDto> {
     try {
       const res = await apiClient.get(`/companies/${encodeURIComponent(companyId)}`, { signal });

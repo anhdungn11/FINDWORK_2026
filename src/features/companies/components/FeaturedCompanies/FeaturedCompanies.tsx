@@ -16,7 +16,7 @@ const FeaturedCompanies = () => {
     setLoading(true);
     setError(null);
     publicApi
-      .listCompanies({ page: 1, pageSize: 6 })
+      .listFeaturedCompanies({ page: 1, pageSize: 12 })
       .then((paged) => {
         setCompaniesList(paged.data);
         setLoading(false);
