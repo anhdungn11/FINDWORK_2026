@@ -24,6 +24,7 @@ import {
 } from "@/services/api/apiTypes";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
+import { canManageMembers, canInviteMembers } from "@/features/company/companyWorkspacePermissions";
 import { WritesDisabledNotice } from "./EmployerDashboardPage";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -38,6 +39,8 @@ const EmployerMembersPage = () => {
   const { active, reload: reloadWorkspace } = useCompanyWorkspace();
   const currentUser = useAuthStore((s) => s.user);
   const writes = isWorkspaceWritesEnabled();
+  const userCanManage = canManageMembers(active.memberRoleNames);
+  const userCanInvite = canInviteMembers(active.memberRoleNames);
 
   const [params, setParams] = useSearchParams();
   const currentTab = params.get("tab") === "invitations" ? "invitations" : "members";
@@ -308,7 +311,7 @@ const EmployerMembersPage = () => {
                       const isCurrentOwner = Boolean(
                         members.data?.some((mem) => mem.isOwner && currentUser?.id && mem.user?.id === currentUser.id),
                       );
-                      const canModify = writes && !m.isOwner && !isSelf;
+                      const canModify = writes && userCanManage && !m.isOwner && !isSelf;
                       const primaryRole = m.roles?.[0]?.role?.name || "VIEWER";
 
                       return (
@@ -429,32 +432,38 @@ const EmployerMembersPage = () => {
 
           {/* INVITE FORM */}
           <Card title="Mời nhân sự nội bộ tham gia quản trị">
-            <form onSubmit={handleInvite} style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-              <div style={{ flex: "1 1 320px" }}>
-                <label htmlFor="inviteEmailInput" className={ui.label}>
-                  Địa chỉ Email của đồng nghiệp cần mời
-                </label>
-                <input
-                  id="inviteEmailInput"
-                  type="email"
-                  className={ui.input}
-                  placeholder="dongnghiep@congty.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  required
-                  disabled={!writes || inviting}
-                />
+            {!userCanInvite ? (
+              <div className={`${ui.notice}`} role="note" style={{ marginBottom: 12 }}>
+                Tài khoản của bạn hiện không có quyền gửi lời mời thành viên. Chỉ Chủ sở hữu, Quản trị viên hoặc Trưởng phòng nhân sự mới có thẩm quyền này.
               </div>
-              <button
-                type="submit"
-                className={`${ui.btn} ${ui.btnPrimary}`}
-                disabled={!writes || inviting || !inviteEmail.trim()}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              >
-                <UserPlus size={16} />
-                <span>{inviting ? "Đang gửi thư mời..." : "Gửi lời mời nội bộ"}</span>
-              </button>
-            </form>
+            ) : (
+              <form onSubmit={handleInvite} style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <div style={{ flex: "1 1 320px" }}>
+                  <label htmlFor="inviteEmailInput" className={ui.label}>
+                    Địa chỉ Email của đồng nghiệp cần mời
+                  </label>
+                  <input
+                    id="inviteEmailInput"
+                    type="email"
+                    className={ui.input}
+                    placeholder="dongnghiep@congty.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                    disabled={!writes || inviting}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className={`${ui.btn} ${ui.btnPrimary}`}
+                  disabled={!writes || inviting || !inviteEmail.trim()}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <UserPlus size={16} />
+                  <span>{inviting ? "Đang gửi thư mời..." : "Gửi lời mời nội bộ"}</span>
+                </button>
+              </form>
+            )}
             <p style={{ margin: "10px 0 0", fontSize: "0.85rem", color: "var(--color-text-secondary, #64748b)" }}>
               * Thành viên sau khi chấp nhận lời mời sẽ mặc định có quyền <strong>Người xem (Viewer)</strong> và có thể được phân quyền bổ sung bởi Quản trị viên.
             </p>

@@ -6,6 +6,7 @@ import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext"
 import { companyWorkspaceApi, type CompanyLocationInput } from "@/services/api/companyWorkspaceApi";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
+import { canUpdateCompany } from "@/features/company/companyWorkspacePermissions";
 import { WritesDisabledNotice } from "./EmployerDashboardPage";
 
 const EmployerLocationsPage = () => {
@@ -19,6 +20,7 @@ const EmployerLocationsPage = () => {
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const writes = isWorkspaceWritesEnabled();
+  const canUpdate = canUpdateCompany(active.memberRoleNames);
 
   const handleCreateLocation = async (e: FormEvent) => {
     e.preventDefault();
@@ -78,7 +80,7 @@ const EmployerLocationsPage = () => {
         title="Địa điểm làm việc"
         subtitle="Danh sách các chi nhánh, văn phòng và trụ sở chính của doanh nghiệp."
         actions={
-          !showAddForm && (
+          !showAddForm && canUpdate && (
             <button
               type="button"
               className={`${ui.btn} ${ui.btnPrimary}`}
@@ -191,8 +193,15 @@ const EmployerLocationsPage = () => {
                         <button
                           type="button"
                           className={ui.btn}
-                          disabled={!writes || busyId === loc.id}
-                          title={writes ? undefined : "Cổng ghi dữ liệu đang khóa"}
+                          disabled={!writes || !canUpdate || busyId === loc.id}
+                          aria-disabled={!writes || !canUpdate}
+                          title={
+                            !canUpdate
+                              ? "Tài khoản không có quyền thay đổi trụ sở chính"
+                              : !writes
+                              ? "Cổng ghi dữ liệu đang khóa"
+                              : undefined
+                          }
                           onClick={() => handlePromoteHeadquarters(loc.id)}
                         >
                           Đặt làm trụ sở chính
@@ -201,8 +210,15 @@ const EmployerLocationsPage = () => {
                       <button
                         type="button"
                         className={ui.btn}
-                        disabled={!writes || busyId === loc.id}
-                        title={writes ? undefined : "Cổng ghi dữ liệu đang khóa"}
+                        disabled={!writes || !canUpdate || busyId === loc.id}
+                        aria-disabled={!writes || !canUpdate}
+                        title={
+                          !canUpdate
+                            ? "Tài khoản không có quyền xóa địa điểm"
+                            : !writes
+                            ? "Cổng ghi dữ liệu đang khóa"
+                            : undefined
+                        }
                         onClick={() => handleDeleteLocation(loc.id)}
                       >
                         Xóa

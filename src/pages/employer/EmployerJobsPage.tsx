@@ -185,7 +185,7 @@ const EmployerJobsPage = () => {
                     </td>
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                        {canEditJob(job.status) && (
+                        {canManage && canEditJob(job.status) && (
                           <Link className={ui.btn} to={`/employer/jobs/${job.id}/edit`}>
                             Sửa tin
                           </Link>
@@ -204,9 +204,15 @@ const EmployerJobsPage = () => {
                             key={a}
                             type="button"
                             className={ui.btn}
-                            disabled={!writes || busyId === job.id}
-                            aria-disabled={!writes}
-                            title={writes ? undefined : "Thao tác ghi đang tắt"}
+                            disabled={!writes || !canManage || busyId === job.id}
+                            aria-disabled={!writes || !canManage}
+                            title={
+                              !canManage
+                                ? "Tài khoản của bạn không có quyền thay đổi trạng thái tin tuyển dụng"
+                                : !writes
+                                ? "Thao tác ghi đang tắt"
+                                : undefined
+                            }
                             onClick={() => transition(job, a)}
                           >
                             {a === "publish" && job.status === "PAUSED" ? "Mở lại tin" : ACTION_LABEL[a]}

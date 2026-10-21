@@ -1,4 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
+import { AlertCircle, ArrowRight } from "lucide-react";
 import { Badge, Card, JobStatusBadge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
@@ -11,8 +12,16 @@ export const EmployerWorkspaceOutlet = () => <Outlet />;
 
 export const WritesDisabledNotice = () =>
   isWorkspaceWritesEnabled() ? null : (
-    <div className={`${ui.notice} ${ui.noticeWarn}`} role="note" data-testid="writes-disabled-notice">
-      Chế độ chỉ xem: thao tác ghi dữ liệu (tạo, sửa, đăng tin…) đang tắt nên không có yêu cầu nào được gửi tới máy chủ.
+    <div
+      className={`${ui.notice} ${ui.noticeWarn}`}
+      role="note"
+      data-testid="writes-disabled-notice"
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px" }}
+    >
+      <AlertCircle size={18} color="var(--color-warning, #d97706)" style={{ flexShrink: 0 }} />
+      <span>
+        <strong>Chế độ chỉ xem (Read-only):</strong> Thao tác ghi dữ liệu (tạo, sửa, đăng tin…) đang tạm tắt để bảo toàn môi trường kiểm thử.
+      </span>
     </div>
   );
 

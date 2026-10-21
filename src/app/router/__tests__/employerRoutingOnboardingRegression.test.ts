@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { canManageJobs, formatCompanyRole } from "../../../features/company/companyWorkspacePermissions";
+import { canManageJobs, canReviewApplications, formatCompanyRole } from "../../../features/company/companyWorkspacePermissions";
 
 describe("Employer Routing & Onboarding Regression", () => {
   it("RoleRoute redirects unauthenticated employer requests to /employer/login", () => {
@@ -24,22 +24,30 @@ describe("Employer Routing & Onboarding Regression", () => {
     );
   });
 
-  it("canManageJobs authorizes recruitment roles and blocks read-only VIEWER", () => {
+  it("canManageJobs authorizes recruitment roles and blocks read-only VIEWER and HIRING_MANAGER", () => {
     // Authorized roles
     assert.equal(canManageJobs(["OWNER"]), true);
     assert.equal(canManageJobs(["COMPANY_OWNER"]), true);
     assert.equal(canManageJobs(["ADMIN"]), true);
     assert.equal(canManageJobs(["HR_MANAGER"]), true);
     assert.equal(canManageJobs(["RECRUITER"]), true);
-    assert.equal(canManageJobs(["HIRING_MANAGER"]), true);
     assert.equal(canManageJobs(["VIEWER", "RECRUITER"]), true);
 
-    // Unauthorized roles
+    // Unauthorized roles (including HIRING_MANAGER per backend company-roles.ts)
+    assert.equal(canManageJobs(["HIRING_MANAGER"]), false);
     assert.equal(canManageJobs(["VIEWER"]), false);
     assert.equal(canManageJobs([]), false);
     assert.equal(canManageJobs(null), false);
     assert.equal(canManageJobs(undefined), false);
     assert.equal(canManageJobs(["UNKNOWN_ROLE"]), false);
+
+    // canReviewApplications authorizes recruiters/managers and blocks HIRING_MANAGER/VIEWER
+    assert.equal(canReviewApplications(["OWNER"]), true);
+    assert.equal(canReviewApplications(["ADMIN"]), true);
+    assert.equal(canReviewApplications(["HR_MANAGER"]), true);
+    assert.equal(canReviewApplications(["RECRUITER"]), true);
+    assert.equal(canReviewApplications(["HIRING_MANAGER"]), false);
+    assert.equal(canReviewApplications(["VIEWER"]), false);
   });
 
   it("formatCompanyRole maps roles to clear Vietnamese UI labels", () => {
@@ -97,6 +105,19 @@ describe("Employer Routing & Onboarding Regression", () => {
     assert.ok(
       onboardingSrc.includes("handleSwitchAccount"),
       "Must provide action to switch or log in with another account"
+    );
+    assert.ok(
+      !onboardingSrc.includes("VITE_ENABLE_WORKSPACE_WRITES"),
+      "Must not expose raw developer environment variables in UI"
+    );
+
+    const formSrc = readFileSync(
+      new URL("../../../features/company/components/CompanyRegistrationOnboarding.tsx", import.meta.url),
+      "utf8"
+    );
+    assert.ok(
+      !formSrc.includes('role="note"'),
+      "CompanyRegistrationOnboarding must not render duplicate warning banner"
     );
   });
 

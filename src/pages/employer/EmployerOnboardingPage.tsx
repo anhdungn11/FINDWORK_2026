@@ -1,5 +1,5 @@
 import { useNavigate, Navigate, Link } from "react-router-dom";
-import { LogOut, Home, User } from "lucide-react";
+import { LogOut, Home, User, AlertCircle, ArrowRightLeft, Mail, CheckCircle2 } from "lucide-react";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import type { ApiFailure } from "@/services/api/apiFailure";
@@ -9,6 +9,7 @@ import { CompanyRegistrationOnboarding } from "@/features/company/components/Com
 import { useAuthStore } from "@/store/authStore";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 import styles from "@/layouts/EmployerLayout.module.css";
+import onboardingStyles from "./EmployerOnboardingPage.module.css";
 
 const EmployerOnboardingPage = () => {
   const navigate = useNavigate();
@@ -136,73 +137,32 @@ const EmployerOnboardingPage = () => {
         </div>
       </header>
 
-      {/* MAIN ONBOARDING BODY */}
-      <main style={{ maxWidth: 680, margin: "32px auto", padding: "0 16px", width: "100%" }}>
-        {/* CONTEXT INFORMATION CARD */}
-        <div
-          style={{
-            marginBottom: 20,
-            padding: "16px 20px",
-            background: "var(--color-surface, #ffffff)",
-            border: "1px solid var(--color-border, #e2e8f0)",
-            borderRadius: 12,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 12,
-          }}
-          data-testid="onboarding-account-status"
-        >
-          <div>
-            <div style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary, #64748b)" }}>
-              Tài khoản đang đăng nhập:
-            </div>
-            <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--color-text-primary, #1e293b)" }}>
-              {user?.email || "Chưa xác định"}
-            </div>
-            <div style={{ fontSize: "0.8125rem", color: "var(--color-text-secondary, #64748b)", marginTop: 2 }}>
-              Tài khoản hiện chưa thuộc về hoặc sở hữu doanh nghiệp nào.
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              className={ui.btn}
-              style={{ fontSize: "0.8125rem", padding: "6px 12px" }}
-              onClick={handleSwitchAccount}
-            >
-              Đổi tài khoản khác
-            </button>
-          </div>
-        </div>
-
-        {/* READ-ONLY GATE GUIDANCE */}
+      {/* MAIN ONBOARDING CONTAINER */}
+      <main className={onboardingStyles.container}>
+        {/* SINGLE COMPACT ENVIRONMENT NOTICE IF WRITES ARE DISABLED */}
         {!writes && (
           <div
-            className={`${ui.notice} ${ui.noticeWarn}`}
+            className={onboardingStyles.noticeBanner}
             role="note"
             data-testid="onboarding-writes-disabled-notice"
-            style={{ marginBottom: 20, padding: "16px 20px" }}
           >
-            <strong style={{ display: "block", marginBottom: 6 }}>
-              Chế độ chỉ xem (Read-only): Cổng ghi dữ liệu doanh nghiệp đang khóa
-            </strong>
-            <p style={{ margin: "0 0 12px", lineHeight: 1.5, fontSize: "0.875rem" }}>
-              Trong môi trường kiểm thử này, tính năng tạo doanh nghiệp mới tạm thời bị vô hiệu hóa
-              (<code>VITE_ENABLE_WORKSPACE_WRITES=false</code>) để bảo toàn dữ liệu. Bạn có thể sử dụng các liên kết an toàn dưới đây để điều hướng:
+            <div className={onboardingStyles.noticeHeader}>
+              <AlertCircle size={18} color="var(--color-warning, #d97706)" />
+              <span>Chế độ chỉ xem (Read-only): Cổng ghi dữ liệu doanh nghiệp đang tạm khóa</span>
+            </div>
+            <p className={onboardingStyles.noticeText}>
+              Trong môi trường thử nghiệm hiện tại, tính năng thành lập doanh nghiệp mới tạm thời không ghi nhận dữ liệu để đảm bảo an toàn hệ thống. Bạn có thể sử dụng các liên kết an toàn dưới đây để tiếp tục trải nghiệm:
             </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div className={onboardingStyles.noticeActions}>
               <Link className={`${ui.btn} ${ui.btnPrimary}`} to="/">
                 Về trang chủ
               </Link>
-              <Link className={`${ui.btn}`} to="/candidate">
+              <Link className={ui.btn} to="/candidate">
                 Không gian tìm việc
               </Link>
               <button
                 type="button"
-                className={`${ui.btn}`}
+                className={ui.btn}
                 onClick={handleSwitchAccount}
               >
                 Đăng nhập tài khoản khác
@@ -211,11 +171,86 @@ const EmployerOnboardingPage = () => {
           </div>
         )}
 
-        <CompanyRegistrationOnboarding
-          onCreated={() => {
-            navigate("/employer", { replace: true });
-          }}
-        />
+        {/* BALANCED 2-COLUMN DESKTOP LAYOUT */}
+        <div className={onboardingStyles.grid}>
+          {/* LEFT COLUMN: IDENTITY & ONBOARDING GUIDANCE */}
+          <div className={onboardingStyles.leftPanel}>
+            {/* ACCOUNT IDENTITY CARD */}
+            <div className={onboardingStyles.accountCard} data-testid="onboarding-account-status">
+              <div className={onboardingStyles.accountRow}>
+                <div className={onboardingStyles.accountAvatar}>
+                  <User size={22} />
+                </div>
+                <div className={onboardingStyles.accountMeta}>
+                  <div className={onboardingStyles.accountLabel}>Tài khoản đang đăng nhập</div>
+                  <div className={onboardingStyles.accountEmail} title={user?.email || "Chưa xác định"}>
+                    {user?.email || "Chưa xác định"}
+                  </div>
+                  <div className={onboardingStyles.accountStatusText}>
+                    Tài khoản hiện chưa thuộc về hoặc sở hữu doanh nghiệp nào.
+                  </div>
+                </div>
+              </div>
+
+              <div className={onboardingStyles.accountActions}>
+                <button
+                  type="button"
+                  className={ui.btn}
+                  style={{ fontSize: "0.8125rem", padding: "6px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}
+                  onClick={handleSwitchAccount}
+                >
+                  <ArrowRightLeft size={14} />
+                  <span>Đổi tài khoản khác</span>
+                </button>
+              </div>
+            </div>
+
+            {/* VALUE PROPOSITION & STEPS GUIDE */}
+            <div className={onboardingStyles.guideCard}>
+              <div className={onboardingStyles.guideTitle}>Các bước khởi tạo không gian tuyển dụng</div>
+              <ul className={onboardingStyles.guideList}>
+                <li className={onboardingStyles.guideItem}>
+                  <span className={onboardingStyles.guideStepNumber}>1</span>
+                  <div>
+                    <strong>Đăng ký tổ chức</strong>: Thiết lập tên doanh nghiệp và đường dẫn định danh thương hiệu độc quyền.
+                  </div>
+                </li>
+                <li className={onboardingStyles.guideItem}>
+                  <span className={onboardingStyles.guideStepNumber}>2</span>
+                  <div>
+                    <strong>Đăng tin tuyển dụng</strong>: Tạo bài tuyển dụng với mô tả, đãi ngộ và câu hỏi sàng lọc hồ sơ.
+                  </div>
+                </li>
+                <li className={onboardingStyles.guideItem}>
+                  <span className={onboardingStyles.guideStepNumber}>3</span>
+                  <div>
+                    <strong>Kết nối nhân sự</strong>: Mời các đồng nghiệp trong phòng HR cùng đánh giá và phỏng vấn ứng viên.
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            {/* INVITATION HELPER BOX */}
+            <div className={onboardingStyles.invitationBox}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <Mail size={16} color="var(--color-primary, #4f6ef7)" />
+                <h4 className={onboardingStyles.invitationTitle}>Bạn được mời tham gia vào doanh nghiệp khác?</h4>
+              </div>
+              <p className={onboardingStyles.invitationText}>
+                Nếu đã nhận được email mời từ quản trị viên, hãy nhấp vào đường dẫn trong thư mời để tham gia trực tiếp vào tổ chức mà không cần tạo doanh nghiệp mới.
+              </p>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: REGISTRATION FORM */}
+          <div className={onboardingStyles.rightPanel}>
+            <CompanyRegistrationOnboarding
+              onCreated={() => {
+                navigate("/employer", { replace: true });
+              }}
+            />
+          </div>
+        </div>
       </main>
     </div>
   );

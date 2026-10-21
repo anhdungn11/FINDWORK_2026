@@ -1,0 +1,261 @@
+.container {
+  max-width: 1140px;
+  margin: 32px auto;
+  padding: 0 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.noticeBanner {
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: var(--color-warning-soft, #fffbeb);
+  border: 1px solid var(--color-warning-border, #fef3c7);
+  color: var(--color-warning-text, #92400e);
+}
+
+.noticeHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  margin-bottom: 6px;
+}
+
+.noticeText {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #475569);
+}
+
+.noticeActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.leftPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.accountCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.accountRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.accountAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--color-primary-soft, #eef2ff);
+  color: var(--color-primary, #4f6ef7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.accountMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.accountLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.accountEmail {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountStatusText {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #64748b);
+  margin-top: 2px;
+}
+
+.accountActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.guideCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.guideTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #1e293b);
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.guideList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guideItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.84rem;
+  color: var(--color-text-secondary, #475569);
+  line-height: 1.45;
+}
+
+.guideStepNumber {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary-soft, #eef2ff);
+  color: var(--color-primary, #4f6ef7);
+  font-weight: 700;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.invitationBox {
+  background: var(--color-surface-soft, #f8fafc);
+  border: 1px dashed var(--color-border, #cbd5e1);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.invitationTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #1e293b);
+  margin: 0 0 4px;
+}
+
+.invitationText {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.rightPanel {
+  min-width: 0;
+}
+
+.formCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.formHeader {
+  margin-bottom: 24px;
+}
+
+.formTitle {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary, #1e293b);
+  margin: 0 0 6px;
+}
+
+.formSubtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #64748b);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.slugPreview {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #64748b);
+  margin-top: 6px;
+  padding: 4px 10px;
+  background: var(--color-surface-soft, #f1f5f9);
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.slugPreviewCode {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--color-primary, #4f6ef7);
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 860px) {
+  .container {
+    margin: 20px auto;
+    padding: 0 16px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .formCard {
+    padding: 20px;
+  }
+
+  .formTitle {
+    font-size: 1.2rem;
+  }
+}

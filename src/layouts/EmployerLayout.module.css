@@ -228,6 +228,24 @@
   border-radius: 10px;
 }
 
+.sidebarCompanySelector {
+  margin-top: -10px;
+  margin-bottom: 4px;
+}
+
+.sidebarSelect {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-surface-soft, #f1f5f9);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1e293b);
+  cursor: pointer;
+  outline: none;
+}
+
 .companyAvatar {
   width: 40px;
   height: 40px;

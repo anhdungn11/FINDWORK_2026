@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  User,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
@@ -133,6 +134,15 @@ const EmployerLayout = () => {
           <ExternalLink size={13} />
         </Link>
 
+        <Link
+          to="/candidate"
+          className={styles.viewPublicLink}
+          title="Chuyển sang không gian tìm việc (Ứng viên)"
+        >
+          <User size={14} />
+          <span>Không gian ứng viên</span>
+        </Link>
+
         <span className={styles.spacer} />
 
         {/* RIGHT ACTIONS */}
@@ -185,6 +195,24 @@ const EmployerLayout = () => {
               <div className={styles.companyRoleTag}>{primaryRole}</div>
             </div>
           </div>
+
+          {/* SIDEBAR COMPANY SELECTOR FOR MULTI-COMPANY USERS */}
+          {companies.length > 1 && (
+            <div className={styles.sidebarCompanySelector}>
+              <select
+                aria-label="Chuyển đổi doanh nghiệp"
+                className={styles.sidebarSelect}
+                value={active.id}
+                onChange={(e) => setActiveId(e.target.value)}
+              >
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.verificationStatus === "VERIFIED" ? "✓" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* GROUP 1: MAIN WORKSPACE */}
           <div className={styles.navSection}>
@@ -303,6 +331,16 @@ const EmployerLayout = () => {
                 </NavLink>
               </li>
             </ul>
+          </div>
+
+          {/* CANDIDATE WORKSPACE SWITCHER */}
+          <div className={styles.navSection} style={{ marginTop: "auto", paddingTop: 16, borderTop: "1px solid var(--color-border, #e2e8f0)" }}>
+            <Link to="/candidate" className={styles.navLink} title="Chuyển sang không gian tìm việc (Ứng viên)">
+              <span className={styles.navIcon}>
+                <User size={18} />
+              </span>
+              <span>Không gian ứng viên</span>
+            </Link>
           </div>
         </aside>
 

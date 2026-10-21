@@ -20,6 +20,7 @@ import { companyWorkspaceApi, type UpdateCompanyProfileInput } from "@/services/
 import { publicApi } from "@/services/api/publicApi";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
+import { canUpdateCompany } from "@/features/company/companyWorkspacePermissions";
 import { WritesDisabledNotice } from "./EmployerDashboardPage";
 
 const EMPLOYEE_SIZE_OPTIONS = [
@@ -49,6 +50,7 @@ const EmployerProfilePage = () => {
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const writes = isWorkspaceWritesEnabled();
+  const canUpdate = canUpdateCompany(active.memberRoleNames);
 
   useEffect(() => {
     if (profile.data) {
@@ -304,7 +306,7 @@ const EmployerProfilePage = () => {
               </p>
             </div>
             <div>
-              {!isEditingBrand ? (
+              {!isEditingBrand && canUpdate ? (
                 <button
                   type="button"
                   className={`${ui.btn} ${ui.btnPrimary}`}
@@ -730,13 +732,15 @@ const EmployerProfilePage = () => {
                 </div>
 
                 <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                  <button
-                    type="button"
-                    className={`${ui.btn} ${ui.btnPrimary}`}
-                    onClick={() => setIsEditingLegal(true)}
-                  >
-                    Chỉnh sửa thông tin pháp lý
-                  </button>
+                  {canUpdate && (
+                    <button
+                      type="button"
+                      className={`${ui.btn} ${ui.btnPrimary}`}
+                      onClick={() => setIsEditingLegal(true)}
+                    >
+                      Chỉnh sửa thông tin pháp lý
+                    </button>
+                  )}
                   <Link className={ui.btn} to="/employer/locations">
                     Quản lý trụ sở & địa chỉ →
                   </Link>

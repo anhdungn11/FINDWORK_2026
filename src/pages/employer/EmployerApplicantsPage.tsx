@@ -33,6 +33,7 @@ import {
   availableReviewTransitions,
   companyWorkspaceApi,
 } from "@/services/api/companyWorkspaceApi";
+import { canReviewApplications } from "@/features/company/companyWorkspacePermissions";
 import {
   APPLICATION_STATUS_LABEL,
   formatAvailability,
@@ -82,6 +83,7 @@ const EmployerApplicantsPage = () => {
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const writes = isWorkspaceWritesEnabled();
+  const canReview = canReviewApplications(active.memberRoleNames);
 
   // Load company's jobs for selecting job scope
   const jobs = useAsyncData(
@@ -323,9 +325,15 @@ const EmployerApplicantsPage = () => {
                             key={nextSt}
                             type="button"
                             className={ui.btn}
-                            disabled={!writes || busyId === app.id}
-                            aria-disabled={!writes}
-                            title={writes ? undefined : "Thao tác ghi đang bị khóa"}
+                            disabled={!writes || !canReview || busyId === app.id}
+                            aria-disabled={!writes || !canReview}
+                            title={
+                              !canReview
+                                ? "Tài khoản của bạn không có quyền cập nhật trạng thái ứng viên"
+                                : !writes
+                                ? "Thao tác ghi đang bị khóa"
+                                : undefined
+                            }
                             onClick={() => handleReview(app, nextSt)}
                             style={{ fontSize: "0.85rem", padding: "5px 10px" }}
                           >
@@ -650,7 +658,15 @@ const EmployerApplicantsPage = () => {
                     key={st}
                     type="button"
                     className={`${ui.btn} ${st === "REJECTED" ? ui.btnDanger : ui.btnPrimary}`}
-                    disabled={!writes || busyId === activeApplication.id}
+                    disabled={!writes || !canReview || busyId === activeApplication.id}
+                    aria-disabled={!writes || !canReview}
+                    title={
+                      !canReview
+                        ? "Tài khoản của bạn không có quyền cập nhật trạng thái ứng viên"
+                        : !writes
+                        ? "Thao tác ghi đang bị khóa"
+                        : undefined
+                    }
                     onClick={() => handleReview(activeApplication, st)}
                     style={{ fontSize: "0.875rem", padding: "6px 14px" }}
                   >
