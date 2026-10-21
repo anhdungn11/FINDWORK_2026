@@ -4,8 +4,6 @@ Current backend behavior uses the existing `ApplicationStatus` values. A company
 
 Assignment records do not grant application access. Under the approved role matrix, `HIRING_MANAGER` and `VIEWER` have only `company.view`; they cannot read an assigned application. Recruiters and HR managers already have `application.view` at COMPANY scope. A hiring manager assignment is therefore recorded but cannot yet be worked by that member.
 
-Assignment records do not grant application access. Under the approved role matrix, `HIRING_MANAGER` and `VIEWER` have only `company.view`; they cannot read an assigned application. Recruiters and HR managers already have `application.view` at COMPANY scope. A hiring manager assignment is therefore recorded but cannot yet be worked by that member.
-
 ## Approval-gated minimal migration
 
 An explicit job mode cannot be enforced with the current `Job` schema. An independent professional evaluation and in-app employer message cannot be persisted with the existing status history without inventing a status change. Proposed additive migration:
@@ -52,10 +50,6 @@ Existing jobs default to `STANDARD`; no existing application status changes. No 
 
 To let an assigned `HIRING_MANAGER` see and evaluate only the applications assigned to them, add `application.view:ASSIGNED` and a new `application.evaluate:ASSIGNED` grant to that existing company role. Keep `VIEWER` unchanged. The `application.evaluate` permission registry entry would be `resource=application`, `action=evaluate`, COMPANY role usable only at `ASSIGNED` scope. The application read and evaluation guards must check an active `ApplicationAssignment` for the authenticated member, application, company and job; the existing COMPANY scoped recruiter and HR access remains unchanged. No status mutation grant is proposed for `HIRING_MANAGER`. This role policy and registry addition require separate approval before implementation or provisioning.
 
-## Separate role policy proposal for assigned hiring managers
-
-To let an assigned `HIRING_MANAGER` see and evaluate only the applications assigned to them, add `application.view:ASSIGNED` and a new `application.evaluate:ASSIGNED` grant to that existing company role. Keep `VIEWER` unchanged. The `application.evaluate` permission registry entry would be `resource=application`, `action=evaluate`, COMPANY role usable only at `ASSIGNED` scope. The application read and evaluation guards must check an active `ApplicationAssignment` for the authenticated member, application, company and job; the existing COMPANY scoped recruiter and HR access remains unchanged. No status mutation grant is proposed for `HIRING_MANAGER`. This role policy and registry addition require separate approval before implementation or provisioning.
-
 ## Proposed API contract after approval
 
 - `POST /companies/:companyId/jobs` and draft `PATCH /companies/:companyId/jobs/:jobId` accept `workflowMode: QUICK|STANDARD`; company and public job reads return it. Publishing freezes the mode. With the mode stored, `REVIEWING → OFFERED` is valid only for QUICK, and `SHORTLISTED → INTERVIEW → OFFERED` remains valid for STANDARD. Earlier jobs stay STANDARD.
@@ -64,3 +58,18 @@ To let an assigned `HIRING_MANAGER` see and evaluate only the applications assig
 - All new writes require active application/company/membership checks, same-company foreign keys, atomic audit, and tenant scoped reads. Existing permission codes and role grants remain unchanged.
 
 The schema and API additions above are pending explicit approval. The current backend supports the two status paths operationally but does not record or enforce a job's selected mode.
+
+## Interview scheduling using existing schema — contract approval required
+
+`Interview` and `InterviewParticipant` already persist company-scoped interview time, duration, ONSITE/PHONE/VIDEO type, location/meeting URL, SCHEDULED/RESCHEDULED/COMPLETED/CANCELLED status and same-company participants. The permission registry already contains `interview.view`, `interview.create`, `interview.update`, `interview.cancel`, `interview.evaluate` and `interview.respond`, but the default company roles have no interview grants and there are no interview HTTP routes. Scheduling therefore remains unavailable.
+
+Minimal proposed routes under `/api/v1/companies/:companyId/jobs/:jobId/applications/:applicationId/interviews`:
+
+| Method/path | Proposed permission and DTO | Response and behavior |
+| --- | --- | --- |
+| `GET /` and `GET /:interviewId` | `interview.view:COMPANY`, active member; list `page`, `pageSize`. | Paginated list or one tenant-scoped interview with active participants; read only. |
+| `POST /` | `interview.create:COMPANY`; `{scheduledAt:ISO8601 future,durationMinutes:int(15..480),type:ONSITE|PHONE|VIDEO,location?:string(1..255),meetingUrl?:HTTPS URL,participantMemberIds?:UUID[]}`. | 201 SCHEDULED interview. Resolve participants to active same-company members; transactionally create interview, participants and audit. No email, calendar event or external meeting is created. |
+| `PATCH /:interviewId` | `interview.update:COMPANY`; `{scheduledAt?:ISO8601 future,durationMinutes?:int(15..480),type?,location?,meetingUrl?,participantMemberIds?,expectedUpdatedAt:ISO8601}`. | 200 RESCHEDULED or edited interview; compare timestamp, update participants and audit atomically. |
+| `POST /:interviewId/cancel` | `interview.cancel:COMPANY`; `{expectedUpdatedAt:ISO8601}`. | 200 CANCELLED interview with audit; cancellation is terminal. |
+
+All routes must join application to the requested company and job, reject foreign or absent IDs with 404, stale edits with 409, invalid DTO/state with 400/409, and unauthorized access with 401/403. `Interview` has no integer version field, so timestamp compare-and-swap is the minimum without migration; if that is insufficient, seek approval for an additive version column. Decide candidate visibility and location/meeting URL redaction before adding a candidate interview read route. These DTOs and transitions are a proposal only. Approve exact role grants separately; `HIRING_MANAGER` receives no permission based on its name alone. Independent interviewer evaluations still need the proposed `ApplicationEvaluation` table and assignment-aware access policy above; `interview.evaluate` in the registry alone cannot persist an evaluation.

@@ -13,6 +13,7 @@ import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { CompanyService } from "./company.service";
 import { CompanyCreatedResponseDto } from "./dto/company-created-response.dto";
 import { CreateCompanyDto } from "./dto/create-company.dto";
+import { FeaturedCompanyQueryDto } from "./dto/featured-company-query.dto";
 import { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
 
 @ApiTags("Companies")
@@ -31,6 +32,12 @@ export class CompanyController {
   @ApiOperation({ summary: "Discover active companies with a public profile only" })
   listPublic(@Query() query: PublicCompanyQueryDto) {
     return this.companyService.listPublic(query);
+  }
+
+  @Get("featured")
+  @ApiOperation({ summary: "Discover verified companies with an available published job" })
+  listFeatured(@Query() query: FeaturedCompanyQueryDto) {
+    return this.companyService.listFeatured(query);
   }
 
   @Get(":companyId")

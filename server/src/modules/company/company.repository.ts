@@ -3,6 +3,7 @@ import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import { publicJobVisibility } from "../jobs/public-job-visibility";
 import { DEFAULT_COMPANY_PERMISSION_CODES, DEFAULT_COMPANY_ROLES } from "./company-roles";
+import type { FeaturedCompanyQueryDto } from "./dto/featured-company-query.dto";
 import type { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
 
 function publicCompanySelect(now: Date) {
@@ -47,6 +48,24 @@ export class CompanyRepository {
       ...(query.provinceId && { locations: { some: { provinceId: query.provinceId } } }),
       ...(query.verifiedOnly && { verificationStatus: "VERIFIED" }),
     };
+    return this.listPublicByWhere(where, query, now);
+  }
+
+  async listFeatured(query: FeaturedCompanyQueryDto) {
+    const now = new Date();
+    const where: Prisma.CompanyWhereInput = {
+      status: "ACTIVE",
+      verificationStatus: "VERIFIED",
+      jobs: { some: publicJobVisibility(now) },
+    };
+    return this.listPublicByWhere(where, query, now);
+  }
+
+  private async listPublicByWhere(
+    where: Prisma.CompanyWhereInput,
+    query: FeaturedCompanyQueryDto,
+    now: Date,
+  ) {
     const [rows, total] = await Promise.all([
       this.prisma.company.findMany({ where, select: publicCompanySelect(now),
         orderBy: [{ name: "asc" }, { id: "asc" }],

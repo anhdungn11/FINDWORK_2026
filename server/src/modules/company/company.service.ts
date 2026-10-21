@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from "@nestjs/common";
 import { CompanyRepository } from "./company.repository";
 import type { CreateCompanyDto } from "./dto/create-company.dto";
+import type { FeaturedCompanyQueryDto } from "./dto/featured-company-query.dto";
 import type { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
 
 @Injectable()
@@ -13,6 +14,10 @@ export class CompanyService {
 
   listPublic(query: PublicCompanyQueryDto) {
     return this.companyRepository.listPublic(query);
+  }
+
+  listFeatured(query: FeaturedCompanyQueryDto) {
+    return this.companyRepository.listFeatured(query);
   }
 
   getPublic(companyId: string) {
