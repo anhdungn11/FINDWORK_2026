@@ -2,9 +2,10 @@ import { Link, Outlet } from "react-router-dom";
 import { Badge, Card, JobStatusBadge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import { CompanyWorkspaceProvider, useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
+import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
+import { canManageJobs } from "@/features/company/companyWorkspacePermissions";
 
 export const EmployerWorkspaceOutlet = () => <Outlet />;
 
@@ -47,8 +48,8 @@ const EmployerDashboardPage = () => {
     <>
       <PageHeader
         title={active.name}
-        subtitle={companies.length > 1 ? `Bạn thuộc ${companies.length} doanh nghiệp; đang xem doanh nghiệp đầu tiên.` : "Tổng quan hoạt động tuyển dụng và nhân sự của doanh nghiệp."}
-        actions={<Link className={`${ui.btn} ${ui.btnPrimary}`} to="/employer/jobs/new">Đăng tin mới</Link>}
+        subtitle={companies.length > 1 ? `Bạn thuộc ${companies.length} doanh nghiệp; đang xem "${active.name}".` : "Tổng quan hoạt động tuyển dụng và nhân sự của doanh nghiệp."}
+        actions={canManageJobs(active.memberRoleNames) ? <Link className={`${ui.btn} ${ui.btnPrimary}`} to="/employer/jobs/new">Đăng tin mới</Link> : undefined}
       />
       <WritesDisabledNotice />
       <div className={ui.grid}>

@@ -18,7 +18,8 @@ const RoleRoute = ({ kind }: { kind: WorkspaceKind }) => {
   const access = resolveWorkspaceAccess(kind, status, user, accessToken);
   if (access === "loading") return <div style={{ padding: 24 }}><LoadingBlock rows={2} label="Đang kiểm tra phiên đăng nhập" /></div>;
   if (access === "unauthenticated") {
-    return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
+    const loginTarget = kind === "employer" ? "/employer/login" : "/login";
+    return <Navigate to={loginTarget} replace state={{ from: location.pathname + location.search + location.hash }} />;
   }
   if (access === "forbidden") {
     return (

@@ -6,6 +6,7 @@ import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { availableTransitions, canEditJob, companyWorkspaceApi, type JobTransition } from "@/services/api/companyWorkspaceApi";
+import { canManageJobs } from "@/features/company/companyWorkspacePermissions";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 import { EMPLOYMENT_TYPE_LABEL, WORKPLACE_TYPE_LABEL, type JobDto } from "@/services/api/apiTypes";
@@ -65,20 +66,24 @@ const EmployerJobsPage = () => {
     }
   };
 
+  const canManage = canManageJobs(active.memberRoleNames);
+
   return (
     <>
       <PageHeader
         title="Quản lý tin tuyển dụng"
         subtitle="Quản lý vòng đời tuyển dụng: bản nháp → đang tuyển dụng → tạm dừng → đóng tin."
         actions={
-          <Link
-            className={`${ui.btn} ${ui.btnPrimary}`}
-            to="/employer/jobs/new"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
-            <Plus size={16} />
-            <span>Đăng tin tuyển dụng mới</span>
-          </Link>
+          canManage ? (
+            <Link
+              className={`${ui.btn} ${ui.btnPrimary}`}
+              to="/employer/jobs/new"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Plus size={16} />
+              <span>Đăng tin tuyển dụng mới</span>
+            </Link>
+          ) : undefined
         }
       />
       <WritesDisabledNotice />

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import type { AuthUser } from "@/store/authStore";
 
@@ -28,6 +28,11 @@ const AccountDropdown = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
+  const location = useLocation();
+
+  const isEmployerContext = location.pathname.startsWith("/employer");
+  const workspaceTarget = isEmployerContext ? "/employer" : "/candidate";
+  const workspaceTitle = isEmployerContext ? "Không gian nhà tuyển dụng" : "Không gian ứng viên";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -52,7 +57,7 @@ const AccountDropdown = ({
 
   return (
     <div ref={rootRef} className={`${styles.account} ${variant === "mobile" ? styles.mobile : ""}`}>
-      <Link to="/candidate" className={styles.workspaceLink} onClick={onNavigate}>
+      <Link to={workspaceTarget} className={styles.workspaceLink} onClick={onNavigate} title={workspaceTitle}>
         Workspace
       </Link>
       <div className={styles.menuAnchor}>
@@ -74,6 +79,7 @@ const AccountDropdown = ({
         {isOpen && (
           <nav id={menuId} className={styles.menu} aria-label="Tài khoản">
             <Link to="/candidate" onClick={onNavigate}>Bảng điều khiển</Link>
+            <Link to="/employer" onClick={onNavigate}>Không gian tuyển dụng</Link>
             <Link to="/candidate/profile" onClick={onNavigate}>
               Hồ sơ <small>Đang phát triển</small>
             </Link>

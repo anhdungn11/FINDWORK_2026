@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
+import { canManageJobs } from "@/features/company/companyWorkspacePermissions";
 import { Badge } from "@/components/ui";
 import styles from "./EmployerLayout.module.css";
 
@@ -136,10 +137,12 @@ const EmployerLayout = () => {
 
         {/* RIGHT ACTIONS */}
         <div className={styles.topbarRight}>
-          <Link to="/employer/jobs/new" className={styles.postJobBtn}>
-            <Plus size={16} />
-            <span>Đăng tin mới</span>
-          </Link>
+          {canManageJobs(active?.memberRoleNames) && (
+            <Link to="/employer/jobs/new" className={styles.postJobBtn}>
+              <Plus size={16} />
+              <span>Đăng tin mới</span>
+            </Link>
+          )}
 
           {user && (
             <div className={styles.accountInfo}>

@@ -20,6 +20,7 @@ import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import { publicApi } from "@/services/api/publicApi";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
+import { canManageJobs, formatCompanyRole } from "@/features/company/companyWorkspacePermissions";
 import {
   EMPTY_JOB_FORM,
   formToPayload,
@@ -274,6 +275,33 @@ const EmployerJobFormPage = () => {
       setSavingQuestions(false);
     }
   };
+
+  const canManage = canManageJobs(active.memberRoleNames);
+  if (!canManage) {
+    return (
+      <main style={{ padding: 24, maxWidth: 640, margin: "40px auto" }} data-testid="job-permission-denied">
+        <div className={`${ui.state} ${ui.stateError}`} role="alert">
+          <h1 className={ui.stateTitle}>Bạn không có quyền đăng hoặc sửa tin tuyển dụng</h1>
+          <p className={ui.stateText}>
+            Tài khoản của bạn tại doanh nghiệp <strong>{active.name}</strong> hiện có vai trò:{" "}
+            <strong>{active.memberRoleNames.map(formatCompanyRole).join(", ") || "Người xem (Viewer)"}</strong>.
+            Vai trò này không được phân quyền tạo mới hay chỉnh sửa tin tuyển dụng.
+          </p>
+          <p className={ui.hint} style={{ margin: "12px 0 20px" }}>
+            Vui lòng liên hệ Quản trị viên hoặc Chủ sở hữu của doanh nghiệp để được nâng cấp phân quyền.
+          </p>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Link className={`${ui.btn} ${ui.btnPrimary}`} to="/employer/jobs">
+              Xem danh sách tin tuyển dụng
+            </Link>
+            <Link className={`${ui.btn}`} to="/employer">
+              Về bảng điều khiển
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (isEdit && existing.loading) return <LoadingBlock rows={3} label="Đang tải dữ liệu tin tuyển dụng..." />;
   if (isEdit && existing.error) return <ApiErrorState error={existing.error} onRetry={existing.reload} />;
