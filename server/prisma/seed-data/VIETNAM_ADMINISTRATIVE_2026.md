@@ -1,6 +1,6 @@
 # Vietnam administrative reference preparation, as of 2026-10-16
 
-`vietnam-administrative-2026-10-16.json` is a **source-preparation artifact**, separate from the existing 2025 `reference-snapshot.json`. It contains 34 reviewed provincial codes and no ward rows. It is not wired to the seed command or the Reference API. Run the offline validator from `server` with `npm run validate:admin:2026`; it never opens a database connection.
+`vietnam-administrative-2026-10-16.json` contains 34 reviewed provincial codes and no ward rows. The guarded `db:seed:reference:2026` command now previews or, after separate approval, inserts these provinces together with the 67-skill and 30-certificate catalogs. It never writes wards. Run the offline validator from `server` with `npm run validate:admin:2026`; it never opens a database connection.
 
 ## Official evidence matrix
 
@@ -30,4 +30,12 @@ Candidate Profile and Company Location writes accept UUIDs; Candidate Onboarding
 
 ## Seed gate
 
-The existing `db:seed:reference` command still rejects an unscoped `--apply` and only permits Skill/Certificate writes under its explicit scope and environment gates. This administrative artifact has no apply path. A future province/ward seed needs separate authorization, reviewed idempotent code-to-UUID logic, a complete ward source, version checks, conflict handling, and a read-only preview before any database write approval is requested.
+The existing `db:seed:reference` command still rejects an unscoped `--apply` and only permits Skill/Certificate writes under its explicit scope and environment gates. The new `db:seed:reference:2026` command can apply the reviewed 34-province subset together with Skills/Certificates after separate approval; it has no ward apply path. A future ward seed needs a complete reviewed source, code-to-UUID logic, conflict handling, and a read-only preview before any database write approval is requested.
+
+## Draft-code check and guarded release procedure
+
+The saved Candidate draft uses province `38` and ward `16531`. The reviewed province artifact and the current [Statistics Office province register](https://danhmuchanhchinh.nso.gov.vn/) identify `38` as **Tỉnh Thanh Hóa**. The [official Decision 19/2025 PDF](https://www.nso.gov.vn/wp-content/uploads/2025/07/19_2025_qd-ttg_30062025-signed-6-143-da-nen.pdf) lists `16531` as **Phường Sầm Sơn** under `38`; the [Statistics Office code list](https://www.nso.gov.vn/wp-content/uploads/2025/06/Danh-sach-va-ma-so-cac-don-vi-hanh-chinh-cap-xa.pdf) corroborates that 2025 mapping. This confirms code consistency at that baseline, not a complete 2026 ward release or proof that no later change affected `16531`. The draft remains untouched. The release command refuses to create this single ward as a partial catalog.
+
+Set `REFERENCE_SEED_BACKUP_PATH` to an absolute `.dump` outside the Git worktree, `REFERENCE_SEED_BACKUP_SHA256` to its exact SHA-256, and `REFERENCE_SEED_PG_RESTORE` to a PostgreSQL `pg_restore` executable. `NODE_ENV=development` and `DATABASE_URL` must target `127.0.0.1:5432/findwork_dev?schema=public`. From `server`, run `npm run db:seed:reference:2026 -- --dry-run`. The command verifies the recent backup hash, custom format and database name via `pg_restore --list`, checks actual SQL connection identity, sets the transaction read-only, and reports catalog and preserved business-record counts.
+
+**Separate write approval is required.** The prepared apply scope is 34 provinces from `vn-admin-2026-10-16`, 67 skills and 30 certificate types from `cp8a-2026-10-15`, and **zero wards**. Only after approval and a fresh verified backup, set `REFERENCE_SEED_ALLOW_WRITE=YES`, `REFERENCE_SEED_EXPECT_DATABASE=findwork_dev`, and `REFERENCE_SEED_APPROVED_SCOPE=skills-certificates-and-2026-provinces`; then run `npm run db:seed:reference:2026 -- --apply`. Province conflicts or inactive codes stop the transaction for history review. Existing UUIDs and unrelated records are preserved. This apply alone cannot unblock the saved draft because ward `16531` will still be absent.
