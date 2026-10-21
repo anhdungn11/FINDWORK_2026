@@ -126,6 +126,7 @@ export interface OnboardingImportBannerProps {
   draftSummary: OnboardingDraftSummary;
   onOpenImportPreview: () => void;
   onGoToOnboarding: () => void;
+  onOpenManualCreate?: () => void;
   isPreview?: boolean;
   isLiveWritesEnabled?: boolean;
 }
@@ -147,6 +148,7 @@ export interface OnboardingImportPreviewModalProps {
   draftData?: import("../../types/onboarding.types").CandidateOnboardingData | null;
   detectedUnsupportedAssets?: import("./candidateApi.types").UnsupportedOnboardingAsset[];
   privacyDifferences?: import("../adapters/candidateProfileNormalizer").PrivacyDifferenceItem[];
+  onOpenManualCreate?: () => void;
 }
 
 /** Props cho State Feedback Card (Error, Forbidden, Eligibility Unknown, etc.) */
@@ -177,6 +179,7 @@ export interface CandidateProfileViewProps {
   onRetry?: () => void;
   onGoToOnboarding?: () => void;
   onConfirmImport?: (payload: ImportOnboardingPayload) => Promise<void> | void;
+  onCreateManualProfile?: (dto: import("./candidateApi.types").CreateCandidateProfileDto) => Promise<void> | void;
   onSavePersonalInfo?: (data: Partial<FullCandidateProfileRecord>) => Promise<void> | void;
   onSaveOverview?: (data: { fullName: string; headline?: string; bio?: string | null; careerStatus: CandidateCareerStatus | null }) => Promise<void> | void;
   onAddEducation?: (item: Omit<CandidateEducationRecord, "id">) => Promise<void> | void;

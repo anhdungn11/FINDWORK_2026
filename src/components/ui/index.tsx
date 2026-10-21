@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import styles from "./ui.module.css";
 
@@ -14,8 +14,8 @@ export const PageHeader = ({ title, subtitle, actions }: { title: string; subtit
   </div>
 );
 
-export const Card = ({ title, children }: { title?: string; children: ReactNode }) => (
-  <section className={styles.card}>
+export const Card = ({ title, children, style }: { title?: string; children: ReactNode; style?: CSSProperties }) => (
+  <section className={styles.card} style={style}>
     {title && <h2 className={styles.cardTitle}>{title}</h2>}
     {children}
   </section>
@@ -29,8 +29,8 @@ const toneClass: Record<Tone, string> = {
   danger: styles.badgeDanger,
   info: styles.badgeInfo,
 };
-export const Badge = ({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) => (
-  <span className={`${styles.badge} ${toneClass[tone]}`}>{children}</span>
+export const Badge = ({ tone = "neutral", children, style }: { tone?: Tone; children: ReactNode; style?: CSSProperties }) => (
+  <span className={`${styles.badge} ${toneClass[tone]}`} style={style}>{children}</span>
 );
 
 export const JOB_STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
@@ -56,13 +56,16 @@ export const LoadingBlock = ({ rows = 3, label = "Đang tải dữ liệu" }: { 
 );
 
 export const EmptyState = ({
-  title, text, actionLabel, actionTo,
-}: { title: string; text?: string; actionLabel?: string; actionTo?: string }) => (
+  title, text, actionLabel, actionTo, onAction,
+}: { title: string; text?: string; actionLabel?: string; actionTo?: string; onAction?: () => void }) => (
   <div className={styles.state}>
     <h2 className={styles.stateTitle}>{title}</h2>
     {text && <p className={styles.stateText}>{text}</p>}
     {actionLabel && actionTo && (
       <Link className={`${styles.btn} ${styles.btnPrimary}`} to={actionTo}>{actionLabel}</Link>
+    )}
+    {actionLabel && onAction && !actionTo && (
+      <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={onAction}>{actionLabel}</button>
     )}
   </div>
 );

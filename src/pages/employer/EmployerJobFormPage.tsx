@@ -261,7 +261,7 @@ const EmployerJobFormPage = () => {
         };
       });
 
-      const currentVer = screeningData.data?.version ?? existing.data.version;
+      const currentVer = screeningData.data?.version ?? existing.data?.version ?? 1;
       const res = await companyWorkspaceApi.replaceScreeningQuestions(active.id, jobId!, currentVer, payload);
       setQuestionsNotice({
         tone: "ok",

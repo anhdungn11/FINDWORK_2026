@@ -70,7 +70,7 @@ export const useApplicationFlow = ({
     setAllDetails,
     resetDetails,
   } = useApplicationDetails({
-    initialDetails: initialDraft?.details,
+    initialDetails: initialDraft?.details as any,
   });
 
   const [
@@ -107,7 +107,7 @@ export const useApplicationFlow = ({
       if (existingDraft) {
         setCurrentStep(existingDraft.currentStep);
         setSelectedResumeId(existingDraft.selectedResumeId);
-        setAllDetails(existingDraft.details);
+        setAllDetails(existingDraft.details as any);
         setScreeningAnswers(existingDraft.screeningAnswers);
       } else {
         setCurrentStep("resume");

@@ -117,7 +117,7 @@ const JobDiscoveryCard = ({ job }: JobDiscoveryCardProps) => {
       </div>
 
       <div className={styles.skills}>
-        {job.skills.map((skill) => (
+        {(job.skills ?? []).map((skill) => (
           <span key={skill}>
             {skill}
           </span>

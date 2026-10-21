@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { VIETNAM_PROVINCES } from "../../../data/reference/locations/provinces";
 import { useWardOptions } from "../../../hooks/useWardOptions";
 import { searchProvincesWithMergers, SearchProvinceResult } from "./locationMergerReference";
-import type { LocationSelectProps, LocationValue } from "./types";
+import type { LocationSelectProps } from "./types";
 import styles from "./LocationSelect.module.css";
 
 export const LocationSelect: React.FC<LocationSelectProps> = ({

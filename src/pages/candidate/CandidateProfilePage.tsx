@@ -232,6 +232,43 @@ const CandidateProfileScenario = ({ isDev, previewParam, setSearchParams }: Cand
         isPreview={isPreview}
         isLiveWritesEnabled={integration.isLiveWritesEnabled}
         onRetry={integration.refetch}
+        onCreateManualProfile={async (dto) => {
+          if (isPreview) {
+            setDemoProfile({
+              id: "demo-profile-manual",
+              userId: user?.id ?? "demo-user",
+              fullName: dto.fullName,
+              contactEmail: accountEmail,
+              phone: dto.phone ?? null,
+              dateOfBirth: null,
+              gender: null,
+              countryCode: "VN",
+              provinceId: null,
+              wardId: null,
+              addressLine: null,
+              bio: dto.bio ?? null,
+              avatarAssetKey: null,
+              careerStatus: null,
+              isSampleData: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              education: [],
+              experience: [],
+              skills: [],
+              languages: [],
+              careerPreference: null,
+              privacySetting: {
+                searchableProfile: false,
+                showEmail: false,
+                showPhone: false,
+                allowResumeDownload: false,
+                allowJobMatching: true,
+              },
+            });
+            return;
+          }
+          await integration.handleCreateManualProfile(dto);
+        }}
         onConfirmImport={async (payload) => {
           if (isPreview) {
             // MÔ PHỎNG trong bộ nhớ: không gọi endpoint import thật, không đổi kịch bản khác

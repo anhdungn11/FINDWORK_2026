@@ -25,6 +25,7 @@ import {
 } from "../services/candidateProfileService";
 import {
   buildDraftSummaryFromDraft,
+  normalizeFullCandidateProfile,
   detectUnsupportedAssets,
   resolveBootstrapPresentationState,
   toCreateEducationDto,
@@ -49,7 +50,7 @@ import type {
   ImportOnboardingPayload,
   OnboardingDraftSummary,
 } from "../types/candidateProfile.types";
-import type { CandidateBootstrapResponse, UnsupportedOnboardingAsset } from "../types/candidateApi.types";
+import type { CandidateBootstrapResponse, CreateCandidateProfileDto, UnsupportedOnboardingAsset } from "../types/candidateApi.types";
 
 export interface UseCandidateProfileIntegrationOptions {
   isDev?: boolean;
@@ -267,6 +268,55 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
   // ---------------------------------------------------------------------------
 
   /** Xử lý Import Onboarding */
+  const handleCreateManualProfile = async (dto: CreateCandidateProfileDto) => {
+    setIsSaving(true);
+    setErrorMessage(null);
+    setValidationErrors(null);
+
+    if (!isLiveWritesEnabled()) {
+      setIsSaving(false);
+      const msg =
+        "Chức năng khởi tạo hồ sơ thủ công đang tạm khóa trong chế độ an toàn. " +
+        "Dữ liệu chưa được gửi lên cơ sở dữ liệu.";
+      setErrorMessage(msg);
+      throw new CandidateServiceError(msg, 403, "WRITE_GATE_BLOCKED");
+    }
+
+    try {
+      const createdBackendDto = await candidateProfileService.createProfile(dto);
+      const normalized = normalizeFullCandidateProfile(createdBackendDto);
+      setProfile(normalized);
+      setPresentationState("existing_profile");
+      setBootstrapData((prev) =>
+        prev
+          ? {
+              ...prev,
+              profile: {
+                state: "exists",
+                canCreateProfile: false,
+                canViewProfile: true,
+              },
+            }
+          : null
+      );
+      return normalized;
+    } catch (err: unknown) {
+      if (err instanceof CandidateServiceError) {
+        setErrorMessage(err.message);
+        if (err.details?.validationMessages) {
+          setValidationErrors({ general: err.details.validationMessages });
+        }
+      } else if (err instanceof Error) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage("Đã có lỗi xảy ra khi tạo hồ sơ.");
+      }
+      throw err;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleConfirmImport = async (payload: ImportOnboardingPayload) => {
     setIsImporting(true);
     setImportError(null);
@@ -606,6 +656,7 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
     isLiveWritesEnabled: isLiveWritesEnabled(),
     refetch: loadData,
     handleConfirmImport,
+    handleCreateManualProfile,
     handleSaveOverview,
     handleSavePersonalInfo,
     handleAddEducation,

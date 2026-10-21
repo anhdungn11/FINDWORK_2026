@@ -1,5 +1,3 @@
-import type { ProvinceOption, WardOption } from "../../../data/reference/locations/location.types";
-
 export interface LocationValue {
   provinceCode: string;
   provinceName: string;

@@ -1,5 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
-import { AlertCircle, ArrowRight } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Badge, Card, JobStatusBadge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";

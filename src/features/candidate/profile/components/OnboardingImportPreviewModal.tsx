@@ -68,6 +68,7 @@ export const OnboardingImportPreviewModal = ({
   onClose,
   onConfirmImport,
   onGoToOnboarding,
+  onOpenManualCreate,
 }: OnboardingImportPreviewModalProps) => {
   const [confirmPrivacy, setConfirmPrivacy] = useState(false);
   const [confirmPrivacyDifferences, setConfirmPrivacyDifferences] = useState(false);
@@ -216,6 +217,21 @@ export const OnboardingImportPreviewModal = ({
                 <span>Không thể hoàn tất tạo hồ sơ:</span>
               </div>
               <span style={{ fontSize: "0.8125rem" }}>{clientError || importError}</span>
+              {onOpenManualCreate && (
+                <div style={{ marginTop: "0.5rem" }}>
+                  <button
+                    type="button"
+                    className={formStyles.secondaryBtn}
+                    onClick={() => {
+                      onClose();
+                      onOpenManualCreate();
+                    }}
+                    style={{ fontSize: "0.8125rem", padding: "4px 10px" }}
+                  >
+                    Chuyển sang Tạo hồ sơ thủ công
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

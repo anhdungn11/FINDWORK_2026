@@ -16,6 +16,7 @@ import { EducationSection } from "./EducationSection";
 import { ExperienceSection } from "./ExperienceSection";
 import { OnboardingImportBanner } from "./OnboardingImportBanner";
 import { OnboardingImportPreviewModal } from "./OnboardingImportPreviewModal";
+import { ManualProfileCreateModal } from "./ManualProfileCreateModal";
 import { PersonalInfoSection } from "./PersonalInfoSection";
 import { PrivacySettingsSection } from "./PrivacySettingsSection";
 import { ProfileGuidanceChecklist } from "./ProfileGuidanceChecklist";
@@ -43,6 +44,7 @@ export const CandidateProfileView = ({
     window.location.href = "/candidate/onboarding";
   },
   onConfirmImport,
+  onCreateManualProfile,
   onSavePersonalInfo,
   onSaveOverview,
   onAddEducation,
@@ -61,6 +63,7 @@ export const CandidateProfileView = ({
   onSavePrivacy,
 }: CandidateProfileViewProps) => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
   // 1. Loading State
@@ -111,10 +114,25 @@ export const CandidateProfileView = ({
         <OnboardingImportBanner
           draftSummary={draftSummary}
           onOpenImportPreview={() => setIsImportModalOpen(true)}
+          onOpenManualCreate={() => setIsManualModalOpen(true)}
           onGoToOnboarding={onGoToOnboarding}
           isPreview={isPreview}
           isLiveWritesEnabled={isLiveWritesEnabled}
         />
+
+        {isManualModalOpen && onCreateManualProfile && (isPreview || isLiveWritesEnabled) && (
+          <ManualProfileCreateModal
+            isOpen={isManualModalOpen}
+            initialFullName={draftSummary?.fullName || ""}
+            isSaving={isSaving}
+            isLiveWritesEnabled={isLiveWritesEnabled}
+            onClose={() => setIsManualModalOpen(false)}
+            onCreate={async (dto) => {
+              await onCreateManualProfile(dto);
+              setIsManualModalOpen(false);
+            }}
+          />
+        )}
 
         {isImportModalOpen && onConfirmImport && (isPreview || isLiveWritesEnabled) && (
           <OnboardingImportPreviewModal
@@ -127,6 +145,7 @@ export const CandidateProfileView = ({
             isLiveWritesEnabled={isLiveWritesEnabled}
             onClose={() => setIsImportModalOpen(false)}
             onGoToOnboarding={onGoToOnboarding}
+            onOpenManualCreate={() => setIsManualModalOpen(true)}
             onConfirmImport={async (payload) => {
               try {
                 setImportError(null);

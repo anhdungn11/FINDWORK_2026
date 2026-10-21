@@ -311,7 +311,7 @@ const RealJobApplicationPage = ({ jobId }: RealJobApplicationPageProps) => {
   const initialDetails = useMemo(() => {
     return createInitialDetails({
       contact: {
-        fullName: initialDraft?.details?.contact?.fullName || user?.name || "",
+        fullName: initialDraft?.details?.contact?.fullName || user?.fullName || "",
         email: initialDraft?.details?.contact?.email || user?.email || "",
         phone: initialDraft?.details?.contact?.phone || "",
       },

@@ -3,14 +3,9 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Building2,
   ShieldCheck,
-  CheckCircle2,
   AlertTriangle,
   ExternalLink,
   MapPin,
-  Briefcase,
-  Globe,
-  Users,
-  Calendar,
 } from "lucide-react";
 import { Badge, Card, EmptyState, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
@@ -623,7 +618,7 @@ const EmployerProfilePage = () => {
                   gap: 8,
                 }}
               >
-                <AlertTriangle size={18} flexShrink={0} />
+                <AlertTriangle size={18} style={{ flexShrink: 0 }} />
                 <span>
                   <strong>Yêu cầu cần thiết:</strong> Vui lòng cập nhật đầy đủ <strong>Tên pháp lý</strong> và <strong>Mã số thuế</strong> trong biểu mẫu bên dưới để kích hoạt nút gửi yêu cầu xác minh.
                 </span>

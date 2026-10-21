@@ -22,6 +22,7 @@ export { ProfileQuickNav } from "./components/ProfileQuickNav";
 export { CvCenterReferenceCard } from "./components/CvCenterReferenceCard";
 export { OnboardingImportBanner } from "./components/OnboardingImportBanner";
 export { OnboardingImportPreviewModal } from "./components/OnboardingImportPreviewModal";
+export { ManualProfileCreateModal } from "./components/ManualProfileCreateModal";
 export { ProfileSkeletonLoader } from "./components/ProfileSkeletonLoader";
 export { ProfileStateFeedback } from "./components/ProfileStateFeedback";
 

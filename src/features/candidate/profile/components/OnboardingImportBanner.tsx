@@ -14,6 +14,7 @@ export const OnboardingImportBanner = ({
   draftSummary,
   onOpenImportPreview,
   onGoToOnboarding,
+  onOpenManualCreate,
   isPreview = false,
   isLiveWritesEnabled = false,
 }: OnboardingImportBannerProps) => {
@@ -64,6 +65,17 @@ export const OnboardingImportBanner = ({
         >
           <span>Sửa bản nháp</span>
         </button>
+        {onOpenManualCreate && (
+          <button
+            type="button"
+            className={formStyles.btnSecondary}
+            onClick={onOpenManualCreate}
+            disabled={importBlocked}
+            aria-label="Khởi tạo hồ sơ ứng viên thủ công"
+          >
+            <span>Tạo hồ sơ thủ công</span>
+          </button>
+        )}
         <button
           type="button"
           className={formStyles.btnPrimary}

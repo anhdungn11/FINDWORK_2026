@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Badge, EmptyState, JobStatusBadge, LoadingBlock, PageHeader, Pagination, ui } from "@/components/ui";
+import { EmptyState, JobStatusBadge, LoadingBlock, PageHeader, Pagination, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { adminApi, type AdminJobDto } from "@/services/api/adminApi";

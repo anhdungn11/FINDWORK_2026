@@ -1,5 +1,5 @@
 import { useNavigate, Navigate, Link } from "react-router-dom";
-import { LogOut, Home, User, AlertCircle, ArrowRightLeft, Mail, CheckCircle2 } from "lucide-react";
+import { LogOut, Home, User, AlertCircle, ArrowRightLeft, Mail } from "lucide-react";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import type { ApiFailure } from "@/services/api/apiFailure";

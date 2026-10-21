@@ -18,8 +18,6 @@ describe("P0-01 Backend API Contract & HTTP Method Regression", () => {
   const memberId = "m4444444-4444-4444-8444-444444444444";
   const invitationId = "i5555555-5555-4555-8555-555555555555";
   const applicationId = "a6666666-6666-4666-8666-666666666666";
-  const locationId = "l7777777-7777-4777-8777-777777777777";
-
   describe("Admin API write routes and methods", () => {
     it("adminApi.verifyCompany sends PATCH /admin/companies/:id/verification with status", async () => {
       setWorkspaceWritesForTesting(true);

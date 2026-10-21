@@ -1,21 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import {
-  Users,
-  Briefcase,
-  Calendar,
-  Mail,
-  Phone,
-  MapPin,
-  Clock,
-  FileText,
-  CheckCircle2,
-  XCircle,
-  HelpCircle,
-  ArrowRight,
-  X,
-  Filter,
-} from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { FileText, X } from "lucide-react";
 import {
   Badge,
   Card,
@@ -211,7 +196,7 @@ const EmployerApplicantsPage = () => {
               onChange={(e) => setFilter("jobId", e.target.value)}
             >
               {jobs.data.data.map((j) => {
-                const stLabel = JOB_STATUS_LABEL[j.status]?.label ?? j.status;
+                const stLabel = (j.status ? JOB_STATUS_LABEL[j.status]?.label : undefined) ?? j.status ?? "";
                 return (
                   <option key={j.id} value={j.id}>
                     {j.title} ({stLabel})
@@ -440,7 +425,6 @@ const EmployerApplicantsPage = () => {
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 {STAGES.map((s, idx) => {
                   const isCurrent = activeApplication.status === s.key;
-                  const isRejected = activeApplication.status === "REJECTED";
                   return (
                     <div key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                       <span
@@ -590,7 +574,7 @@ const EmployerApplicantsPage = () => {
                           const bc = activeApplication.resumeVersion.builderContent as Record<string, unknown>;
                           return (
                             <div style={{ display: "grid", gap: 10, fontSize: "0.85rem" }}>
-                              {bc.summary && (
+                              {Boolean(bc.summary) && (
                                 <div>
                                   <strong style={{ color: "#475569" }}>Tóm tắt chuyên môn:</strong>
                                   <div style={{ marginTop: 2 }}>{String(bc.summary)}</div>

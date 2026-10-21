@@ -9,7 +9,6 @@ import {
   normalizeJob,
   normalizeScreeningQuestions,
   normalizeCompanyApplication,
-  type ScreeningQuestionDto,
 } from "../../../services/api/apiTypes";
 import { isLiveWritesEnabled } from "../../candidate/profile/config/candidateIntegrationConfig";
 

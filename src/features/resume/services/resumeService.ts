@@ -161,9 +161,9 @@ export function normalizeBackendResume(dto: BackendResumeDto): Resume {
       id: latestVersion?.id ?? dto.id,
       versionNumber,
       file: null,
-      builderContent: (latestVersion?.builderContent as ResumeBuilderContent) ?? null,
+      builderContent: (latestVersion?.builderContent as unknown as ResumeBuilderContent) ?? null,
       templateCode: (latestVersion?.templateCode as ResumeTemplateCode) ?? null,
-      builderSettings: (latestVersion?.builderSettings as ResumeBuilderSettings) ?? null,
+      builderSettings: (latestVersion?.builderSettings as unknown as ResumeBuilderSettings) ?? null,
       createdAt: latestVersion?.createdAt ?? dto.createdAt,
     },
   };
