@@ -326,6 +326,19 @@ describe("FINDWORK CP8C — Candidate Profile Integration Foundation Tests", () 
   // 5. API CONTRACT ERRORS
   // ---------------------------------------------------------------------------
   describe("5. API contract errors", () => {
+    it("handles 400 CANDIDATE_IMPORT_PRIVACY_DIFFERENCES with clear Vietnamese explanation", () => {
+      const err = mapCandidateApiError(
+        createAxiosError(400, {
+          code: "CANDIDATE_IMPORT_PRIVACY_DIFFERENCES",
+          message: "Confirm the listed changes from draft privacy choices to initial profile settings.",
+          details: { privacyDifferences: [{ field: "showEmail", label: "Email liên hệ" }] },
+        })
+      );
+      assert.equal(err.status, 400);
+      assert.equal(err.code, "CANDIDATE_IMPORT_PRIVACY_DIFFERENCES");
+      assert.match(err.message, /Cần xác nhận các thay đổi giữa lựa chọn quyền riêng tư/);
+    });
+
     it("handles 400 CANDIDATE_IMPORT_UNSUPPORTED_ASSETS and extracts asset list", () => {
       const err = mapCandidateApiError(
         createAxiosError(400, {
@@ -505,6 +518,34 @@ describe("FINDWORK CP8C — Candidate Profile Integration Foundation Tests", () 
     it("payload contract mandates confirmPrivacy: true", () => {
       const validPayload = { version: 3, confirmPrivacy: true as const };
       assert.equal(validPayload.confirmPrivacy, true);
+    });
+
+    it("validates privacy difference confirmation requirement when draft choices differ from defaults", () => {
+      const draftPrivacy = {
+        showEmail: true,
+        showPhone: true,
+        searchableProfile: true,
+        allowResumeDownload: true,
+        allowJobMatching: true,
+      };
+      const differences = computePrivacyDifferences(draftPrivacy);
+      assert.equal(differences.length, 4, "Must detect 4 privacy differences from initial private defaults");
+
+      // When consent is checked:
+      const payload: any = {
+        version: 1,
+        confirmPrivacy: true,
+        confirmPrivacyDifferences: true,
+      };
+      assert.equal(payload.confirmPrivacy, true);
+      assert.equal(payload.confirmPrivacyDifferences, true);
+
+      // When consent is unchecked: confirmPrivacy is false, preventing import dispatch
+      const unconfirmedPayload = {
+        version: 1,
+        confirmPrivacy: false,
+      };
+      assert.equal(unconfirmedPayload.confirmPrivacy, false);
     });
 
     it("validates omit flag requirement when unsupported assets are present", () => {

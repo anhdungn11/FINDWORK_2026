@@ -111,6 +111,14 @@ export function mapCandidateApiError(error: unknown): CandidateServiceError {
 
     switch (status) {
       case 400:
+        if (serverCode === "CANDIDATE_IMPORT_PRIVACY_DIFFERENCES") {
+          return new CandidateServiceError(
+            "Cần xác nhận các thay đổi giữa lựa chọn quyền riêng tư trong bản nháp và thiết lập khởi tạo hồ sơ ban đầu.",
+            400,
+            "CANDIDATE_IMPORT_PRIVACY_DIFFERENCES",
+            details,
+          );
+        }
         if (serverCode === "CANDIDATE_IMPORT_UNSUPPORTED_ASSETS") {
           return new CandidateServiceError(
             "Cần xác nhận bỏ qua các tài nguyên chưa được lưu trữ trước khi tạo hồ sơ.",

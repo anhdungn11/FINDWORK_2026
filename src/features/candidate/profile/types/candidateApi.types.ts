@@ -392,6 +392,7 @@ export interface UpdateCandidatePrivacyDto {
 export interface ImportCandidateOnboardingDto {
   version: number;
   confirmPrivacy: true;
+  confirmPrivacyDifferences?: boolean;
   confirmOmitUnsupportedAssets?: boolean;
 }
 
@@ -419,6 +420,7 @@ export type CandidateApiErrorCode =
   | "CANDIDATE_DRAFT_INVALID"
   | "CANDIDATE_DRAFT_TOO_LARGE"
   | "CANDIDATE_DRAFT_VERSION_CONFLICT"
+  | "CANDIDATE_IMPORT_PRIVACY_DIFFERENCES"
   | "CANDIDATE_IMPORT_UNSUPPORTED_ASSETS"
   | "CANDIDATE_IMPORT_REQUEST_INVALID"
   | "CANDIDATE_ONBOARDING_EMAIL_MISMATCH"

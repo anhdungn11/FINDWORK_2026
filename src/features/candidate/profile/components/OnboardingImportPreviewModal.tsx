@@ -135,6 +135,7 @@ export const OnboardingImportPreviewModal = ({
     await onConfirmImport({
       version: draftSummary.version,
       confirmPrivacy: true,
+      confirmPrivacyDifferences: true,
       ...(hasUnsupportedAssets ? { confirmOmitUnsupportedAssets: true } : {}),
     });
   };
@@ -183,10 +184,10 @@ export const OnboardingImportPreviewModal = ({
         <div className={formStyles.modalBody}>
           <p id="import-preview-desc" style={{ margin: "0 0 0.75rem 0", fontSize: "0.8125rem", color: "var(--color-text-secondary, #64748b)", lineHeight: 1.5 }}>
             {isPreview
-              ? 'Đây là bản nháp mẫu (Phiên bản ${draftSummary.version}). Thao tác chỉ mô phỏng trong bộ nhớ trình duyệt, KHÔNG gửi yêu cầu tới máy chủ và KHÔNG lưu vào cơ sở dữ liệu.'
+              ? `Đây là bản nháp mẫu (Phiên bản ${draftSummary.version}). Thao tác chỉ mô phỏng trong bộ nhớ trình duyệt, KHÔNG gửi yêu cầu tới máy chủ và KHÔNG lưu vào cơ sở dữ liệu.`
               : importBlocked
-                ? 'Bản nháp Onboarding (Phiên bản ${draftSummary.version}) đang được hiển thị để bạn xem lại. Việc tạo hồ sơ chính thức chưa được bật nên dữ liệu chưa được chuyển giao.'
-                : 'Dữ liệu từ bản nháp Onboarding (Phiên bản ${draftSummary.version}) sẽ được dùng để tạo hồ sơ ứng viên chính thức. Bản nháp gốc không bị xóa bởi thao tác này.'}
+                ? `Bản nháp Onboarding (Phiên bản ${draftSummary.version}) đang được hiển thị để bạn xem lại. Việc tạo hồ sơ chính thức chưa được bật nên dữ liệu chưa được chuyển giao.`
+                : `Dữ liệu từ bản nháp Onboarding (Phiên bản ${draftSummary.version}) sẽ được dùng để tạo hồ sơ ứng viên chính thức. Bản nháp gốc không bị xóa bởi thao tác này.`}
           </p>
 
           {importBlocked && (
@@ -457,7 +458,7 @@ export const OnboardingImportPreviewModal = ({
                   aria-invalid={!confirmPrivacy && Boolean(clientError)}
                 />
                 <span style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
-                  Tôi đã đọc và đồng ý với thiết lập quyền riêng tư ban đầu cho hồ sơ mới.
+                  Tôi đã đọc và đồng ý với thiết lập quyền riêng tư ban đầu cho hồ sơ mới{differences.length > 0 ? " (bao gồm các khác biệt nêu trên)" : ""}.
                 </span>
               </label>
             </div>

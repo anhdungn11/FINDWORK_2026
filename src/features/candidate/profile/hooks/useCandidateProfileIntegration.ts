@@ -286,6 +286,7 @@ export function useCandidateProfileIntegration(options: UseCandidateProfileInteg
       const created = await candidateProfileService.importOnboarding({
         version: payload.version,
         confirmPrivacy: true,
+        confirmPrivacyDifferences: payload.confirmPrivacyDifferences,
         confirmOmitUnsupportedAssets: payload.confirmOmitUnsupportedAssets,
       });
 

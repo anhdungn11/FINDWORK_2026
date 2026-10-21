@@ -246,6 +246,7 @@ export interface FullCandidateProfileRecord {
 export interface ImportOnboardingPayload {
   version: number;
   confirmPrivacy: boolean;
+  confirmPrivacyDifferences?: boolean;
   confirmOmitUnsupportedAssets?: boolean;
 }
 
