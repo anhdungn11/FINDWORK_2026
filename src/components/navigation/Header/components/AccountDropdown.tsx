@@ -79,11 +79,11 @@ const AccountDropdown = ({
         {isOpen && (
           <nav id={menuId} className={styles.menu} aria-label="Tài khoản">
             <Link to="/candidate" onClick={onNavigate}>Bảng điều khiển</Link>
-            <Link to="/employer" onClick={onNavigate}>Không gian tuyển dụng</Link>
-            <Link to="/candidate/profile" onClick={onNavigate}>
-              Hồ sơ <small>Đang phát triển</small>
-            </Link>
+            <Link to="/candidate/profile" onClick={onNavigate}>Hồ sơ cá nhân</Link>
             <Link to="/cv" onClick={onNavigate}>Trung tâm CV</Link>
+            <Link to="/candidate/saved-jobs" onClick={onNavigate}>Việc làm đã lưu</Link>
+            <Link to="/candidate/applications" onClick={onNavigate}>Lịch sử ứng tuyển</Link>
+            <Link to="/employer" onClick={onNavigate}>Không gian tuyển dụng</Link>
             <button type="button" className={styles.logoutButton} onClick={onLogout}>
               Đăng xuất
             </button>
