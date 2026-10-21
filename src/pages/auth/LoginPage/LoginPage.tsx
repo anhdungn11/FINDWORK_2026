@@ -24,12 +24,12 @@ const LoginPage = () => {
   };
   return (
     <AuthShell
-      eyebrow={isEmployer ? "DÀNH CHO NHÀ TUYỂN DỤNG" : "TÀI KHOẢN ỨNG VIÊN"}
+      eyebrow={isEmployer ? "DÀNH CHO NHÀ TUYỂN DỤNG" : "TÀI KHOẢN FINDWORK"}
       title={isEmployer ? "Đăng nhập nhà tuyển dụng" : "Đăng nhập FINDWORK"}
       description={
         isEmployer
           ? "Truy cập không gian làm việc doanh nghiệp để quản lý tin tuyển dụng và tìm kiếm ứng viên."
-          : "Tiếp tục quản lý hồ sơ, CV và những cơ hội nghề nghiệp của bạn."
+          : "Một tài khoản duy nhất để quản lý hồ sơ ứng viên và không gian tuyển dụng doanh nghiệp."
       }
       footer={
         <AuthFooterText>

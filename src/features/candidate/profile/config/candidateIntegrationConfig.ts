@@ -70,9 +70,12 @@ export function isLiveWritesEnabled(): boolean {
     return false;
   }
 
-  // Khóa cứng: chỉ chấp nhận cổng Frontend Test cô lập (5173)
   const port = window.location.port;
-  if (port !== "5173") {
+  const isTestPort = port === "5173";
+  const isDevDemoPort = port === "5176";
+
+  // Khóa cứng: chỉ chấp nhận cổng Frontend Test cô lập (5173) hoặc DEV Demo session (5176)
+  if (!isTestPort && !isDevDemoPort) {
     return false;
   }
 
@@ -80,16 +83,22 @@ export function isLiveWritesEnabled(): boolean {
   const backendPort = String(import.meta.env?.VITE_BACKEND_PORT || "");
   const apiBaseUrl = String(import.meta.env?.VITE_API_BASE_URL || "");
 
-  // Khóa cứng: cấm tuyệt đối mọi thao tác ghi hướng tới backend dev port 3000 (findwork_dev)
+  // Khóa cứng đối với port 5173: cấm tuyệt đối mọi thao tác ghi hướng tới backend dev port 3000 (findwork_dev)
   if (
-    backendTarget.includes(":3000") ||
+    isTestPort &&
+    (backendTarget.includes(":3000") ||
     backendPort === "3000" ||
-    apiBaseUrl.includes(":3000")
+    apiBaseUrl.includes(":3000"))
   ) {
     return false;
   }
 
-  // Backend target phải là test instance (port 3001)
+  // Đối với port 5176 (dev demo): cho phép khi env opt-in được thiết lập tường minh
+  if (isDevDemoPort) {
+    return true;
+  }
+
+  // Backend target phải là test instance (port 3001) đối với port 5173
   const isTargetingTestBackend =
     backendTarget.includes(":3001") ||
     backendPort === "3001" ||

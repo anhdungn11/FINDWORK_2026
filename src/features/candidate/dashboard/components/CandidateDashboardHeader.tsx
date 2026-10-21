@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Briefcase, FileText, Sparkles, User as UserIcon } from "lucide-react";
+import { Briefcase, Building2, FileText, Sparkles, User as UserIcon } from "lucide-react";
 import type { AuthUser } from "../../../../store/authStore";
 import { formatUserRole, formatUserStatus } from "../utils/dashboardProgress";
 import styles from "../styles/CandidateDashboard.module.css";
@@ -26,7 +26,7 @@ export const CandidateDashboardHeader = ({
       <div className={styles.headerMain}>
         <span className={styles.headerEyebrow}>
           <Sparkles size={14} aria-hidden="true" />
-          Bảng điều khiển ứng viên
+          Không gian ứng viên
         </span>
 
         <h1 className={styles.headerTitle}>{greeting}</h1>
@@ -61,6 +61,14 @@ export const CandidateDashboardHeader = ({
       </div>
 
       <div className={styles.headerActions}>
+        <Link
+          to="/employer"
+          className={styles.buttonSecondary}
+          title="Chuyển sang không gian nhà tuyển dụng để quản lý doanh nghiệp và tin tuyển dụng"
+        >
+          <Building2 size={15} aria-hidden="true" />
+          Tuyển dụng
+        </Link>
         <Link to="/cv" className={styles.buttonSecondary}>
           <FileText size={15} aria-hidden="true" />
           CV của tôi

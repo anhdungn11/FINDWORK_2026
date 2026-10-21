@@ -23,8 +23,12 @@ export const isWorkspaceWritesEnabled = (): boolean => {
 
   // 2. Kiểm tra an toàn tại browser runtime
   if (typeof window !== "undefined") {
-    // Cổng frontend bắt buộc là 5173 (cô lập cho test)
-    if (window.location.port !== "5173") {
+    const port = window.location.port;
+    const isTestPort = port === "5173";
+    const isDevDemoPort = port === "5176";
+
+    // Chỉ cho phép chạy trên port 5173 (test instance) hoặc 5176 (dev demo session)
+    if (!isTestPort && !isDevDemoPort) {
       return false;
     }
 
@@ -32,16 +36,22 @@ export const isWorkspaceWritesEnabled = (): boolean => {
     const backendPort = String(import.meta.env?.VITE_BACKEND_PORT || "");
     const apiBaseUrl = String(import.meta.env?.VITE_API_BASE_URL || "");
 
-    // Khóa cứng: cấm tuyệt đối mọi thao tác ghi hướng tới backend port 3000 (findwork_dev)
+    // Khóa cứng đối với port 5173: cấm tuyệt đối mọi thao tác ghi hướng tới backend port 3000 (findwork_dev)
     if (
-      backendTarget.includes(":3000") ||
+      isTestPort &&
+      (backendTarget.includes(":3000") ||
       backendPort === "3000" ||
-      apiBaseUrl.includes(":3000")
+      apiBaseUrl.includes(":3000"))
     ) {
       return false;
     }
 
-    // Backend target phải là test instance (port 3001)
+    // Đối với port 5176 (dev demo có kiểm soát): cho phép khi env opt-in được bật tường minh
+    if (isDevDemoPort) {
+      return true;
+    }
+
+    // Backend target phải là test instance (port 3001) đối với port 5173
     const isTargetingTestBackend =
       backendTarget.includes(":3001") ||
       backendPort === "3001" ||

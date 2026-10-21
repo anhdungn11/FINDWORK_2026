@@ -59,6 +59,7 @@ const DesktopActions = ({
         isOpen={isEmployerOpen}
         onToggle={onEmployerToggle}
         onClose={onClose}
+        isAuthenticated={authView === "authenticated"}
       />
 
       <span className={styles.actionDivider} />

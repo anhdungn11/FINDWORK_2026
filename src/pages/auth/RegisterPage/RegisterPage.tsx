@@ -21,22 +21,32 @@ const RegisterPage = () => {
   if (isRegistered) {
     return (
       <AuthShell
-        eyebrow="TÀI KHOẢN ỨNG VIÊN"
+        eyebrow="TÀI KHOẢN FINDWORK"
         title="Đã tạo tài khoản FINDWORK"
-        description="Tài khoản đã được tạo. Bạn có thể tiếp tục hoàn thiện hồ sơ. Một số tính năng có thể yêu cầu xác minh email."
+        description="Tài khoản đã sẵn sàng. Bạn có thể tiếp tục hoàn thiện hồ sơ ứng viên hoặc chuyển sang không gian doanh nghiệp."
       >
-        <p role="status">Đăng ký thành công. Họ tên sẽ được bổ sung trong bước hoàn thiện hồ sơ.</p>
-        <p><Link to="/candidate/onboarding">Tiếp tục hoàn thiện hồ sơ</Link></p>
+        <p role="status">Đăng ký thành công. Họ tên sẽ được bổ sung trong bước tiếp theo.</p>
+        <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
+          <Link to="/candidate/onboarding" className={styles.termsLink}>Tiếp tục hoàn thiện hồ sơ</Link>
+          <span>•</span>
+          <Link to="/employer/onboarding" className={styles.termsLink}>Đăng ký doanh nghiệp</Link>
+        </div>
       </AuthShell>
     );
   }
 
   return (
     <AuthShell
-      eyebrow="TÀI KHOẢN ỨNG VIÊN"
+      eyebrow="TÀI KHOẢN FINDWORK"
       title="Tạo tài khoản FINDWORK"
-      description="Đăng ký bằng email và mật khẩu. Bạn có thể bổ sung họ tên khi hoàn thiện hồ sơ."
-      footer={<AuthFooterText>Đã có tài khoản? <Link to="/login">Đăng nhập</Link></AuthFooterText>}
+      description="Một tài khoản duy nhất để tìm việc làm hoặc khởi tạo không gian tuyển dụng doanh nghiệp."
+      footer={
+        <AuthFooterText>
+          Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+          {" | "}
+          Tuyển dụng? <Link to="/employer/register">Đăng ký doanh nghiệp</Link>
+        </AuthFooterText>
+      }
     >
       <AuthForm onSubmit={handleSubmit}>
         <AuthField

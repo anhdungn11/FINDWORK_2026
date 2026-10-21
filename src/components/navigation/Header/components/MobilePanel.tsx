@@ -42,6 +42,8 @@ const MobilePanel = ({
     return null;
   }
 
+  const isAuthenticated = authView === "authenticated" && user !== null;
+
   return (
     <div className={styles.mobilePanel}>
       <div
@@ -128,25 +130,47 @@ const MobilePanel = ({
             Nhà tuyển dụng
           </span>
 
-          <Link
-            to="/employer/login"
-            className={styles.mobileActionLink}
-            onClick={onClose}
-          >
-            Đăng nhập nhà tuyển dụng
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                to="/employer"
+                className={styles.mobileActionLink}
+                onClick={onClose}
+              >
+                Không gian tuyển dụng
+              </Link>
 
-          <Link
-            to="/employer/register"
-            className={styles.mobileActionLink}
-            onClick={onClose}
-          >
-            Đăng ký doanh nghiệp
-          </Link>
+              <Link
+                to="/employer/onboarding"
+                className={styles.mobileActionLink}
+                onClick={onClose}
+              >
+                Đăng ký doanh nghiệp
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/employer/login"
+                className={styles.mobileActionLink}
+                onClick={onClose}
+              >
+                Đăng nhập nhà tuyển dụng
+              </Link>
+
+              <Link
+                to="/employer/register"
+                className={styles.mobileActionLink}
+                onClick={onClose}
+              >
+                Đăng ký doanh nghiệp
+              </Link>
+            </>
+          )}
         </div>
 
         <div className={`${styles.mobileAuth} ${authView === "anonymous" ? "" : styles.mobileAuthSingle}`}>
-          {authView === "authenticated" && user ? (
+          {isAuthenticated && user ? (
             <AccountDropdown
               user={user}
               variant="mobile"

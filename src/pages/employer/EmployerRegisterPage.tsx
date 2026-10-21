@@ -31,7 +31,7 @@ const EmployerRegisterPage = () => {
       <AuthShell
         eyebrow="DÀNH CHO NHÀ TUYỂN DỤNG"
         title="Đã tạo tài khoản tuyển dụng"
-        description="Tài khoản đã sẵn sàng. Hãy tiếp tục bước khởi tạo doanh nghiệp để bắt đầu đăng tin tuyển dụng."
+        description="Tài khoản FINDWORK đã sẵn sàng. Hãy tiếp tục bước khởi tạo doanh nghiệp để bắt đầu đăng tin tuyển dụng."
       >
         <p role="status">Đăng ký thành công. Bước tiếp theo: Thiết lập hồ sơ doanh nghiệp của bạn.</p>
         <p><Link to="/employer/onboarding">Tiếp tục khởi tạo doanh nghiệp</Link></p>
@@ -43,8 +43,8 @@ const EmployerRegisterPage = () => {
     <AuthShell
       eyebrow="DÀNH CHO NHÀ TUYỂN DỤNG"
       title="Đăng ký tài khoản doanh nghiệp"
-      description="Tạo tài khoản để khởi tạo doanh nghiệp, quản lý tin đăng và tiếp cận các ứng viên tài năng trên FINDWORK."
-      footer={<AuthFooterText>Đã có tài khoản tuyển dụng? <Link to="/employer/login">Đăng nhập</Link></AuthFooterText>}
+      description="Tạo một tài khoản FINDWORK để khởi tạo doanh nghiệp, quản lý tin đăng tuyển dụng và tìm kiếm ứng viên."
+      footer={<AuthFooterText>Đã có tài khoản? <Link to="/employer/login">Đăng nhập</Link></AuthFooterText>}
     >
       <AuthForm onSubmit={handleSubmit}>
         <AuthField

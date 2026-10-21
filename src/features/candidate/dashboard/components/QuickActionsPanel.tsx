@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Briefcase, FileText, Layers, User } from "lucide-react";
+import { ArrowUpRight, Briefcase, Building2, FileText, Layers, User } from "lucide-react";
 import styles from "../styles/CandidateDashboard.module.css";
 
 const QUICK_ACTIONS = [
@@ -30,6 +30,13 @@ const QUICK_ACTIONS = [
     href: "/jobs",
     icon: Briefcase,
     badge: "Đa ngành",
+  },
+  {
+    title: "Không gian nhà tuyển dụng",
+    description: "Chuyển sang workspace doanh nghiệp để khởi tạo công ty, đăng tin và quản lý tuyển dụng.",
+    href: "/employer",
+    icon: Building2,
+    badge: "Doanh nghiệp",
   },
 ];
 
