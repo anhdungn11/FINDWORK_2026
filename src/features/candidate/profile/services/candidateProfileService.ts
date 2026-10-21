@@ -85,7 +85,7 @@ export function mapCandidateApiError(error: unknown): CandidateServiceError {
     const axiosError = error as AxiosError<{
       code?: string;
       message?: string | string[];
-      details?: { unsupportedAssets?: UnsupportedOnboardingAsset[] };
+      details?: { unsupportedAssets?: UnsupportedOnboardingAsset[]; catalog?: string };
       catalog?: string;
     }>;
 
@@ -95,7 +95,7 @@ export function mapCandidateApiError(error: unknown): CandidateServiceError {
     const rawMessage = data?.message;
     const details: CandidateServiceErrorDetails = {
       unsupportedAssets: data?.details?.unsupportedAssets,
-      catalog: data?.catalog,
+      catalog: data?.details?.catalog ?? data?.catalog,
       raw: data,
     };
 
@@ -192,7 +192,7 @@ export function mapCandidateApiError(error: unknown): CandidateServiceError {
 
       case 503:
         return new CandidateServiceError(
-          `Danh mục tham chiếu hệ thống (${data?.catalog || "hệ thống"}) tạm thời chưa sẵn sàng. Vui lòng thử lại sau.`,
+          `Danh mục tham chiếu hệ thống (${details.catalog || "hệ thống"}) tạm thời chưa sẵn sàng. Vui lòng thử lại sau.`,
           503,
           "CANDIDATE_REFERENCE_CATALOG_UNAVAILABLE",
           details,

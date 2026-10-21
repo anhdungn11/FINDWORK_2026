@@ -612,7 +612,7 @@ describe("FINDWORK CP8C — Candidate Profile Integration Foundation Tests", () 
       const err = mapCandidateApiError(
         createAxiosError(503, {
           code: "CANDIDATE_REFERENCE_CATALOG_UNAVAILABLE",
-          catalog: "jobCategory",
+          details: { catalog: "jobCategory" },
           message: "jobCategory catalog is not loaded.",
         })
       );

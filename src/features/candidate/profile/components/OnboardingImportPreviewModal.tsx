@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import type { OnboardingImportPreviewModalProps } from "../types/uiProfileProps.types";
 import { useModalAccessibility } from "../utils/useModalAccessibility";
+import { prepareImportRequest } from "../utils/importConsent";
 import {
   computePrivacyDifferences,
   detectUnsupportedAssets,
@@ -68,16 +69,18 @@ export const OnboardingImportPreviewModal = ({
   onConfirmImport,
   onGoToOnboarding,
 }: OnboardingImportPreviewModalProps) => {
-  const [confirmPrivacy, setConfirmPrivacy] = useState(true);
+  const [confirmPrivacy, setConfirmPrivacy] = useState(false);
+  const [confirmPrivacyDifferences, setConfirmPrivacyDifferences] = useState(false);
   const [confirmOmitAssets, setConfirmOmitAssets] = useState(false);
   const [clientError, setClientError] = useState<string | null>(null);
 
   // Thật + ghi bị khóa => không được gửi POST. Demo luôn là mô phỏng trong bộ nhớ.
-  const importBlocked = !isPreview && !isLiveWritesEnabled;
+  const importBlocked = !isPreview && (!isLiveWritesEnabled || !draftData);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
   const privacyCheckboxId = useId();
+  const privacyDifferencesCheckboxId = useId();
   const omitAssetsCheckboxId = useId();
 
   // Nhận diện tài nguyên chưa hỗ trợ
@@ -104,40 +107,43 @@ export const OnboardingImportPreviewModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      setConfirmPrivacy(true);
+      setConfirmPrivacy(false);
+      setConfirmPrivacyDifferences(false);
       setConfirmOmitAssets(false);
       setClientError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, draftSummary.version]);
 
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
     if (importBlocked) {
-      setClientError("Tính năng tạo hồ sơ chính thức chưa được bật. Chưa có yêu cầu nào được gửi tới máy chủ.");
+      setClientError(!draftData
+        ? "Không thể tải bản nháp đã lưu. Vui lòng tải lại trang trước khi xác nhận."
+        : "Tính năng tạo hồ sơ chính thức chưa được bật. Chưa có yêu cầu nào được gửi tới máy chủ.");
       return;
     }
 
-    if (!confirmPrivacy) {
-      setClientError("Bạn cần xác nhận đã nắm rõ thiết lập quyền riêng tư ban đầu để tiếp tục.");
-      return;
-    }
-
-    if (hasUnsupportedAssets && !confirmOmitAssets) {
-      setClientError(
-        "Bạn cần tích chọn xác nhận đồng ý bỏ qua các tệp chưa được lưu trữ (Ảnh đại diện / CV) để tiếp tục khởi tạo hồ sơ."
-      );
+    const prepared = prepareImportRequest({
+      version: draftSummary.version,
+      confirmPrivacy,
+      confirmPrivacyDifferences,
+      confirmOmitUnsupportedAssets: confirmOmitAssets,
+      hasPrivacyDifferences: differences.length > 0,
+      hasUnsupportedAssets,
+    });
+    if (!prepared.ok) {
+      const messages = {
+        privacy: "Bạn cần xác nhận đã nắm rõ thiết lập quyền riêng tư ban đầu để tiếp tục.",
+        differences: "Bạn cần xác nhận riêng các thay đổi quyền riêng tư so với bản nháp.",
+        assets: "Bạn cần xác nhận riêng việc bỏ qua tệp CV hoặc ảnh chưa được lưu trữ.",
+      };
+      setClientError(messages[prepared.missing]);
       return;
     }
 
     setClientError(null);
-
-    await onConfirmImport({
-      version: draftSummary.version,
-      confirmPrivacy: true,
-      confirmPrivacyDifferences: true,
-      ...(hasUnsupportedAssets ? { confirmOmitUnsupportedAssets: true } : {}),
-    });
+    await onConfirmImport(prepared.payload);
   };
 
 
@@ -316,7 +322,7 @@ export const OnboardingImportPreviewModal = ({
                         <strong>{asset === "avatar" ? "Ảnh đại diện (Avatar)" : "Tệp đính kèm CV (Resume)"}:</strong>{" "}
                         {asset === "avatar"
                           ? "Sẽ không tạo ảnh đại diện trên máy chủ; hồ sơ sử dụng chữ viết tắt mặc định."
-                          : "Sẽ không tạo tệp CV lưu trữ; bạn có thể tải lên tệp CV chuẩn tại CV Center sau khi tạo hồ sơ."}
+                          : "Sẽ không tạo tệp CV lưu trữ; sau khi tạo hồ sơ, bạn cần tạo và lưu CV bằng CV Builder trước khi ứng tuyển."}
                       </li>
                     ))}
                   </ul>
@@ -436,6 +442,21 @@ export const OnboardingImportPreviewModal = ({
                     </li>
                   ))}
                 </ul>
+                <label className={formStyles.checkboxRow} htmlFor={privacyDifferencesCheckboxId} style={{ marginTop: "0.5rem" }}>
+                  <input
+                    id={privacyDifferencesCheckboxId}
+                    type="checkbox"
+                    className={formStyles.checkboxInput}
+                    checked={confirmPrivacyDifferences}
+                    onChange={(e) => {
+                      setConfirmPrivacyDifferences(e.target.checked);
+                      if (clientError) setClientError(null);
+                    }}
+                  />
+                  <span style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
+                    Tôi đã xem từng khác biệt nêu trên và đồng ý tạo hồ sơ với thiết lập ban đầu thay cho lựa chọn trong bản nháp.
+                  </span>
+                </label>
               </div>
             ) : (
               <p style={{ margin: 0, fontSize: "0.6875rem", color: "var(--color-text-secondary, #64748b)" }}>
@@ -458,7 +479,7 @@ export const OnboardingImportPreviewModal = ({
                   aria-invalid={!confirmPrivacy && Boolean(clientError)}
                 />
                 <span style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
-                  Tôi đã đọc và đồng ý với thiết lập quyền riêng tư ban đầu cho hồ sơ mới{differences.length > 0 ? " (bao gồm các khác biệt nêu trên)" : ""}.
+                  Tôi đã đọc và đồng ý với thiết lập quyền riêng tư ban đầu cho hồ sơ mới.
                 </span>
               </label>
             </div>
@@ -487,7 +508,7 @@ export const OnboardingImportPreviewModal = ({
             type="button"
             className={formStyles.btnPrimary}
             onClick={handleConfirm}
-            disabled={importBlocked || isImporting || !confirmPrivacy || (hasUnsupportedAssets && !confirmOmitAssets)}
+            disabled={importBlocked || isImporting || !confirmPrivacy || (differences.length > 0 && !confirmPrivacyDifferences) || (hasUnsupportedAssets && !confirmOmitAssets)}
             aria-disabled={importBlocked || undefined}
             aria-busy={isImporting}
           >
