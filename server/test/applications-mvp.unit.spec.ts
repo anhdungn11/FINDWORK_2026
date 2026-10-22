@@ -2,6 +2,7 @@ import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { CandidateApplicationsController, CompanyApplicationsController } from "../src/modules/applications/applications.controller";
 import { ApplicationsService } from "../src/modules/applications/applications.service";
 import { AccessTokenGuard } from "../src/modules/auth/guards/access-token.guard";
+import { AccountTypeGuard } from "../src/modules/auth/guards/account-type.guard";
 import { PermissionGuard } from "../src/modules/authorization/guards/permission.guard";
 import { CompanyPermissionGuard } from "../src/modules/authorization/guards/company-permission.guard";
 import { REQUIRED_PERMISSIONS_KEY } from "../src/modules/authorization/decorators/require-permissions.decorator";
@@ -72,7 +73,7 @@ describe("applications MVP security", () => {
     }
   });
   it("requires system own-scope and company-scoped permission guards", () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, CandidateApplicationsController)).toEqual([AccessTokenGuard, PermissionGuard]);
+    expect(Reflect.getMetadata(GUARDS_METADATA, CandidateApplicationsController)).toEqual([AccessTokenGuard, AccountTypeGuard, PermissionGuard]);
     expect(Reflect.getMetadata(GUARDS_METADATA, CompanyApplicationsController)).toEqual([AccessTokenGuard, CompanyPermissionGuard]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, CandidateApplicationsController.prototype.submit)).toEqual(["application.create"]);
     expect(Reflect.getMetadata(REQUIRED_COMPANY_PERMISSIONS_KEY, CompanyApplicationsController.prototype.review)).toEqual(["application.review"]);

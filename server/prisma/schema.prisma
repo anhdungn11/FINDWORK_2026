@@ -211,6 +211,12 @@ enum RoleKind {
   COMPANY
 }
 
+enum AccountType {
+  CANDIDATE
+  EMPLOYER
+  LEGACY_UNCLASSIFIED
+}
+
 enum PermissionEffect {
   ALLOW
   DENY
@@ -235,6 +241,7 @@ model User {
   emailNormalized String     @unique @db.VarChar(320)
   passwordHash    String     @db.VarChar(255)
   status          UserStatus @default(ACTIVE)
+  accountType     AccountType?
   emailVerifiedAt DateTime?  @db.Timestamptz(6)
   createdAt       DateTime   @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime   @updatedAt @db.Timestamptz(6)

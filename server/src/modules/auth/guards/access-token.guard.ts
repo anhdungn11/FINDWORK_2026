@@ -85,6 +85,7 @@ export class AccessTokenGuard implements CanActivate {
         status: "ACTIVE",
         emailVerified:
           session.user.emailVerifiedAt !== null,
+        accountType: session.user.accountType ?? "LEGACY_UNCLASSIFIED",
       },
     };
 

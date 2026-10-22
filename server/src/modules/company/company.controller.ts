@@ -10,6 +10,7 @@ import {
 } from "@nestjs/swagger";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
+import { AccountTypeGuard, RequireAccountTypes } from "../auth/guards/account-type.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { CompanyService } from "./company.service";
 import { CompanyMediaService } from "./company-media.service";
@@ -65,7 +66,8 @@ export class CompanyController {
   @ApiCreatedResponse({ type: CompanyCreatedResponseDto })
   @ApiUnauthorizedResponse({ description: "A valid access token is required." })
   @ApiConflictResponse({ description: "Company slug already exists." })
-  @UseGuards(AccessTokenGuard)
+  @UseGuards(AccessTokenGuard, AccountTypeGuard)
+  @RequireAccountTypes("EMPLOYER", "LEGACY_UNCLASSIFIED")
   @Post()
   create(
     @CurrentAuth() auth: AuthenticatedPrincipal,

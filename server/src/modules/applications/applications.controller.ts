@@ -2,6 +2,7 @@ import { Body, Controller, ForbiddenException, Get, Param, ParseUUIDPipe, Patch,
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
+import { AccountTypeGuard, RequireAccountTypes } from "../auth/guards/account-type.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
@@ -24,7 +25,8 @@ function requireCompany(req: CompanyAuthorizedRequest, code: "application.view" 
 @ApiTags("Candidate Applications")
 @ApiBearerAuth("access-token")
 @Controller()
-@UseGuards(AccessTokenGuard, PermissionGuard)
+@UseGuards(AccessTokenGuard, AccountTypeGuard, PermissionGuard)
+@RequireAccountTypes("CANDIDATE", "LEGACY_UNCLASSIFIED")
 export class CandidateApplicationsController {
   constructor(private readonly applications: ApplicationsService) {}
 

@@ -4,6 +4,7 @@ import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { Prisma } from "../src/generated/prisma/client";
 import { AccessTokenGuard } from "../src/modules/auth/guards/access-token.guard";
+import { AccountTypeGuard } from "../src/modules/auth/guards/account-type.guard";
 import { REQUIRED_PERMISSIONS_KEY } from "../src/modules/authorization/decorators/require-permissions.decorator";
 import { PermissionGuard } from "../src/modules/authorization/guards/permission.guard";
 import { CandidateSavedJobsController } from "../src/modules/candidate/candidate-saved-jobs.controller";
@@ -41,7 +42,7 @@ function fakeDb() {
 
 describe("candidate saved jobs", () => {
   it("requires authentication and saved_job.manage OWN on every route", async () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, CandidateSavedJobsController)).toEqual([AccessTokenGuard, PermissionGuard]);
+    expect(Reflect.getMetadata(GUARDS_METADATA, CandidateSavedJobsController)).toEqual([AccessTokenGuard, AccountTypeGuard, PermissionGuard]);
     for (const method of ["save", "list", "status", "remove"] as const) {
       expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, CandidateSavedJobsController.prototype[method]))
         .toEqual(["saved_job.manage"]);

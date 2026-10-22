@@ -4,6 +4,7 @@ import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 interface CreateRegisteredUserInput {
   email: string;
   emailNormalized: string;
+  accountType: "CANDIDATE" | "EMPLOYER" | "LEGACY_UNCLASSIFIED";
   passwordHash: string;
   sessionId: string;
   refreshTokenHash: string;
@@ -36,6 +37,7 @@ export class AuthRepository {
         passwordHash: true,
         status: true,
         emailVerifiedAt: true,
+        accountType: true,
       },
     });
   }
@@ -44,7 +46,7 @@ export class AuthRepository {
     input: CreateRegisteredUserInput,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      const candidateRole = await tx.role.findUnique({
+      const candidateRole = input.accountType === "EMPLOYER" ? null : await tx.role.findUnique({
         where: {
           systemCode: "CANDIDATE",
         },
@@ -55,11 +57,8 @@ export class AuthRepository {
         },
       });
 
-      if (
-        !candidateRole ||
-        candidateRole.kind !== "SYSTEM" ||
-        !candidateRole.isActive
-      ) {
+      if (input.accountType !== "EMPLOYER" &&
+        (!candidateRole || candidateRole.kind !== "SYSTEM" || !candidateRole.isActive)) {
         throw new Error(
           "CANDIDATE system role is not provisioned or active.",
         );
@@ -70,22 +69,22 @@ export class AuthRepository {
           email: input.email,
           emailNormalized: input.emailNormalized,
           passwordHash: input.passwordHash,
+          accountType: input.accountType,
         },
         select: {
           id: true,
           email: true,
           status: true,
           emailVerifiedAt: true,
+          accountType: true,
         },
       });
 
-      await tx.systemUserRole.create({
-        data: {
-          userId: user.id,
-          roleId: candidateRole.id,
-          assignedByUserId: null,
-        },
-      });
+      if (candidateRole) {
+        await tx.systemUserRole.create({ data: {
+          userId: user.id, roleId: candidateRole.id, assignedByUserId: null,
+        } });
+      }
 
       await tx.authSession.create({
         data: {
@@ -146,6 +145,7 @@ export class AuthRepository {
             email: true,
             status: true,
             emailVerifiedAt: true,
+            accountType: true,
           },
         },
       },
@@ -168,6 +168,7 @@ export class AuthRepository {
             email: true,
             status: true,
             emailVerifiedAt: true,
+            accountType: true,
           },
         },
       },

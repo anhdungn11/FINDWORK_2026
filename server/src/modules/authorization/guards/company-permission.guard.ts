@@ -42,10 +42,6 @@ export class CompanyPermissionGuard
         ],
       ) ?? [];
 
-    if (requiredPermissions.length === 0) {
-      return true;
-    }
-
     const request =
       context.switchToHttp().getRequest<
         CompanyAuthorizedRequest
@@ -56,6 +52,17 @@ export class CompanyPermissionGuard
         code: "AUTH_ACCESS_TOKEN_REQUIRED",
         message: "Access token is required.",
       });
+    }
+
+    if (request.auth.user.accountType === "CANDIDATE") {
+      throw new ForbiddenException({
+        code: "AUTH_ACCOUNT_TYPE_FORBIDDEN",
+        message: "Candidate accounts cannot manage companies.",
+      });
+    }
+
+    if (requiredPermissions.length === 0) {
+      return true;
     }
 
     const companyIdParam = request.params?.companyId;
