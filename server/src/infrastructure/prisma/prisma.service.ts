@@ -15,6 +15,9 @@ export class PrismaService
   constructor(configService: ConfigService) {
     const adapter = new PrismaPg({
       connectionString: configService.getOrThrow<string>("DATABASE_URL"),
+      // PrismaPg converts timestamptz values using the connection's session
+      // timezone. Use UTC so Date reads and writes keep their actual instant.
+      options: "-c timezone=UTC",
     });
 
     super({ adapter });

@@ -50,6 +50,25 @@ npm run db:seed
 npm run start:dev
 ```
 
+For the local demo, set `CORS_ORIGINS` in `server/.env` to include both
+`http://localhost:5176` and `http://127.0.0.1:5176`. Nest loads `.env` from
+its working directory; existing process environment variables take precedence.
+Start the Backend from `server/` so it uses that file. The exact browser origin
+must be allowed by both CORS and `AuthOriginGuard`.
+
+Before the demo, run the read-only check from `server/`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-dev-demo.ps1
+```
+
+It verifies the local DEV target, Backend health and database connectivity,
+public jobs and companies, and the auth CORS preflight. It never starts or
+stops a server. If Backend 3000 is absent, start it in a separate terminal
+with `npm run start:dev`; identify any existing port owner before restarting.
+If the demo must be recovered, first run this check and use the verified
+backup under `D:\DACSN\FindWork-Backups` for a separately approved restore.
+
 Endpoints:
 
 - `GET http://localhost:3000/api/v1/health`
