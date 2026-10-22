@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import type { AuthUser } from "@/store/authStore";
+import { useEmployerMembership } from "@/features/company/hooks/useEmployerMembership";
 
 import { getAccountInitials, getAccountName } from "../hooks/headerAuth";
 import styles from "../styles/AccountDropdown.module.css";
@@ -29,10 +30,17 @@ const AccountDropdown = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
   const location = useLocation();
+  const { isEmployer } = useEmployerMembership();
 
   const isEmployerContext = location.pathname.startsWith("/employer");
-  const workspaceTarget = isEmployerContext ? "/employer" : "/candidate";
-  const workspaceTitle = isEmployerContext ? "Không gian nhà tuyển dụng" : "Không gian ứng viên";
+  // Chỉ tài khoản có tư cách doanh nghiệp hợp lệ (GET /companies/me) mới có đích đến /employer.
+  // Tài khoản thuần Ứng viên luôn hướng tới /candidate.
+  const workspaceTarget = isEmployer ? (isEmployerContext ? "/employer" : "/employer") : "/candidate";
+  const workspaceTitle = isEmployer
+    ? isEmployerContext
+      ? "Không gian nhà tuyển dụng"
+      : "Không gian nhà tuyển dụng"
+    : "Không gian ứng viên";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -83,7 +91,9 @@ const AccountDropdown = ({
             <Link to="/cv" onClick={onNavigate}>Trung tâm CV</Link>
             <Link to="/candidate/saved-jobs" onClick={onNavigate}>Việc làm đã lưu</Link>
             <Link to="/candidate/applications" onClick={onNavigate}>Lịch sử ứng tuyển</Link>
-            <Link to="/employer" onClick={onNavigate}>Không gian tuyển dụng</Link>
+            {isEmployer && (
+              <Link to="/employer" onClick={onNavigate}>Không gian tuyển dụng</Link>
+            )}
             <button type="button" className={styles.logoutButton} onClick={onLogout}>
               Đăng xuất
             </button>

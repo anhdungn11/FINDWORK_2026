@@ -220,15 +220,15 @@ const EmployerJobsPage = () => {
                         ))}
                         {job.status === "PUBLISHED" && (
                           <Link
-                            className={ui.link}
+                            className={ui.btn}
                             to={`/jobs/${job.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: "0.8125rem", padding: "4px 8px" }}
-                            title="Xem trang tin tuyển dụng công khai như ứng viên nhìn thấy"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.85rem", padding: "5px 10px" }}
+                            title="Kiểm tra tin tuyển dụng hiển thị công khai đối với ứng viên"
                           >
-                            <span>Xem trên web</span>
-                            <ExternalLink size={12} />
+                            <ExternalLink size={13} />
+                            <span>Xem hiển thị công khai</span>
                           </Link>
                         )}
                       </div>

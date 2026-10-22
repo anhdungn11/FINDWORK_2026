@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useEmployerMembership } from "@/features/company/hooks/useEmployerMembership";
 
 import dropdownStyles from "../styles/HeaderDropdown.module.css";
 import styles from "../styles/EmployerDropdown.module.css";
@@ -16,6 +17,8 @@ const EmployerDropdown = ({
   onClose,
   isAuthenticated = false,
 }: EmployerDropdownProps) => {
+  const { isEmployer } = useEmployerMembership();
+
   return (
     <div className={dropdownStyles.dropdown}>
       <button
@@ -58,23 +61,44 @@ const EmployerDropdown = ({
           <div className={styles.menuDivider} />
 
           {isAuthenticated ? (
-            <Link
-              to="/employer"
-              className={styles.employerMenuItem}
-              onClick={onClose}
-            >
-              <span className={styles.menuItemIcon}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              </span>
+            isEmployer ? (
+              <Link
+                to="/employer"
+                className={styles.employerMenuItem}
+                onClick={onClose}
+              >
+                <span className={styles.menuItemIcon}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </span>
 
-              <span>
-                <strong>Không gian tuyển dụng</strong>
-                <small>Bảng điều khiển & quản lý doanh nghiệp</small>
-              </span>
-            </Link>
+                <span>
+                  <strong>Không gian tuyển dụng</strong>
+                  <small>Bảng điều khiển & quản lý doanh nghiệp</small>
+                </span>
+              </Link>
+            ) : (
+              <Link
+                to="/employer/onboarding"
+                className={styles.employerMenuItem}
+                onClick={onClose}
+              >
+                <span className={styles.menuItemIcon}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 20V8l8-4 8 4v12" />
+                    <path d="M9 20v-5h6v5" />
+                    <path d="M8 10h.01M12 10h.01M16 10h.01" />
+                  </svg>
+                </span>
+
+                <span>
+                  <strong>Khởi tạo doanh nghiệp mới</strong>
+                  <small>Đăng ký không gian tuyển dụng cho doanh nghiệp</small>
+                </span>
+              </Link>
+            )
           ) : (
             <Link
               to="/employer/login"
@@ -95,31 +119,33 @@ const EmployerDropdown = ({
             </Link>
           )}
 
-          <Link
-            to="/employer/register"
-            className={styles.employerMenuItem}
-            onClick={onClose}
-          >
-            <span className={styles.menuItemIcon}>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 20V8l8-4 8 4v12" />
-                <path d="M9 20v-5h6v5" />
-                <path d="M8 10h.01M12 10h.01M16 10h.01" />
-              </svg>
-            </span>
+          {(!isAuthenticated || isEmployer) && (
+            <Link
+              to="/employer/register"
+              className={styles.employerMenuItem}
+              onClick={onClose}
+            >
+              <span className={styles.menuItemIcon}>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 20V8l8-4 8 4v12" />
+                  <path d="M9 20v-5h6v5" />
+                  <path d="M8 10h.01M12 10h.01M16 10h.01" />
+                </svg>
+              </span>
 
-            <span>
-              <strong>Đăng ký doanh nghiệp</strong>
-              <small>
-                {isAuthenticated
-                  ? "Khởi tạo hồ sơ doanh nghiệp mới"
-                  : "Tạo tài khoản và bắt đầu tuyển dụng"}
-              </small>
-            </span>
-          </Link>
+              <span>
+                <strong>Đăng ký doanh nghiệp</strong>
+                <small>
+                  {isAuthenticated
+                    ? "Khởi tạo thêm doanh nghiệp mới"
+                    : "Tạo tài khoản và bắt đầu tuyển dụng"}
+                </small>
+              </span>
+            </Link>
+          )}
 
           <Link
-            to="/employer/jobs/new"
+            to={isEmployer ? "/employer/jobs/new" : "/employer/onboarding"}
             className={styles.employerMenuItem}
             onClick={onClose}
           >
