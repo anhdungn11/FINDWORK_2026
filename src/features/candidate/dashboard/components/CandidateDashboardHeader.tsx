@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Briefcase, Building2, FileText, Sparkles, User as UserIcon } from "lucide-react";
 import type { AuthUser } from "../../../../store/authStore";
+import { useEmployerMembership } from "@/features/company/hooks/useEmployerMembership";
 import { formatUserRole, formatUserStatus } from "../utils/dashboardProgress";
 import styles from "../styles/CandidateDashboard.module.css";
 
@@ -13,6 +14,8 @@ export const CandidateDashboardHeader = ({
   user,
   displayName,
 }: CandidateDashboardHeaderProps) => {
+  const { isEmployer } = useEmployerMembership();
+
   const greeting = displayName
     ? `Chào mừng trở lại, ${displayName}!`
     : "Chào mừng bạn đến với FINDWORK!";
@@ -61,14 +64,16 @@ export const CandidateDashboardHeader = ({
       </div>
 
       <div className={styles.headerActions}>
-        <Link
-          to="/employer"
-          className={styles.buttonSecondary}
-          title="Chuyển sang không gian nhà tuyển dụng để quản lý doanh nghiệp và tin tuyển dụng"
-        >
-          <Building2 size={15} aria-hidden="true" />
-          Tuyển dụng
-        </Link>
+        {isEmployer && (
+          <Link
+            to="/employer"
+            className={styles.buttonSecondary}
+            title="Chuyển sang không gian nhà tuyển dụng để quản lý doanh nghiệp và tin tuyển dụng"
+          >
+            <Building2 size={15} aria-hidden="true" />
+            Tuyển dụng
+          </Link>
+        )}
         <Link to="/cv" className={styles.buttonSecondary}>
           <FileText size={15} aria-hidden="true" />
           CV của tôi

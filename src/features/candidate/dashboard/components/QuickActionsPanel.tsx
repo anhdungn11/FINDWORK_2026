@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Briefcase, Building2, FileText, Layers, User } from "lucide-react";
+import { useEmployerMembership } from "@/features/company/hooks/useEmployerMembership";
 import styles from "../styles/CandidateDashboard.module.css";
 
 const QUICK_ACTIONS = [
@@ -41,6 +42,11 @@ const QUICK_ACTIONS = [
 ];
 
 export const QuickActionsPanel = () => {
+  const { isEmployer } = useEmployerMembership();
+  const visibleActions = isEmployer
+    ? QUICK_ACTIONS
+    : QUICK_ACTIONS.filter((action) => action.href !== "/employer");
+
   return (
     <section aria-labelledby="quick-actions-heading">
       <h2 id="quick-actions-heading" style={{ fontSize: "1.125rem", fontWeight: 700, marginBottom: "0.75rem", color: "var(--color-text-primary, #1e293b)" }}>
@@ -48,7 +54,7 @@ export const QuickActionsPanel = () => {
       </h2>
 
       <div className={styles.quickActionsGrid}>
-        {QUICK_ACTIONS.map((action) => {
+        {visibleActions.map((action) => {
           const Icon = action.icon;
           return (
             <Link
