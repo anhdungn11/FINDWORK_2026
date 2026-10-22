@@ -2,9 +2,10 @@ import styles from "./ResumeEmptyState.module.css";
 
 interface ResumeEmptyStateProps {
   onAddResume: () => void;
+  onCreateResume?: () => void;
 }
 
-const ResumeEmptyState = ({ onAddResume }: ResumeEmptyStateProps) => {
+const ResumeEmptyState = ({ onAddResume, onCreateResume }: ResumeEmptyStateProps) => {
   return (
     <section className={styles.emptyState}>
       <div className={styles.icon} aria-hidden="true">
@@ -18,15 +19,25 @@ const ResumeEmptyState = ({ onAddResume }: ResumeEmptyStateProps) => {
         <span className={styles.eyebrow}>CV đầu tiên</span>
         <h2>Bạn chưa có CV nào</h2>
         <p>
-          Tải CV đầu tiên để sẵn sàng ứng tuyển. FINDWORK hiện hỗ trợ
-          PDF tối đa 10 MB.
+          Tạo bản CV điện tử chuẩn hóa hoặc tải lên tệp PDF có sẵn để sẵn sàng ứng tuyển vào các vị trí mong muốn.
         </p>
       </div>
 
-      <button type="button" className={styles.primaryButton} onClick={onAddResume}>
-        <span aria-hidden="true">＋</span>
-        Tải CV
-      </button>
+      <div className={styles.actions}>
+        {onCreateResume && (
+          <button type="button" className={styles.primaryButton} onClick={onCreateResume}>
+            <span aria-hidden="true">＋</span>
+            Tạo CV trực tuyến
+          </button>
+        )}
+        <button
+          type="button"
+          className={onCreateResume ? styles.secondaryButton : styles.primaryButton}
+          onClick={onAddResume}
+        >
+          Tải file PDF
+        </button>
+      </div>
     </section>
   );
 };
