@@ -1,0 +1,144 @@
+.container {
+  margin-bottom: 20px;
+}
+
+.legend {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 580px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 14px 12px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.card:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.cardSelected {
+  border-color: var(--color-primary, #4f6ef7);
+  background: #f4f7ff;
+  box-shadow: 0 0 0 1px var(--color-primary, #4f6ef7);
+}
+
+.card:focus-within {
+  outline: 2px solid var(--color-primary, #4f6ef7);
+  outline-offset: 2px;
+}
+
+.radioInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.iconTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconBox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  transition: all 0.18s ease;
+}
+
+.cardSelected .iconBox {
+  background: var(--color-primary, #4f6ef7);
+  color: #ffffff;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.cardSelected .badge {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.radioCircle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  transition: all 0.15s ease;
+}
+
+.cardSelected .radioCircle {
+  border-color: var(--color-primary, #4f6ef7);
+  background: var(--color-primary, #4f6ef7);
+}
+
+.radioDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.description {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
+  margin: 0;
+}
