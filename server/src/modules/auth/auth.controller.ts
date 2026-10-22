@@ -22,7 +22,7 @@ import { AUTH_REFRESH_COOKIE_NAME } from "./auth.constants";
 import { AuthService } from "./auth.service";
 import { CurrentAuth } from "./decorators/current-auth.decorator";
 import { LoginDto } from "./dto/login.dto";
-import { RegisterDto } from "./dto/register.dto";
+import { RegisterDto, TypedRegisterDto } from "./dto/register.dto";
 import { AccessTokenGuard } from "./guards/access-token.guard";
 import { AuthOriginGuard } from "./guards/auth-origin.guard";
 import { AuthCookieService } from "./services/auth-cookie.service";
@@ -52,6 +52,25 @@ export class AuthController {
     @Body() dto: RegisterDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthResponse> {
+    return this.registerAccount(dto, request, response);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 600_000 } })
+  @UseGuards(AuthOriginGuard, ThrottlerGuard)
+  @Post("register/v2")
+  async registerTyped(
+    @Body() dto: TypedRegisterDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthResponse> {
+    return this.registerAccount(dto, request, response);
+  }
+
+  private async registerAccount(
+    dto: RegisterDto,
+    request: Request,
+    response: Response,
   ): Promise<AuthResponse> {
     const result = await this.authService.register(
       dto,

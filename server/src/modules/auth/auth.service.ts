@@ -53,6 +53,7 @@ export class AuthService {
         await this.authRepository.createRegisteredUserWithSession({
           email,
           emailNormalized,
+          accountType: dto.accountType ?? "LEGACY_UNCLASSIFIED",
           passwordHash,
           sessionId,
           refreshTokenHash,
@@ -282,12 +283,14 @@ export class AuthService {
     email: string;
     status: string;
     emailVerifiedAt: Date | null;
+    accountType: "CANDIDATE" | "EMPLOYER" | "LEGACY_UNCLASSIFIED" | null;
   }): PublicAuthUser {
     return {
       id: user.id,
       email: user.email,
       status: "ACTIVE",
       emailVerified: user.emailVerifiedAt !== null,
+      accountType: user.accountType ?? "LEGACY_UNCLASSIFIED",
     };
   }
 

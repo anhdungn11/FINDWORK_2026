@@ -17,6 +17,7 @@ import {
 } from "@nestjs/swagger";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
+import { AccountTypeGuard, RequireAccountTypes } from "../auth/guards/account-type.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
 import { PermissionGuard } from "../authorization/guards/permission.guard";
@@ -55,7 +56,8 @@ import {
 @ApiTags("Candidate")
 @ApiBearerAuth("access-token")
 @Controller("candidate")
-@UseGuards(AccessTokenGuard)
+@UseGuards(AccessTokenGuard, AccountTypeGuard)
+@RequireAccountTypes("CANDIDATE", "LEGACY_UNCLASSIFIED")
 export class CandidateController {
   constructor(
     private readonly candidateService: CandidateService,

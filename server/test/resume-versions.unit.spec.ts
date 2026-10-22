@@ -2,6 +2,7 @@ import { GUARDS_METADATA } from "@nestjs/common/constants";
 import { CandidateResumesController } from "../src/modules/candidate/candidate-resumes.controller";
 import { CandidateResumesService } from "../src/modules/candidate/candidate-resumes.service";
 import { AccessTokenGuard } from "../src/modules/auth/guards/access-token.guard";
+import { AccountTypeGuard } from "../src/modules/auth/guards/account-type.guard";
 import { PermissionGuard } from "../src/modules/authorization/guards/permission.guard";
 import { REQUIRED_PERMISSIONS_KEY } from "../src/modules/authorization/decorators/require-permissions.decorator";
 import { Prisma } from "../src/generated/prisma/client";
@@ -26,7 +27,7 @@ function fixture() {
 
 describe("builder resume version persistence", () => {
   it("requires session and own-scope update permission", () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, CandidateResumesController)).toEqual([AccessTokenGuard, PermissionGuard]);
+    expect(Reflect.getMetadata(GUARDS_METADATA, CandidateResumesController)).toEqual([AccessTokenGuard, AccountTypeGuard, PermissionGuard]);
     expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, CandidateResumesController.prototype.update)).toEqual(["resume.update"]);
   });
 

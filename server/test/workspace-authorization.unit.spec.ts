@@ -5,16 +5,24 @@ import request from "supertest";
 import { PrismaService } from "../src/infrastructure/prisma/prisma.service";
 import { AuthRepository } from "../src/modules/auth/auth.repository";
 import { AccessTokenGuard } from "../src/modules/auth/guards/access-token.guard";
+import { AccountTypeGuard } from "../src/modules/auth/guards/account-type.guard";
 import { TokenService } from "../src/modules/auth/services/token.service";
 import { AuthorizationRepository } from "../src/modules/authorization/authorization.repository";
 import { AuthorizationService } from "../src/modules/authorization/authorization.service";
 import { CompanyPermissionGuard } from "../src/modules/authorization/guards/company-permission.guard";
+import { PermissionGuard } from "../src/modules/authorization/guards/permission.guard";
 import { PermissionResolverService } from "../src/modules/authorization/services/permission-resolver.service";
 import { CompanyApplicationsController } from "../src/modules/applications/applications.controller";
 import { ApplicationsService } from "../src/modules/applications/applications.service";
+import { CandidateController } from "../src/modules/candidate/candidate.controller";
+import { CandidateService } from "../src/modules/candidate/candidate.service";
+import { CandidateOnboardingDraftService } from "../src/modules/candidate/candidate-onboarding-draft.service";
+import { CandidateOnboardingImportService } from "../src/modules/candidate/candidate-onboarding-import.service";
 import { CompanyController } from "../src/modules/company/company.controller";
 import { CompanyProfileLocationsController } from "../src/modules/company/company-profile-locations.controller";
 import { CompanyProfileLocationsService } from "../src/modules/company/company-profile-locations.service";
+import { CompanyInvitationAcceptanceController } from "../src/modules/company/company-invitations.controller";
+import { CompanyInvitationsService } from "../src/modules/company/company-invitations.service";
 import { CompanyRepository } from "../src/modules/company/company.repository";
 import { DEFAULT_COMPANY_ROLES } from "../src/modules/company/company-roles";
 import { CompanyService } from "../src/modules/company/company.service";
@@ -55,7 +63,7 @@ describe("candidate and employer workspace authorization", () => {
   };
   const grants = {
     findActiveCompanyMember: jest.fn(async (userId: string, targetCompanyId: string) =>
-      userId === "owner" && targetCompanyId === companyId ? { id: "owner-member" } : null),
+      (userId === "owner" || userId === "employer") && targetCompanyId === companyId ? { id: "owner-member" } : null),
     findCompanyPermissionGrantSnapshot: jest.fn(async (_memberId: string, _companyId: string, code: string) => ({
       code, isDeprecated: false, directOverride: null,
       roleScopes: ownerPermissions.has(code) ? ["COMPANY"] : [],
@@ -69,21 +77,31 @@ describe("candidate and employer workspace authorization", () => {
     listCompany: jest.fn().mockResolvedValue({ data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } }),
     review: jest.fn().mockResolvedValue({ id: applicationId, status: "REVIEWING" }),
   };
+  const invitations = { accept: jest.fn().mockResolvedValue({ companyId, role: "VIEWER" }) };
+  const candidate = {
+    getBootstrap: jest.fn().mockResolvedValue({ profile: null, draft: null }),
+    createProfile: jest.fn().mockResolvedValue({ id: "new-profile" }),
+  };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [
         CompanyController, CompanyProfileLocationsController,
         CompanyJobsController, PublicJobsController, CompanyApplicationsController,
+        CompanyInvitationAcceptanceController, CandidateController,
       ],
       providers: [
         CompanyRepository, CompanyService, JobsService,
-        AccessTokenGuard, CompanyPermissionGuard,
+        AccessTokenGuard, AccountTypeGuard, CompanyPermissionGuard, PermissionGuard,
         AuthorizationService, PermissionResolverService,
         { provide: PrismaService, useValue: db },
         { provide: AuthorizationRepository, useValue: grants },
         { provide: CompanyProfileLocationsService, useValue: profile },
         { provide: ApplicationsService, useValue: applications },
+        { provide: CompanyInvitationsService, useValue: invitations },
+        { provide: CandidateService, useValue: candidate },
+        { provide: CandidateOnboardingDraftService, useValue: {} },
+        { provide: CandidateOnboardingImportService, useValue: {} },
         { provide: TokenService, useValue: {
           verifyAccessToken: async (token: string) => ({ sub: token, sid: `session-${token}` }),
         } },
@@ -92,7 +110,8 @@ describe("candidate and employer workspace authorization", () => {
             const userId = sessionId.replace(/^session-/, "");
             return { id: sessionId, userId, revokedAt: null,
               expiresAt: new Date(Date.now() + 60_000),
-              user: { id: userId, email: `${userId}@example.test`, status: "ACTIVE", emailVerifiedAt: null } };
+              user: { id: userId, email: `${userId}@example.test`, status: "ACTIVE", emailVerifiedAt: null,
+                accountType: userId === "candidate" ? "CANDIDATE" : userId === "employer" ? "EMPLOYER" : null } };
           },
         } },
       ],
@@ -107,7 +126,7 @@ describe("candidate and employer workspace authorization", () => {
   afterAll(async () => app?.close());
   beforeEach(() => jest.clearAllMocks());
 
-  const bearer = (user: "candidate" | "owner") => ({ Authorization: `Bearer ${user}` });
+  const bearer = (user: "candidate" | "employer" | "owner") => ({ Authorization: `Bearer ${user}` });
 
   it("shows only active memberships and never provisions a workspace on GET", async () => {
     await request(app.getHttpServer()).get("/api/v1/companies/me").expect(401);
@@ -137,6 +156,23 @@ describe("candidate and employer workspace authorization", () => {
     expect(profile.updateProfile).not.toHaveBeenCalled();
     expect(applications.review).not.toHaveBeenCalled();
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("denies a typed CANDIDATE before any membership lookup", async () => {
+    const response = await request(app.getHttpServer()).get(`/api/v1/companies/${companyId}/profile`)
+      .set(bearer("candidate")).expect(403);
+    expect(response.body.code).toBe("AUTH_ACCOUNT_TYPE_FORBIDDEN");
+    expect(grants.findActiveCompanyMember).not.toHaveBeenCalled();
+    expect(profile.getProfile).not.toHaveBeenCalled();
+  });
+
+  it("allows a typed EMPLOYER with company grants to read managed resources", async () => {
+    await request(app.getHttpServer()).get(`/api/v1/companies/${companyId}/profile`)
+      .set(bearer("employer")).expect(200);
+    await request(app.getHttpServer()).get(`/api/v1/companies/${companyId}/jobs?page=1&pageSize=1`)
+      .set(bearer("employer")).expect(200);
+    expect(grants.findActiveCompanyMember).toHaveBeenCalledWith("employer", companyId);
+    expect(db.candidateProfile.create).not.toHaveBeenCalled();
   });
 
   it("retains OWNER management access through company-scoped permissions", async () => {
@@ -180,6 +216,22 @@ describe("candidate and employer workspace authorization", () => {
     expect(db.$transaction).not.toHaveBeenCalled();
   });
 
+  it("keeps Candidate Workspace available to Candidate and legacy users only", async () => {
+    await request(app.getHttpServer()).get("/api/v1/candidate/bootstrap")
+      .set(bearer("employer")).expect(403);
+    await request(app.getHttpServer()).post("/api/v1/candidate/profile")
+      .set(bearer("employer")).send({ fullName: "Employer" }).expect(403);
+    expect(candidate.getBootstrap).not.toHaveBeenCalled();
+    expect(candidate.createProfile).not.toHaveBeenCalled();
+    await request(app.getHttpServer()).get("/api/v1/candidate/bootstrap")
+      .set(bearer("candidate")).expect(200);
+    await request(app.getHttpServer()).get("/api/v1/candidate/bootstrap")
+      .set(bearer("owner")).expect(200);
+    await request(app.getHttpServer()).post("/api/v1/candidate/profile")
+      .set(bearer("candidate")).send({ fullName: "Candidate" }).expect(201);
+    expect(candidate.createProfile).toHaveBeenCalledWith("candidate", { fullName: "Candidate" });
+  });
+
   it("keeps employer workspace navigation read-only", async () => {
     await request(app.getHttpServer()).get("/api/v1/companies/me")
       .set(bearer("owner")).expect(200);
@@ -205,9 +257,21 @@ describe("candidate and employer workspace authorization", () => {
       .send({ name: "New Company", slug: "new-company" }).expect(401);
     expect(create).not.toHaveBeenCalled();
     await request(app.getHttpServer()).post("/api/v1/companies")
-      .set(bearer("candidate")).send({ name: "New Company", slug: "new-company" }).expect(201);
-    expect(create).toHaveBeenCalledWith({ actorUserId: "candidate", name: "New Company", slug: "new-company" });
+      .set(bearer("candidate")).send({ name: "New Company", slug: "new-company" }).expect(403);
+    expect(create).not.toHaveBeenCalled();
+    await request(app.getHttpServer()).post("/api/v1/companies")
+      .set(bearer("employer")).send({ name: "New Company", slug: "new-company" }).expect(201);
+    expect(create).toHaveBeenCalledWith({ actorUserId: "employer", name: "New Company", slug: "new-company" });
     expect(db.company.create).not.toHaveBeenCalled();
     create.mockRestore();
+  });
+
+  it("requires Employer or legacy type for explicit invitation acceptance", async () => {
+    await request(app.getHttpServer()).post("/api/v1/company-invitations/accept")
+      .set(bearer("candidate")).send({ token: "test-token" }).expect(403);
+    expect(invitations.accept).not.toHaveBeenCalled();
+    await request(app.getHttpServer()).post("/api/v1/company-invitations/accept")
+      .set(bearer("employer")).send({ token: "test-token" }).expect(201);
+    expect(invitations.accept).toHaveBeenCalledWith("employer", { token: "test-token" });
   });
 });

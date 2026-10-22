@@ -2,6 +2,7 @@ import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, Par
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
+import { AccountTypeGuard, RequireAccountTypes } from "../auth/guards/account-type.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
 import { PermissionGuard, type AuthorizedRequest } from "../authorization/guards/permission.guard";
@@ -17,7 +18,8 @@ function requireOwn(req: AuthorizedRequest): void {
 @ApiTags("Candidate Saved Jobs")
 @ApiBearerAuth("access-token")
 @Controller("candidate/saved-jobs")
-@UseGuards(AccessTokenGuard, PermissionGuard)
+@UseGuards(AccessTokenGuard, AccountTypeGuard, PermissionGuard)
+@RequireAccountTypes("CANDIDATE", "LEGACY_UNCLASSIFIED")
 export class CandidateSavedJobsController {
   constructor(private readonly savedJobs: CandidateSavedJobsService) {}
 

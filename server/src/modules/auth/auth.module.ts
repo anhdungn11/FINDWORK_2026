@@ -10,6 +10,7 @@ import { EmailVerificationEnqueueService } from "./email-verification/email-veri
 import { AuthRepository } from "./auth.repository";
 import { AuthService } from "./auth.service";
 import { AccessTokenGuard } from "./guards/access-token.guard";
+import { AccountTypeGuard } from "./guards/account-type.guard";
 import { AuthOriginGuard } from "./guards/auth-origin.guard";
 import { AuthCookieService } from "./services/auth-cookie.service";
 import { PasswordService } from "./services/password.service";
@@ -25,6 +26,7 @@ import { TokenService } from "./services/token.service";
     TokenService,
     AuthCookieService,
     AccessTokenGuard,
+    AccountTypeGuard,
     AuthOriginGuard,
     EmailVerificationService,
     EmailVerificationRepository,
@@ -37,6 +39,7 @@ import { TokenService } from "./services/token.service";
     TokenService,
     AuthCookieService,
     AccessTokenGuard,
+    AccountTypeGuard,
   ],
 })
 export class AuthModule {}

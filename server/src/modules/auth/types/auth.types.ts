@@ -10,6 +10,7 @@ export interface PublicAuthUser {
   email: string;
   status: "ACTIVE";
   emailVerified: boolean;
+  accountType: "CANDIDATE" | "EMPLOYER" | "LEGACY_UNCLASSIFIED";
 }
 
 export interface AuthenticatedPrincipal {
