@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -35,6 +36,12 @@ export class AuthService {
     dto: RegisterDto,
     metadata: AuthRequestMetadata,
   ): Promise<AuthCommandResult> {
+    if (dto.accountType !== "CANDIDATE" && dto.accountType !== "EMPLOYER") {
+      throw new BadRequestException({
+        code: "AUTH_ACCOUNT_TYPE_REQUIRED",
+        message: "Choose CANDIDATE or EMPLOYER for a new account.",
+      });
+    }
     const email = dto.email.trim();
     const emailNormalized = this.normalizeEmail(email);
 
@@ -53,7 +60,7 @@ export class AuthService {
         await this.authRepository.createRegisteredUserWithSession({
           email,
           emailNormalized,
-          accountType: dto.accountType ?? "LEGACY_UNCLASSIFIED",
+          accountType: dto.accountType,
           passwordHash,
           sessionId,
           refreshTokenHash,

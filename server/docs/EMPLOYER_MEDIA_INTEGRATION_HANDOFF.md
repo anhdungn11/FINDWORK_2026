@@ -1,15 +1,15 @@
 # Employer Media integration handoff — isolated branch
 
-Status: **code and in-memory HTTP verified; real PostgreSQL and browser acceptance pending**. This branch does not change the running Backend 3000, Frontend 5176, `findwork_dev`, or `findwork_test`.
+Status (2026-10-23): **real PostgreSQL and HTTP media acceptance passed on the isolated integration environment; browser acceptance pending**. Backend 3000, Frontend 5176, `findwork_dev`, and `findwork_test` were not changed.
 
 ## Local isolation gate
 
 - Backend: `127.0.0.1:3002`, `NODE_ENV=test`, API prefix `/api/v1`.
 - Frontend for Antigravity: `http://127.0.0.1:5177`, API base `http://127.0.0.1:3002/api/v1`. Use the same `127.0.0.1` host for cookies. Both `127.0.0.1:5177` and `localhost:5177` are explicitly allowed CORS/Auth origins; no wildcard.
 - Dedicated storage: `C:\Users\HP\AppData\Local\FINDWORK\EmployerMedia3002`, outside Git. Its verified ACL permits only the local owner, SYSTEM, and Administrators. The configured root must already exist; the API never creates an arbitrary root.
-- Copy `.env.employer-media.example` to the Git-ignored `.env.employer-media.local`. A local file with random JWT secrets and the storage path is prepared. Its `DATABASE_URL` deliberately retains an unusable credential until a **separate isolated database** is approved and provisioned. Never replace it with `findwork_dev` or `findwork_test`.
-- Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-employer-media-integration.ps1` from `server`. The checker prints no secrets, checks exact DB identity in the URL, storage path/ACL, origins, and port availability. It currently fails solely on the unprovisioned isolated DB credential. It does not connect to or modify a database.
-- Only after the separate DB/schema is approved and provisioned: run the checker, then start a **new** Backend process from `server` with `node -r dotenv/config .\dist\main.js dotenv_config_path=.env.employer-media.local dotenv_config_override=true`. Start Antigravity's separate Frontend checkout on `--host 127.0.0.1 --port 5177 --strictPort`. Do not restart or terminate processes on 3000/5176. No worker entrypoint is needed.
+- The dedicated `findwork_employer_media_3002` database was created empty and all eight migrations were applied there. The project's foundation permission/reference catalog was seeded there only. Test-owned users and companies were created through HTTP there. No DEV/TEST database was written.
+- The Git-ignored `.env.employer-media.local` in this integration worktree has generated secrets, the dedicated database URL, explicit 5177 origins, and the private storage path. Never copy it into Git or use the demo database URL for port 3002.
+- Backend 3002 is running. Before starting another process, check `GET http://127.0.0.1:3002/api/v1/health`. When stopped, run `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-employer-media-integration.ps1` from `server`, then `node -r dotenv/config .\dist\main.js dotenv_config_path=.env.employer-media.local dotenv_config_override=true`. The checker requires ports 3002/5177 to be free, so use it before startup. Start Antigravity's separate Frontend checkout on `--host 127.0.0.1 --port 5177 --strictPort`. Do not restart or terminate 3000/5176. No worker entrypoint is needed.
 
 ## Exact media contract
 
@@ -33,4 +33,6 @@ Example error for a mismatched MIME type: HTTP 400 `{"code":"COMPANY_MEDIA_TYPE_
 
 ## Acceptance still required
 
-Provisioning and migrating `findwork_employer_media_3002` needs separate approval. Once provisioned, run real upload/reload/delete and profile/location browser checks with isolated identities and fixtures. A production rollout additionally needs shared durable storage and image processing; the local adapter is appropriate only for one local Backend instance.
+Real HTTP acceptance passed for registration, explicit Company creation and OWNER membership, Company Profile update/reload, first headquarters location create/list, legal verification request remaining PENDING, candidate and cross-company 403 denial, multipart logo and cover upload, repeat public GET with identical bytes and `no-store`, authorized DELETE, and 404 after deletion. Health, public jobs, companies and featured returned HTTP 200. Read-only database verification showed 8 applied migrations, two test-owned companies, two OWNER memberships and no remaining media keys after deletion. Browser acceptance on 5177 remains pending because that Frontend is not running. The 5176 website was unavailable for request tracing; its historical upload failure cannot be attributed to a specific status without a captured request. The demo worktree's `.env` has no `COMPANY_MEDIA_STORAGE_DIR`, which would cause HTTP 503 if its running process has no separate override. Frontend source explicitly sets `Content-Type: multipart/form-data` on `FormData`; Antigravity should let the browser/Axios adapter generate the boundary and capture the actual response status and `code`.
+
+A production rollout additionally needs shared durable storage and image decode/re-encode plus metadata/malware policy; the local adapter is appropriate only for one local Backend instance.

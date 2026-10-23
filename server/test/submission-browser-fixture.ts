@@ -85,11 +85,11 @@ async function setup(app: INestApplication, db: PrismaService, runId: string): P
   const api = (path: string) => `/${prefix}${path}`;
   const http = app.getHttpServer();
   const category = await db.jobCategory.create({ data: { code: slug, name: "Browser E2E fixture", isActive: true } });
-  const candidateAuth = await request(http).post(api("/auth/register"))
-    .send({ email: candidateEmail, password: candidatePassword });
+  const candidateAuth = await request(http).post(api("/auth/register/v2"))
+    .send({ email: candidateEmail, password: candidatePassword, accountType: "CANDIDATE" });
   check(candidateAuth, 201, "Register candidate");
-  const recruiterAuth = await request(http).post(api("/auth/register"))
-    .send({ email: recruiterEmail, password: recruiterPassword });
+  const recruiterAuth = await request(http).post(api("/auth/register/v2"))
+    .send({ email: recruiterEmail, password: recruiterPassword, accountType: "EMPLOYER" });
   check(recruiterAuth, 201, "Register recruiter");
   const candidateToken = candidateAuth.body.accessToken as string;
   const recruiterToken = recruiterAuth.body.accessToken as string;

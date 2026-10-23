@@ -28,12 +28,12 @@ const registration = {
 };
 
 describe("persisted account type contract", () => {
-  it("accepts typed and legacy registration, rejecting explicit null or unknown types", async () => {
-    for (const type of [undefined, "CANDIDATE", "EMPLOYER"]) {
+  it("requires an explicit supported type on both registration routes", async () => {
+    for (const type of ["CANDIDATE", "EMPLOYER"]) {
       const dto = plainToInstance(RegisterDto, { email: "person@example.test", password: "StrongPassword123!", accountType: type });
       expect(await validate(dto)).toEqual([]);
     }
-    for (const type of [null, "LEGACY_UNCLASSIFIED", "ADMIN", "candidate"]) {
+    for (const type of [undefined, null, "LEGACY_UNCLASSIFIED", "ADMIN", "candidate"]) {
       const dto = plainToInstance(RegisterDto, { email: "person@example.test", password: "StrongPassword123!", accountType: type });
       expect(await validate(dto)).not.toEqual([]);
     }
@@ -114,11 +114,12 @@ describe("persisted account type contract", () => {
     expect((await service.refresh("refresh")).user.accountType).toBe("EMPLOYER");
 
     existing.accountType = null;
-    expect((await service.register({ email: existing.email, password: "StrongPassword123!" }, {})).user.accountType)
-      .toBe("LEGACY_UNCLASSIFIED");
-    expect(repository.createRegisteredUserWithSession).toHaveBeenLastCalledWith(expect.objectContaining({ accountType: "LEGACY_UNCLASSIFIED" }));
     expect((await service.login({ email: existing.email, password: "StrongPassword123!" }, {})).user.accountType)
       .toBe("LEGACY_UNCLASSIFIED");
+    expect((await service.refresh("refresh")).user.accountType).toBe("LEGACY_UNCLASSIFIED");
+    await expect(service.register({ email: existing.email, password: "StrongPassword123!" } as RegisterDto, {}))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: "AUTH_ACCOUNT_TYPE_REQUIRED" }) });
+    expect(repository.createRegisteredUserWithSession).toHaveBeenCalledTimes(1);
   });
 
   it("takes account type from the persisted session user, not the JWT", async () => {
@@ -147,7 +148,7 @@ describe("registration HTTP compatibility", () => {
     accessToken: "access", accessTokenExpiresInSeconds: 900,
     refreshToken: "refresh", refreshExpiresAt: new Date(Date.now() + 60_000),
     user: { id: "user", email: dto.email, status: "ACTIVE", emailVerified: false,
-      accountType: dto.accountType ?? "LEGACY_UNCLASSIFIED" },
+      accountType: dto.accountType },
   }));
 
   beforeAll(async () => {
@@ -171,15 +172,16 @@ describe("registration HTTP compatibility", () => {
   afterAll(async () => app?.close());
   beforeEach(() => jest.clearAllMocks());
 
-  it("requires type on v2 while preserving the old registration route", async () => {
+  it("requires type on both routes while accepting typed registrations", async () => {
     const body = { email: "person@example.test", password: "StrongPassword123!" };
     await request(app.getHttpServer()).post("/api/v1/auth/register/v2").send(body).expect(400);
+    await request(app.getHttpServer()).post("/api/v1/auth/register").send(body).expect(400);
     expect(register).not.toHaveBeenCalled();
     const typed = await request(app.getHttpServer()).post("/api/v1/auth/register/v2")
       .send({ ...body, accountType: "EMPLOYER" }).expect(201);
     expect(typed.body.user.accountType).toBe("EMPLOYER");
-    const legacy = await request(app.getHttpServer()).post("/api/v1/auth/register")
-      .send(body).expect(201);
-    expect(legacy.body.user.accountType).toBe("LEGACY_UNCLASSIFIED");
+    const original = await request(app.getHttpServer()).post("/api/v1/auth/register")
+      .send({ ...body, accountType: "CANDIDATE" }).expect(201);
+    expect(original.body.user.accountType).toBe("CANDIDATE");
   });
 });

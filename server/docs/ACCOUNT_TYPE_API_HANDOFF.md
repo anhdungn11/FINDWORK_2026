@@ -1,18 +1,20 @@
-# Account type API handoff (isolated branch)
+# Account type API handoff (integrated release candidate)
 
 This contract requires migration `20261022180000_account_type_registration`
-before deployment. The migration is prepared but has not been applied to any
-database. The live demo Backend does not yet serve this contract.
+before deployment. It was applied only to the new isolated
+`findwork_employer_media_3002` database on 2026-10-23 (8/8 migrations).
+The live demo database was not migrated for this contract.
 The SQL only creates the enum and adds a nullable `User.accountType` column;
 it neither updates existing users nor touches memberships or business data.
 Deploying the prior Backend code remains a safe application rollback because
 it ignores the additive column. Dropping the column is a separate migration
-decision after data export. No migration was run for this branch.
+decision after data export.
 
 ## Registration and session
 
 `POST /api/v1/auth/register/v2` is the route for Antigravity (public, origin
-allowlist and rate limit). It requires an explicit account type:
+allowlist and rate limit). Both this and the retained
+`POST /api/v1/auth/register` require an explicit account type:
 
 ```json
 {"email":"person@example.com","password":"StrongPassword123!","accountType":"CANDIDATE"}
@@ -20,8 +22,11 @@ allowlist and rate limit). It requires an explicit account type:
 
 `accountType` accepts exactly `CANDIDATE` or `EMPLOYER`. Omission, explicit
 `null`, other values, and extra fields fail with HTTP 400 `VALIDATION_ERROR`.
-The existing `POST /api/v1/auth/register` remains available for old clients;
-it accepts the same typed field but omission creates `LEGACY_UNCLASSIFIED`.
+The original route remains available at the same URL, but old clients that omit
+`accountType` now receive HTTP 400 `VALIDATION_ERROR`. This deliberate request
+contract change closes new legacy-account registration. Direct service calls
+without a supported type fail with HTTP 400 `AUTH_ACCOUNT_TYPE_REQUIRED` before
+any database write. Existing legacy accounts remain able to log in and refresh.
 Duplicate email returns 409 `AUTH_EMAIL_ALREADY_REGISTERED`. Success returns
 HTTP 201, sets the existing HTTP-only refresh cookie, and includes:
 
@@ -57,6 +62,13 @@ membership, CandidateProfile, CV, or Application. Employer public Job browsing
 needs no CandidateProfile.
 
 New typed CANDIDATE accounts cannot use company onboarding or invitations.
-Old registration clients can still create `LEGACY_UNCLASSIFIED` accounts through
-the original route during the compatibility period. Retiring that legacy route
-and defining audited conversion between types are separate cutover decisions.
+No public registration route creates a new `LEGACY_UNCLASSIFIED` account.
+Defining audited conversion for existing legacy users is a separate decision.
+
+Isolated live HTTP evidence on 2026-10-23: both registration routes return
+HTTP 400 `VALIDATION_ERROR` if `accountType` is omitted; `/register/v2` returned
+HTTP 201 for `CANDIDATE` and `EMPLOYER`. A new Employer created a company and
+received its OWNER membership; a Candidate and a separate Employer received
+HTTP 403 when attempting media writes to that company. This is API/DB evidence,
+not browser acceptance. The original route's new required field must be
+coordinated with old registration clients before deployment.
