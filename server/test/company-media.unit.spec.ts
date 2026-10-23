@@ -65,6 +65,14 @@ describe("company media", () => {
     expect(storage.put).not.toHaveBeenCalled();
   });
 
+  it("fails closed with a typed 503 when local storage is not provisioned", async () => {
+    const storage = new LocalCompanyMediaStorage({ get: () => undefined } as never);
+    await expect(storage.ready()).rejects.toMatchObject({
+      status: 503, response: { code: "COMPANY_MEDIA_STORAGE_UNAVAILABLE" },
+    });
+    await expect(storage.put(companyId, "logo", "image/png", png)).rejects.toMatchObject({ status: 503 });
+  });
+
   it("removes an uncommitted upload if authorization changes before the database transaction", async () => {
     const repo = { replaceMediaKey: jest.fn().mockRejectedValue(new Error("permission revoked")) };
     const storage = { put: jest.fn().mockResolvedValue(`${companyId}/logo/44444444-4444-4444-8444-444444444444.png`),

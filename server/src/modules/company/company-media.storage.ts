@@ -1,7 +1,8 @@
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
-import { mkdir, lstat, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { access, mkdir, lstat, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 
 export type CompanyMediaKind = "logo" | "cover";
@@ -83,7 +84,7 @@ export abstract class CompanyMediaStorage {
 export class LocalCompanyMediaStorage extends CompanyMediaStorage {
   constructor(private readonly config: ConfigService) { super(); }
 
-  private async root(): Promise<string> {
+  private async root(requireWrite = false): Promise<string> {
     const root = this.config.get<string>("COMPANY_MEDIA_STORAGE_DIR");
     if (!root || !isAbsolute(root)) throw new ServiceUnavailableException({
       code: "COMPANY_MEDIA_STORAGE_UNAVAILABLE", message: "Company media storage is not configured.",
@@ -91,6 +92,7 @@ export class LocalCompanyMediaStorage extends CompanyMediaStorage {
     try {
       const stat = await lstat(root);
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("unsafe storage root");
+      await access(root, fsConstants.R_OK | (requireWrite ? fsConstants.W_OK : 0));
     } catch {
       throw new ServiceUnavailableException({
         code: "COMPANY_MEDIA_STORAGE_UNAVAILABLE", message: "Company media storage is unavailable.",
@@ -99,27 +101,29 @@ export class LocalCompanyMediaStorage extends CompanyMediaStorage {
     return root;
   }
 
-  async ready(): Promise<void> { await this.root(); }
+  async ready(): Promise<void> { await this.root(true); }
 
   async put(companyId: string, kind: CompanyMediaKind, type: CompanyMediaType, bytes: Buffer): Promise<string> {
-    const root = await this.root();
+    const root = await this.root(true);
     const key = `${companyId}/${kind}/${randomUUID()}.${EXTENSION[type]}`;
     const companyDirectory = join(root, companyId);
     const directory = join(companyDirectory, kind);
-    await mkdir(companyDirectory, { recursive: true, mode: 0o700 });
-    const companyStat = await lstat(companyDirectory);
-    if (!companyStat.isDirectory() || companyStat.isSymbolicLink()) throw new Error("Unsafe company media directory");
-    await mkdir(directory, { recursive: true, mode: 0o700 });
-    const kindStat = await lstat(directory);
-    if (!kindStat.isDirectory() || kindStat.isSymbolicLink()) throw new Error("Unsafe company media directory");
     const target = join(root, key);
     const temporary = `${target}.${randomUUID()}.tmp`;
     try {
+      await mkdir(companyDirectory, { recursive: true, mode: 0o700 });
+      const companyStat = await lstat(companyDirectory);
+      if (!companyStat.isDirectory() || companyStat.isSymbolicLink()) throw new Error("Unsafe company media directory");
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const kindStat = await lstat(directory);
+      if (!kindStat.isDirectory() || kindStat.isSymbolicLink()) throw new Error("Unsafe company media directory");
       await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
       await rename(temporary, target);
-    } catch (error) {
-      await rm(temporary, { force: true });
-      throw error;
+    } catch {
+      await rm(temporary, { force: true }).catch(() => undefined);
+      throw new ServiceUnavailableException({
+        code: "COMPANY_MEDIA_STORAGE_UNAVAILABLE", message: "Company media storage is unavailable.",
+      });
     }
     return key;
   }
@@ -141,7 +145,7 @@ export class LocalCompanyMediaStorage extends CompanyMediaStorage {
 
   async remove(key: string, companyId: string, kind: CompanyMediaKind): Promise<void> {
     if (!mediaTypeForKey(key, companyId, kind)) return;
-    const root = await this.root();
+    const root = await this.root(true);
     for (const directory of [join(root, companyId), join(root, companyId, kind)]) {
       const stat = await lstat(directory);
       if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("Unsafe company media directory");

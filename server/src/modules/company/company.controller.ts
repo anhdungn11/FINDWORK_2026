@@ -56,7 +56,8 @@ export class CompanyController {
     response.setHeader("Content-Type", type);
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
-    response.setHeader("Cache-Control", "public, max-age=300");
+    // The URL is stable while uploads replace its underlying asset.
+    response.setHeader("Cache-Control", "no-store");
     return new StreamableFile(bytes);
   }
 
