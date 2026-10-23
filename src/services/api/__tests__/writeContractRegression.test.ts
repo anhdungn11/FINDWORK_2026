@@ -468,6 +468,61 @@ describe("P0-01 Backend API Contract & HTTP Method Regression", () => {
         setWorkspaceWritesForTesting(null);
       }
     });
+
+    it("companyWorkspaceApi.getMediaUrl constructs correct URLs with optional cache busting", () => {
+      const logoUrl = companyWorkspaceApi.getMediaUrl(companyId, "logo");
+      assert.ok(logoUrl.includes(`/companies/${companyId}/media/logo`));
+
+      const coverUrlWithBust = companyWorkspaceApi.getMediaUrl(companyId, "cover", 123456789);
+      assert.ok(coverUrlWithBust.includes(`/companies/${companyId}/media/cover?t=123456789`));
+    });
+
+    it("companyWorkspaceApi.uploadMedia sends PUT /companies/:id/media/:kind with FormData", async () => {
+      setWorkspaceWritesForTesting(true);
+      const originalPut = apiClient.put;
+      let recordedUrl = "";
+      let recordedConfig: unknown = null;
+
+      try {
+        apiClient.put = (async (url: string, _body: unknown, config: unknown) => {
+          recordedUrl = url;
+          recordedConfig = config;
+          return { data: { kind: "logo", available: true } };
+        }) as never;
+
+        const fakeFile = new Blob(["fake-image-content"], { type: "image/png" }) as File;
+        const res = await companyWorkspaceApi.uploadMedia(companyId, "logo", fakeFile);
+
+        assert.equal(recordedUrl, `/companies/${companyId}/media/logo`);
+        assert.equal(res.kind, "logo");
+        assert.equal(res.available, true);
+        assert.ok((recordedConfig as { headers?: Record<string, string> })?.headers?.["Content-Type"]?.includes("multipart/form-data"));
+      } finally {
+        apiClient.put = originalPut;
+        setWorkspaceWritesForTesting(null);
+      }
+    });
+
+    it("companyWorkspaceApi.deleteMedia sends DELETE /companies/:id/media/:kind", async () => {
+      setWorkspaceWritesForTesting(true);
+      const originalDelete = apiClient.delete;
+      let recordedUrl = "";
+
+      try {
+        apiClient.delete = (async (url: string) => {
+          recordedUrl = url;
+          return { data: { kind: "cover", available: false } };
+        }) as never;
+
+        const res = await companyWorkspaceApi.deleteMedia(companyId, "cover");
+        assert.equal(recordedUrl, `/companies/${companyId}/media/cover`);
+        assert.equal(res.kind, "cover");
+        assert.equal(res.available, false);
+      } finally {
+        apiClient.delete = originalDelete;
+        setWorkspaceWritesForTesting(null);
+      }
+    });
   });
 
   describe("P0-04 Write Safety Gate Fail-Closed Verification", () => {
@@ -525,6 +580,34 @@ describe("P0-01 Backend API Contract & HTTP Method Regression", () => {
         apiClient.patch = originalPatch;
         setWorkspaceWritesForTesting(null);
       }
+    });
+
+    it("blocks media uploads and deletions when workspace writes are disabled", async () => {
+      setWorkspaceWritesForTesting(false);
+      const fakeFile = new Blob(["test"], { type: "image/png" }) as File;
+
+      await assert.rejects(
+        async () => {
+          await companyWorkspaceApi.uploadMedia("comp-1", "logo", fakeFile);
+        },
+        (err: any) => {
+          assert.equal(err.kind, "write_blocked");
+          assert.equal(err.status, 403);
+          return true;
+        },
+      );
+
+      await assert.rejects(
+        async () => {
+          await companyWorkspaceApi.deleteMedia("comp-1", "cover");
+        },
+        (err: any) => {
+          assert.equal(err.kind, "write_blocked");
+          assert.equal(err.status, 403);
+          return true;
+        },
+      );
+      setWorkspaceWritesForTesting(null);
     });
 
     it("defaults both write gates to CLOSED (false)", () => {

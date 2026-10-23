@@ -92,7 +92,7 @@ describe("Employer Workspace Functional Completion Regression", () => {
     );
   });
 
-  it("EmployerProfilePage truthfully displays brand identity and disables upload until backend contract exists", () => {
+  it("EmployerProfilePage integrates real Logo and Cover Media API with validation and fallback", () => {
     const profileSrc = readFileSync(
       new URL("../../../pages/employer/EmployerProfilePage.tsx", import.meta.url),
       "utf8"
@@ -107,9 +107,24 @@ describe("Employer Workspace Functional Completion Regression", () => {
       "Must preserve truthful documentation about server media persistence"
     );
     assert.ok(
-      profileSrc.includes("Sắp ra mắt khi Backend hoàn tất hợp đồng Media Storage") ||
-        profileSrc.includes("Chờ Backend Media Contract"),
-      "Must clearly communicate pending backend upload contract"
+      profileSrc.includes("companyWorkspaceApi.uploadMedia"),
+      "Must call companyWorkspaceApi.uploadMedia"
+    );
+    assert.ok(
+      profileSrc.includes("companyWorkspaceApi.deleteMedia"),
+      "Must call companyWorkspaceApi.deleteMedia"
+    );
+    assert.ok(
+      profileSrc.includes("companyWorkspaceApi.getMediaUrl"),
+      "Must call companyWorkspaceApi.getMediaUrl"
+    );
+    assert.ok(
+      profileSrc.includes("validateImageFile"),
+      "Must validate image format and dimensions"
+    );
+    assert.ok(
+      profileSrc.includes("ConfirmationModal"),
+      "Must confirm media deletion using ConfirmationModal"
     );
   });
 

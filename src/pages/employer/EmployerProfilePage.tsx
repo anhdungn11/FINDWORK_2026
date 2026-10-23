@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Building2,
@@ -7,8 +7,11 @@ import {
   ExternalLink,
   MapPin,
   Image as ImageIcon,
+  Upload,
+  Trash2,
+  Camera,
 } from "lucide-react";
-import { Badge, Card, EmptyState, LoadingBlock, PageHeader, ui } from "@/components/ui";
+import { Badge, Card, EmptyState, LoadingBlock, PageHeader, ConfirmationModal, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
@@ -37,6 +40,100 @@ interface FormErrors {
   taxCode?: string;
 }
 
+interface ImageValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+const validateImageFile = (
+  file: File,
+  kind: "logo" | "cover"
+): Promise<ImageValidationResult> => {
+  const type = file.type.toLowerCase();
+  const validTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+  if (!validTypes.includes(type)) {
+    return Promise.resolve({
+      valid: false,
+      error: "Định dạng tệp ảnh không được hỗ trợ. Vui lòng chỉ tải lên ảnh PNG, JPEG hoặc WebP.",
+    });
+  }
+
+  const maxBytes = kind === "logo" ? 1024 * 1024 : 2 * 1024 * 1024;
+  const maxLabel = kind === "logo" ? "1MB" : "2MB";
+  if (file.size > maxBytes) {
+    return Promise.resolve({
+      valid: false,
+      error: `Dung lượng tệp (${(file.size / (1024 * 1024)).toFixed(2)}MB) vượt quá giới hạn tối đa ${maxLabel}.`,
+    });
+  }
+
+  return new Promise((resolve) => {
+    if (typeof window === "undefined" || typeof Image === "undefined") {
+      resolve({ valid: true });
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const maxDim = kind === "logo" ? 2048 : 4096;
+      if (img.naturalWidth > maxDim || img.naturalHeight > maxDim) {
+        resolve({
+          valid: false,
+          error: `Kích thước ảnh (${img.naturalWidth}x${img.naturalHeight}px) vượt quá giới hạn tối đa ${maxDim}x${maxDim}px.`,
+        });
+        return;
+      }
+      if (img.naturalWidth * img.naturalHeight > 8388608) {
+        resolve({
+          valid: false,
+          error: `Tổng số điểm ảnh (${img.naturalWidth * img.naturalHeight}) vượt quá giới hạn 8,388,608 pixel.`,
+        });
+        return;
+      }
+      resolve({ valid: true });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({
+        valid: false,
+        error: "Không thể đọc nội dung tệp hình ảnh. Tệp có thể bị hỏng.",
+      });
+    };
+  });
+};
+
+const mapMediaError = (err: unknown): string => {
+  if (err && typeof err === "object") {
+    const errorObj = err as { code?: string; status?: number; message?: string };
+    if (errorObj.status === 503 || errorObj.code === "COMPANY_MEDIA_STORAGE_UNAVAILABLE") {
+      return "Dịch vụ lưu trữ media tập trung chưa được cấu hình trên máy chủ (503 COMPANY_MEDIA_STORAGE_UNAVAILABLE). Vui lòng liên hệ quản trị viên.";
+    }
+    if (errorObj.status === 413 || errorObj.code === "COMPANY_MEDIA_SIZE_INVALID") {
+      return "Tệp ảnh vượt quá dung lượng tối đa cho phép của máy chủ (HTTP 413 Payload Too Large).";
+    }
+    if (errorObj.status === 415 || errorObj.code === "COMPANY_MEDIA_TYPE_INVALID") {
+      return "Định dạng tệp ảnh không được máy chủ hỗ trợ. Vui lòng tải lên ảnh PNG, JPEG hoặc WebP.";
+    }
+    if (errorObj.code === "COMPANY_MEDIA_DIMENSIONS_INVALID") {
+      return "Kích thước chiều ảnh vượt quá giới hạn máy chủ cho phép.";
+    }
+    if (errorObj.code === "COMPANY_MEDIA_FILE_REQUIRED") {
+      return "Vui lòng chọn tệp hình ảnh hợp lệ để tải lên.";
+    }
+    if (errorObj.status === 403) {
+      return "Bạn không có quyền cập nhật phương tiện nhận diện của doanh nghiệp này.";
+    }
+    if (errorObj.status === 401) {
+      return "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.";
+    }
+    if (errorObj.message) {
+      return errorObj.message;
+    }
+  }
+  return "Không thể thao tác với tệp ảnh. Vui lòng thử lại sau.";
+};
+
 const EmployerProfilePage = () => {
   const { active, reload: reloadWorkspace } = useCompanyWorkspace();
   const [params, setParams] = useSearchParams();
@@ -54,6 +151,112 @@ const EmployerProfilePage = () => {
   const [saving, setSaving] = useState(false);
   const [requestingVerify, setRequestingVerify] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const [logoBust, setLogoBust] = useState<number>(Date.now());
+  const [coverBust, setCoverBust] = useState<number>(Date.now());
+  const [logoError, setLogoError] = useState(false);
+  const [coverError, setCoverError] = useState(false);
+  const [uploadingKind, setUploadingKind] = useState<"logo" | "cover" | null>(null);
+  const [mediaNotice, setMediaNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    tone: "danger" | "primary" | "warning";
+    action: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmLabel: "Xác nhận",
+    tone: "danger",
+    action: async () => {},
+  });
+  const [dialogLoading, setDialogLoading] = useState(false);
+
+  const triggerDeleteMedia = (kind: "logo" | "cover") => {
+    const isLogo = kind === "logo";
+    setConfirmDialog({
+      isOpen: true,
+      title: isLogo ? "Xác nhận xóa logo doanh nghiệp" : "Xác nhận xóa ảnh bìa doanh nghiệp",
+      description: isLogo
+        ? "Bạn có chắc chắn muốn xóa logo doanh nghiệp? Giao diện sẽ quay về huy hiệu nhận diện mặc định theo tên viết tắt."
+        : "Bạn có chắc chắn muốn xóa ảnh bìa doanh nghiệp? Giao diện sẽ hiển thị màu nền mặc định.",
+      confirmLabel: isLogo ? "Xóa logo" : "Xóa ảnh bìa",
+      tone: "danger",
+      action: async () => {
+        setDialogLoading(true);
+        try {
+          await companyWorkspaceApi.deleteMedia(active.id, kind);
+          if (isLogo) {
+            setLogoError(true);
+            setLogoBust(Date.now());
+          } else {
+            setCoverError(true);
+            setCoverBust(Date.now());
+          }
+          setMediaNotice({
+            tone: "ok",
+            text: isLogo ? "Đã xóa logo thành công." : "Đã xóa ảnh bìa thành công.",
+          });
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        } catch (err) {
+          setMediaNotice({ tone: "error", text: mapMediaError(err) });
+        } finally {
+          setDialogLoading(false);
+        }
+      },
+    });
+  };
+
+  const handleFileChange = async (
+    kind: "logo" | "cover",
+    e: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setMediaNotice(null);
+
+    const validation = await validateImageFile(file, kind);
+    if (!validation.valid) {
+      setMediaNotice({
+        tone: "error",
+        text: validation.error || "Tệp hình ảnh không hợp lệ.",
+      });
+      return;
+    }
+
+    setUploadingKind(kind);
+    try {
+      await companyWorkspaceApi.uploadMedia(active.id, kind, file);
+      const now = Date.now();
+      if (kind === "logo") {
+        setLogoError(false);
+        setLogoBust(now);
+      } else {
+        setCoverError(false);
+        setCoverBust(now);
+      }
+      setMediaNotice({
+        tone: "ok",
+        text: kind === "logo" ? "Tải lên logo doanh nghiệp thành công." : "Tải lên ảnh bìa doanh nghiệp thành công.",
+      });
+    } catch (err) {
+      setMediaNotice({
+        tone: "error",
+        text: mapMediaError(err),
+      });
+    } finally {
+      setUploadingKind(null);
+    }
+  };
 
   const writes = isWorkspaceWritesEnabled();
   const canUpdate = canUpdateCompany(active.memberRoleNames);
@@ -360,7 +563,7 @@ const EmployerProfilePage = () => {
                 width: 76,
                 height: 76,
                 borderRadius: 14,
-                background: "linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%)",
+                background: !logoError ? "#ffffff" : "linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%)",
                 border: "2px solid #c7d2fe",
                 color: "var(--color-primary, #4f6ef7)",
                 display: "flex",
@@ -370,9 +573,19 @@ const EmployerProfilePage = () => {
                 fontWeight: 800,
                 flexShrink: 0,
                 boxShadow: "0 4px 10px rgba(79, 110, 247, 0.12)",
+                overflow: "hidden",
               }}
             >
-              {companyInitials}
+              {!logoError ? (
+                <img
+                  src={companyWorkspaceApi.getMediaUrl(active.id, "logo", logoBust)}
+                  alt={`Logo ${profile.data.name}`}
+                  onError={() => setLogoError(true)}
+                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                />
+              ) : (
+                companyInitials
+              )}
             </div>
             <div style={{ flex: 1, minWidth: 260 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -404,53 +617,228 @@ const EmployerProfilePage = () => {
 
           {/* TRUTHFUL BRAND IDENTITY & MEDIA CARD */}
           <Card title="Hình ảnh & Nhận diện thương hiệu">
-            <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+            {mediaNotice && (
+              <div
+                className={`${ui.notice} ${mediaNotice.tone === "ok" ? ui.noticeOk : ui.noticeError}`}
+                role="alert"
+                style={{ marginBottom: 16 }}
+              >
+                {mediaNotice.text}
+              </div>
+            )}
+
+            {/* Hidden file selectors */}
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: "none" }}
+              onChange={(e) => handleFileChange("logo", e)}
+            />
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: "none" }}
+              onChange={(e) => handleFileChange("cover", e)}
+            />
+
+            {/* COVER IMAGE HERO WRAPPER */}
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: 180,
+                borderRadius: 12,
+                overflow: "hidden",
+                backgroundColor: "var(--color-surface-soft, #f1f5f9)",
+                border: "1px solid var(--color-border, #e2e8f0)",
+                marginBottom: 44,
+              }}
+            >
+              {!coverError ? (
+                <img
+                  src={companyWorkspaceApi.getMediaUrl(active.id, "cover", coverBust)}
+                  alt={`Ảnh bìa ${profile.data.name}`}
+                  onError={() => setCoverError(true)}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
+                    color: "#94a3b8",
+                    gap: 6,
+                  }}
+                >
+                  <ImageIcon size={28} />
+                  <span style={{ fontSize: "0.8125rem", color: "#cbd5e1" }}>
+                    Chưa thiết lập ảnh bìa doanh nghiệp (sử dụng nền mặc định)
+                  </span>
+                </div>
+              )}
+
+              {/* Cover Action Buttons Overlay */}
               <div
                 style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: 12,
-                  background: "#f1f5f9",
-                  border: "1.5px dashed #cbd5e1",
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
                   display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 4,
-                  color: "#64748b",
-                  flexShrink: 0,
+                  gap: 8,
                 }}
               >
-                <ImageIcon size={24} />
-                <span style={{ fontSize: "10px", fontWeight: 600 }}>Logo</span>
-              </div>
-              <div style={{ flex: 1, minWidth: 260 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <h3 style={{ margin: 0, fontSize: "0.9375rem", fontWeight: 600 }}>Huy hiệu nhận diện thương hiệu chuẩn hóa</h3>
-                  <Badge tone="info">Tự động sinh theo tên</Badge>
-                </div>
-                <div
-                  className={ui.notice}
-                  style={{ fontSize: "0.85rem", background: "var(--color-surface-soft, #f8fafc)", margin: "0 0 12px" }}
+                <button
+                  type="button"
+                  className={ui.btn}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.92)",
+                    backdropFilter: "blur(4px)",
+                    fontSize: "0.8125rem",
+                    padding: "6px 12px",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                  }}
+                  disabled={!canUpdate || !writes || uploadingKind !== null}
+                  title={!writes ? "Cổng ghi đang khóa trong chế độ chỉ xem" : !canUpdate ? "Chỉ thành viên quản trị mới có quyền thay đổi ảnh bìa" : undefined}
+                  onClick={() => coverInputRef.current?.click()}
                 >
-                  <strong>Lưu ý về định dạng nhận diện thương hiệu:</strong> Dữ liệu định danh, giới thiệu và địa điểm được đồng bộ trực tiếp tới máy chủ và trang tuyển dụng công khai. Hiện tại máy chủ chưa hỗ trợ lưu trữ tệp ảnh tải lên; giao diện sử dụng huy hiệu nhận diện tự động từ tên doanh nghiệp.
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Camera size={14} style={{ marginRight: 6 }} />
+                  {uploadingKind === "cover" ? "Đang tải ảnh bìa..." : !coverError ? "Đổi ảnh bìa" : "Tải ảnh bìa mới"}
+                </button>
+                {!coverError && (
                   <button
                     type="button"
                     className={ui.btn}
-                    disabled
-                    aria-disabled="true"
-                    title="Chức năng tải tệp ảnh trực tiếp đang đợi dịch vụ lưu trữ media tập trung từ Backend"
-                    style={{ opacity: 0.6, cursor: "not-allowed" }}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.92)",
+                      backdropFilter: "blur(4px)",
+                      fontSize: "0.8125rem",
+                      padding: "6px 10px",
+                      color: "var(--color-danger, #ef4444)",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                    }}
+                    disabled={!canUpdate || !writes || uploadingKind !== null}
+                    title={!writes ? "Cổng ghi đang khóa trong chế độ chỉ xem" : "Xóa ảnh bìa hiện tại"}
+                    onClick={() => triggerDeleteMedia("cover")}
                   >
-                    Tải logo mới
+                    <Trash2 size={14} />
                   </button>
-                  <span style={{ fontSize: "0.8rem", color: "var(--color-text-secondary, #64748b)" }}>
-                    Sắp ra mắt khi Backend hoàn tất hợp đồng Media Storage.
-                  </span>
-                </div>
+                )}
               </div>
+
+              {/* OVERLAPPING LOGO BADGE */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: -24,
+                  left: 20,
+                  width: 80,
+                  height: 80,
+                  borderRadius: 12,
+                  border: "3px solid #ffffff",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  backgroundColor: "#ffffff",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {!logoError ? (
+                  <img
+                    src={companyWorkspaceApi.getMediaUrl(active.id, "logo", logoBust)}
+                    alt={`Logo ${profile.data.name}`}
+                    onError={() => setLogoError(true)}
+                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      background: "linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%)",
+                      color: "var(--color-primary, #4f6ef7)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontWeight: 700,
+                      fontSize: "1.5rem",
+                    }}
+                  >
+                    {companyInitials}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* LOGO ACTIONS AND LABELS */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 16,
+                paddingBottom: 8,
+              }}
+            >
+              <div style={{ marginLeft: 112, flex: 1, minWidth: 220 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <h3 style={{ margin: 0, fontSize: "0.9375rem", fontWeight: 600 }}>
+                    Logo thương hiệu tuyển dụng
+                  </h3>
+                  {!logoError ? (
+                    <Badge tone="success">Đã tùy chỉnh</Badge>
+                  ) : (
+                    <Badge tone="neutral">Mặc định từ tên</Badge>
+                  )}
+                </div>
+                <p style={{ margin: "4px 0 0", fontSize: "0.8125rem", color: "var(--color-text-secondary, #64748b)" }}>
+                  Logo vuông hoặc chữ nhật, PNG, JPEG hoặc WebP. Dung lượng tối đa 1MB, kích thước tối đa 2048x2048px.
+                </p>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  type="button"
+                  className={`${ui.btn} ${ui.btnPrimary}`}
+                  disabled={!canUpdate || !writes || uploadingKind !== null}
+                  title={!writes ? "Cổng ghi đang khóa trong chế độ chỉ xem" : !canUpdate ? "Chỉ thành viên quản trị mới có quyền thay đổi logo" : undefined}
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  <Upload size={14} style={{ marginRight: 6 }} />
+                  {uploadingKind === "logo" ? "Đang tải logo..." : !logoError ? "Đổi logo mới" : "Tải logo mới"}
+                </button>
+                {!logoError && (
+                  <button
+                    type="button"
+                    className={ui.btn}
+                    disabled={!canUpdate || !writes || uploadingKind !== null}
+                    title={!writes ? "Cổng ghi đang khóa trong chế độ chỉ xem" : "Xóa logo tùy chỉnh"}
+                    onClick={() => triggerDeleteMedia("logo")}
+                  >
+                    <Trash2 size={14} color="var(--color-danger, #ef4444)" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* INFORMATIVE NOTICE SECTION */}
+            <div
+              className={ui.notice}
+              style={{
+                fontSize: "0.85rem",
+                background: "var(--color-surface-soft, #f8fafc)",
+                margin: "16px 0 0",
+              }}
+            >
+              <strong>Lưu ý về định dạng nhận diện thương hiệu:</strong> Dữ liệu logo và ảnh bìa được lưu trữ an toàn trên dịch vụ Media Storage của hệ thống và phân phối có bộ đệm công khai (5 phút). Kích thước ảnh bìa tối đa 2MB (4096px), logo tối đa 1MB (2048px). Khi chưa tải ảnh tùy chỉnh, hệ thống sử dụng huy hiệu nhận diện tự động từ tên doanh nghiệp.
             </div>
           </Card>
 
@@ -957,6 +1345,17 @@ const EmployerProfilePage = () => {
           )}
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmLabel={confirmDialog.confirmLabel}
+        tone={confirmDialog.tone}
+        loading={dialogLoading}
+        onConfirm={confirmDialog.action}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </>
   );
 };

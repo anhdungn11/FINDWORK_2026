@@ -129,6 +129,13 @@ export interface CompanyProfileDto {
   status: string | null;
 }
 
+export type CompanyMediaKind = "logo" | "cover";
+
+export interface CompanyMediaResponse {
+  kind: CompanyMediaKind;
+  available: boolean;
+}
+
 export const ASSIGNABLE_COMPANY_ROLES = ["ADMIN", "HR_MANAGER", "RECRUITER", "HIRING_MANAGER", "VIEWER"] as const;
 export type AssignableCompanyRole = (typeof ASSIGNABLE_COMPANY_ROLES)[number];
 

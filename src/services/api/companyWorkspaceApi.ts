@@ -1,4 +1,4 @@
-import { apiClient } from "../http/apiClient";
+import { apiClient, getApiBaseUrl } from "../http/apiClient";
 import { isWorkspaceWritesEnabled } from "../../config/featureFlags";
 import { toApiFailure, writeBlockedFailure } from "./apiFailure";
 import {
@@ -9,7 +9,7 @@ import {
   type MyCompanyDto, type Paged, type SalaryPeriod, type WorkplaceType,
   type CompanyApplicationDto, type ApplicationReviewStatus,
   type CompanyMemberDto, type CompanyInvitationDto, type AssignableCompanyRole,
-  type ScreeningQuestionDto, type ScreeningQuestionInput,
+  type ScreeningQuestionDto, type ScreeningQuestionInput, type CompanyMediaKind, type CompanyMediaResponse,
 } from "./apiTypes";
 
 export interface JobInput {
@@ -258,6 +258,46 @@ export const companyWorkspaceApi = {
         ),
       ),
     );
+  },
+
+  getMediaUrl: (companyId: string, kind: CompanyMediaKind, cacheBust?: number): string => {
+    const base = `${getApiBaseUrl()}/companies/${encodeURIComponent(companyId)}/media/${kind}`;
+    return cacheBust ? `${base}?t=${cacheBust}` : base;
+  },
+
+  uploadMedia: async (
+    companyId: string,
+    kind: CompanyMediaKind,
+    file: File,
+  ): Promise<CompanyMediaResponse> => {
+    guardWrite(`tải lên phương tiện ${kind}`);
+    return run(async () => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiClient.put<CompanyMediaResponse>(
+        `/companies/${encodeURIComponent(companyId)}/media/${kind}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        },
+      );
+      return res.data;
+    });
+  },
+
+  deleteMedia: async (
+    companyId: string,
+    kind: CompanyMediaKind,
+  ): Promise<CompanyMediaResponse> => {
+    guardWrite(`xóa phương tiện ${kind}`);
+    return run(async () => {
+      const res = await apiClient.delete<CompanyMediaResponse>(
+        `/companies/${encodeURIComponent(companyId)}/media/${kind}`,
+      );
+      return res.data;
+    });
   },
 };
 

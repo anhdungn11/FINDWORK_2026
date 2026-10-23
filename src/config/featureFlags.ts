@@ -3,11 +3,11 @@
  *
  * WORKSPACE WRITES GATE (Company & Admin):
  * Mặc định TẮT (false). Chỉ kích hoạt khi:
- * 1. Cấu hình VITE_ENABLE_WORKSPACE_WRITES=true được chỉ định tường minh.
+ * 1. Cấu hình VITE_ENABLE_WORKSPACE_WRITES=true hoặc VITE_ENABLE_LIVE_WRITES=true được chỉ định tường minh.
  * 2. Trong môi trường trình duyệt:
- *    - Cổng frontend bắt buộc phải là "5173" (test instance cô lập).
- *    - Tuyệt đối cấm kết nối tới backend dev (port 3000 / findwork_dev).
- *    - Chỉ cho phép khi backend target là 127.0.0.1:3001 (findwork_test).
+ *    - Cổng frontend bắt buộc phải là "5173" (test instance cô lập) hoặc "5176" (dev demo session).
+ *    - Tuyệt đối cấm kết nối tới backend dev (port 3000 / findwork_dev) khi chạy trên cổng test 5173.
+ *    - Chỉ cho phép khi backend target là 127.0.0.1:3001 (findwork_test) trên cổng test 5173.
  * Khi tắt, mọi thao tác ghi (POST/PATCH/DELETE) bị chặn ngay tại client service,
  * không có bất kỳ request ghi nào được gửi tới máy chủ.
  */
@@ -16,8 +16,19 @@ let testOverride: boolean | null = null;
 export const isWorkspaceWritesEnabled = (): boolean => {
   if (testOverride !== null) return testOverride;
 
-  // 1. Phải được kích hoạt tường minh qua biến môi trường
-  if (import.meta.env?.VITE_ENABLE_WORKSPACE_WRITES !== "true") {
+  // 1. Phải được kích hoạt tường minh qua biến môi trường (chấp nhận cả VITE_ENABLE_WORKSPACE_WRITES hoặc VITE_ENABLE_LIVE_WRITES)
+  const envWorkspace = import.meta.env?.VITE_ENABLE_WORKSPACE_WRITES;
+  const envLive = import.meta.env?.VITE_ENABLE_LIVE_WRITES;
+
+  const isExplicitlyEnabled =
+    envWorkspace === "true" ||
+    envWorkspace === true ||
+    envWorkspace === "1" ||
+    envLive === "true" ||
+    envLive === true ||
+    envLive === "1";
+
+  if (!isExplicitlyEnabled) {
     return false;
   }
 

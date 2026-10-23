@@ -44,6 +44,20 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
+    define: {
+      "import.meta.env.VITE_ENABLE_WORKSPACE_WRITES": JSON.stringify(
+        process.env.VITE_ENABLE_WORKSPACE_WRITES ?? env.VITE_ENABLE_WORKSPACE_WRITES ?? ""
+      ),
+      "import.meta.env.VITE_ENABLE_LIVE_WRITES": JSON.stringify(
+        process.env.VITE_ENABLE_LIVE_WRITES ?? env.VITE_ENABLE_LIVE_WRITES ?? ""
+      ),
+      "import.meta.env.VITE_BACKEND_TARGET": JSON.stringify(
+        process.env.VITE_BACKEND_TARGET ?? env.VITE_BACKEND_TARGET ?? ""
+      ),
+      "import.meta.env.VITE_BACKEND_PORT": JSON.stringify(
+        process.env.VITE_BACKEND_PORT ?? env.VITE_BACKEND_PORT ?? ""
+      ),
+    },
     // Isolate Vite pre-bundle cache between test (5173) and dev (5176) to eliminate file lock contention
     cacheDir: isTestInstance ? "node_modules/.vite-test" : "node_modules/.vite",
     server: {
@@ -58,21 +72,19 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id: string) {
-          if (id.includes("node_modules")) {
-            if (id.includes("lucide-react")) return "lucide";
-            if (id.includes("react-router-dom") || id.includes("react-dom") || id.includes("react/")) return "vendor";
-            if (id.includes("zustand") || id.includes("axios")) return "state";
-            return "deps";
-          }
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (id.includes("node_modules")) {
+              if (id.includes("lucide-react")) return "lucide";
+              if (id.includes("react-router-dom") || id.includes("react-dom") || id.includes("react/")) return "vendor";
+              if (id.includes("zustand") || id.includes("axios")) return "state";
+              return "deps";
+            }
+          },
         },
       },
     },
-  },
-};
+  };
 });
-
-
