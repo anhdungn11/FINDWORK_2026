@@ -135,6 +135,27 @@
   gap: 12px;
 }
 
+.aiAssistantBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
+  border: 1px solid #c7d2fe;
+  color: var(--color-primary, #4f6ef7);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.aiAssistantBtn:hover {
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  color: #3730a3;
+  box-shadow: 0 1px 3px rgba(79, 110, 247, 0.2);
+}
+
 .postJobBtn {
   display: inline-flex;
   align-items: center;

@@ -58,8 +58,12 @@ export default defineConfig(({ mode }) => {
         process.env.VITE_BACKEND_PORT ?? env.VITE_BACKEND_PORT ?? ""
       ),
     },
-    // Isolate Vite pre-bundle cache between test (5173) and dev (5176) to eliminate file lock contention
-    cacheDir: isTestInstance ? "node_modules/.vite-test" : "node_modules/.vite",
+    // Isolate Vite pre-bundle cache between test (5173), dev (5176) and integration (5177) to eliminate file lock contention
+    cacheDir: isTestInstance
+      ? "node_modules/.vite-test"
+      : process.env.VITE_PORT === "5177" || env.VITE_PORT === "5177"
+      ? "node_modules/.vite-integration"
+      : "node_modules/.vite",
     server: {
       proxy: {
         "/api/v1": {

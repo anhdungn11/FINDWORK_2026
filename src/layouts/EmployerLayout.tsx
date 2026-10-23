@@ -15,11 +15,13 @@ import {
   Menu,
   X,
   User,
+  Sparkles,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { canManageJobs } from "@/features/company/companyWorkspacePermissions";
 import { Badge } from "@/components/ui";
+import { AiAssistantModal } from "@/features/ai/AiAssistantModal";
 import styles from "./EmployerLayout.module.css";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -33,6 +35,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 const EmployerLayout = () => {
   const [open, setOpen] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -147,6 +150,16 @@ const EmployerLayout = () => {
 
         {/* RIGHT ACTIONS */}
         <div className={styles.topbarRight}>
+          <button
+            type="button"
+            className={styles.aiAssistantBtn}
+            onClick={() => setAiModalOpen(true)}
+            title="Mở Trợ lý tuyển dụng AI"
+          >
+            <Sparkles size={16} />
+            <span>Trợ lý AI</span>
+          </button>
+
           {canManageJobs(active?.memberRoleNames) && (
             <Link to="/employer/jobs/new" className={styles.postJobBtn}>
               <Plus size={16} />
@@ -348,6 +361,12 @@ const EmployerLayout = () => {
           <Outlet />
         </main>
       </div>
+
+      <AiAssistantModal
+        isOpen={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+        contextHint={active?.name ? `Doanh nghiệp: ${active.name}` : undefined}
+      />
     </div>
   );
 };

@@ -3,12 +3,15 @@ import { parseAuthResponse } from "../services/http/authResponse";
 import { apiClient, extractApiErrorMessage, setAuthToken } from "../services/http/apiClient";
 import { API_ENDPOINTS } from "../services/http/endpoints";
 
+export type AccountType = "CANDIDATE" | "EMPLOYER" | "LEGACY_UNCLASSIFIED";
+
 export interface AuthUser {
   id: string;
   email: string;
   fullName?: string;
   role?: string;
   status?: string;
+  accountType?: AccountType;
 }
 
 interface LoginResponse {

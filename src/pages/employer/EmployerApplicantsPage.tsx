@@ -29,6 +29,12 @@ import {
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 import { WritesDisabledNotice } from "./EmployerDashboardPage";
+import {
+  InterviewSchedulingModal,
+  type ScheduledInterviewData,
+  getScheduledInterview,
+  saveScheduledInterview,
+} from "@/features/interview/InterviewSchedulingModal";
 
 const STATUS_FILTERS: Array<{ value: string; label: string }> = [
   { value: "", label: "Tất cả trạng thái xét duyệt" },
@@ -66,6 +72,8 @@ const EmployerApplicantsPage = () => {
   const [activeApplication, setActiveApplication] = useState<CompanyApplicationDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [interviewTargetApp, setInterviewTargetApp] = useState<CompanyApplicationDto | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
   const writes = isWorkspaceWritesEnabled();
   const canReview = canReviewApplications(active.memberRoleNames);
@@ -121,6 +129,18 @@ const EmployerApplicantsPage = () => {
   };
 
   const handleReview = async (app: CompanyApplicationDto, nextStatus: ApplicationReviewStatus) => {
+    if (nextStatus === "INTERVIEW") {
+      setInterviewTargetApp(app);
+      return;
+    }
+    await executeReview(app, nextStatus);
+  };
+
+  const executeReview = async (
+    app: CompanyApplicationDto,
+    nextStatus: ApplicationReviewStatus,
+    customNotice?: string,
+  ) => {
     setBusyId(app.id);
     setNotice(null);
     try {
@@ -133,7 +153,9 @@ const EmployerApplicantsPage = () => {
       );
       setNotice({
         tone: "ok",
-        text: `Đã chuyển trạng thái ứng viên “${app.fullNameSnapshot || app.emailSnapshot || app.id}” sang: ${APPLICATION_STATUS_LABEL[nextStatus]}.`,
+        text:
+          customNotice ||
+          `Đã chuyển trạng thái ứng viên “${app.fullNameSnapshot || app.emailSnapshot || app.id}” sang: ${APPLICATION_STATUS_LABEL[nextStatus]}.`,
       });
       if (activeApplication?.id === app.id) {
         setActiveApplication(updated);
@@ -143,6 +165,28 @@ const EmployerApplicantsPage = () => {
       setNotice({ tone: "error", text: toApiFailure(e).message });
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const handleScheduleConfirm = async (data: ScheduledInterviewData) => {
+    if (!interviewTargetApp) return;
+    setScheduleLoading(true);
+    try {
+      saveScheduledInterview(interviewTargetApp.id, data);
+      const formatName =
+        data.format === "ZOOM"
+          ? "Trực tuyến Zoom"
+          : data.format === "MEET"
+          ? "Google Meet"
+          : "Trực tiếp tại văn phòng";
+      await executeReview(
+        interviewTargetApp,
+        "INTERVIEW",
+        `Đã lên lịch phỏng vấn (${formatName} lúc ${new Date(data.scheduledAt).toLocaleString("vi-VN")}) và cập nhật trạng thái ứng viên sang: ${APPLICATION_STATUS_LABEL.INTERVIEW}.`,
+      );
+      setInterviewTargetApp(null);
+    } finally {
+      setScheduleLoading(false);
     }
   };
 
@@ -457,6 +501,68 @@ const EmployerApplicantsPage = () => {
             </div>
 
             <div style={{ display: "grid", gap: 18 }}>
+              {(() => {
+                const activeSavedInterview = activeApplication ? getScheduledInterview(activeApplication.id) : null;
+                if (!activeSavedInterview) return null;
+                return (
+                  <Card title="Lịch phỏng vấn đã xếp">
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                      <div>
+                        <span className={ui.hint}>Thời gian phỏng vấn:</span>
+                        <div style={{ fontWeight: 600 }}>
+                          {new Date(activeSavedInterview.scheduledAt).toLocaleString("vi-VN")} ({activeSavedInterview.durationMinutes} phút)
+                        </div>
+                      </div>
+                      <div>
+                        <span className={ui.hint}>Hình thức:</span>
+                        <div style={{ fontWeight: 600 }}>
+                          {activeSavedInterview.format === "ZOOM"
+                            ? "Trực tuyến Zoom"
+                            : activeSavedInterview.format === "MEET"
+                            ? "Google Meet"
+                            : "Trực tiếp tại văn phòng"}
+                        </div>
+                      </div>
+                      {activeSavedInterview.meetingUrl && (
+                        <div>
+                          <span className={ui.hint}>Link phòng họp:</span>
+                          <div>
+                            <a
+                              href={activeSavedInterview.meetingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "var(--color-primary, #4f6ef7)", wordBreak: "break-all" }}
+                            >
+                              {activeSavedInterview.meetingUrl}
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                      {activeSavedInterview.locationAddress && (
+                        <div>
+                          <span className={ui.hint}>Địa chỉ văn phòng:</span>
+                          <div style={{ fontWeight: 600 }}>{activeSavedInterview.locationAddress}</div>
+                        </div>
+                      )}
+                      {activeSavedInterview.interviewerName && (
+                        <div>
+                          <span className={ui.hint}>Người phỏng vấn:</span>
+                          <div style={{ fontWeight: 600 }}>{activeSavedInterview.interviewerName}</div>
+                        </div>
+                      )}
+                      {activeSavedInterview.notes && (
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <span className={ui.hint}>Ghi chú cho ứng viên:</span>
+                          <div style={{ whiteSpace: "pre-wrap", background: "#f8fafc", padding: "8px 12px", borderRadius: 6, fontSize: "0.875rem", marginTop: 4 }}>
+                            {activeSavedInterview.notes}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })()}
+
               {/* CONTACT DETAILS CARD */}
               <Card title="Thông tin liên hệ & Thời gian làm việc">
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
@@ -669,6 +775,18 @@ const EmployerApplicantsPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {interviewTargetApp && (
+        <InterviewSchedulingModal
+          isOpen={Boolean(interviewTargetApp)}
+          onClose={() => setInterviewTargetApp(null)}
+          candidateName={interviewTargetApp.fullNameSnapshot || interviewTargetApp.emailSnapshot || "Ứng viên"}
+          candidateEmail={interviewTargetApp.emailSnapshot || ""}
+          jobTitle={currentJobObj?.title || "Vị trí tuyển dụng"}
+          onScheduleConfirm={handleScheduleConfirm}
+          loading={scheduleLoading}
+        />
       )}
     </>
   );

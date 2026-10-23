@@ -37,9 +37,10 @@ export const isWorkspaceWritesEnabled = (): boolean => {
     const port = window.location.port;
     const isTestPort = port === "5173";
     const isDevDemoPort = port === "5176";
+    const isIntegrationPort = port === "5177";
 
-    // Chỉ cho phép chạy trên port 5173 (test instance) hoặc 5176 (dev demo session)
-    if (!isTestPort && !isDevDemoPort) {
+    // Chỉ cho phép chạy trên port 5173 (test), 5176 (dev demo) hoặc 5177 (isolated integration)
+    if (!isTestPort && !isDevDemoPort && !isIntegrationPort) {
       return false;
     }
 
@@ -57,8 +58,8 @@ export const isWorkspaceWritesEnabled = (): boolean => {
       return false;
     }
 
-    // Đối với port 5176 (dev demo có kiểm soát): cho phép khi env opt-in được bật tường minh
-    if (isDevDemoPort) {
+    // Đối với port 5176 (dev demo) hoặc 5177 (isolated integration): cho phép khi env opt-in được bật tường minh
+    if (isDevDemoPort || isIntegrationPort) {
       return true;
     }
 

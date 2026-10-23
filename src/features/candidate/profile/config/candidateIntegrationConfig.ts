@@ -73,9 +73,10 @@ export function isLiveWritesEnabled(): boolean {
   const port = window.location.port;
   const isTestPort = port === "5173";
   const isDevDemoPort = port === "5176";
+  const isIntegrationPort = port === "5177";
 
-  // Khóa cứng: chỉ chấp nhận cổng Frontend Test cô lập (5173) hoặc DEV Demo session (5176)
-  if (!isTestPort && !isDevDemoPort) {
+  // Khóa cứng: chỉ chấp nhận cổng Frontend Test cô lập (5173), DEV Demo session (5176) hoặc Integration (5177)
+  if (!isTestPort && !isDevDemoPort && !isIntegrationPort) {
     return false;
   }
 
@@ -93,8 +94,8 @@ export function isLiveWritesEnabled(): boolean {
     return false;
   }
 
-  // Đối với port 5176 (dev demo): cho phép khi env opt-in được thiết lập tường minh
-  if (isDevDemoPort) {
+  // Đối với port 5176 (dev demo) hoặc 5177 (isolated integration): cho phép khi env opt-in được thiết lập tường minh
+  if (isDevDemoPort || isIntegrationPort) {
     return true;
   }
 
