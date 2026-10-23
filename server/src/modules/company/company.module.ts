@@ -17,11 +17,14 @@ import { CompanyMembersController } from "./company-members.controller";
 import { CompanyMembersService } from "./company-members.service";
 import { CompanyMediaService } from "./company-media.service";
 import { CompanyMediaStorage, LocalCompanyMediaStorage } from "./company-media.storage";
+import { AdminCompanyLegalController, CompanyLegalController } from "./company-legal.controller";
+import { CompanyLegalService } from "./company-legal.service";
+import { CompanyLegalStorage } from "./company-legal.storage";
 
 @Module({
   imports: [AuthModule, AuthorizationModule, PrismaModule, EmailDeliveryModule],
   controllers: [
-    CompanyController, CompanyProfileLocationsController,
+    CompanyController, CompanyProfileLocationsController, CompanyLegalController, AdminCompanyLegalController,
     CompanyInvitationsController, CompanyInvitationAcceptanceController,
     CompanyMembersController,
   ],
@@ -31,6 +34,7 @@ import { CompanyMediaStorage, LocalCompanyMediaStorage } from "./company-media.s
     CompanyInvitationsRepository, CompanyInvitationsService, CompanyInvitationDeliveryService,
     CompanyMembersService,
     CompanyMediaService,
+    CompanyLegalService, CompanyLegalStorage,
     { provide: CompanyMediaStorage, useClass: LocalCompanyMediaStorage },
   ],
 })

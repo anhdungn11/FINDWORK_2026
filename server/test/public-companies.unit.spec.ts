@@ -16,6 +16,7 @@ function fixture() {
     id: companyId, name: "Acme", slug: "acme", description: "Public description",
     website: "https://acme.example", employeeSizeRange: "10-50", foundedYear: 2020,
     verificationStatus: "UNVERIFIED", industry: { id: "industry", code: "tech", name: "Technology" },
+    logoAssetKey: "private-key", coverAssetKey: null,
     locations: [{ countryCode: "VN", province: { id: provinceId, code: "79", name: "HCMC" }, ward: null }],
     _count: { jobs: 2 },
   };
@@ -79,14 +80,15 @@ describe("public company discovery", () => {
       orderBy: [{ name: "asc" }, { id: "asc" }], skip: 10, take: 10,
     }));
     const select = company.findMany.mock.calls[0][0].select;
-    for (const secret of ["createdByUserId", "taxCode", "legalName", "members", "invitations", "auditLogs", "logoAssetKey", "coverAssetKey"]) {
+    for (const secret of ["createdByUserId", "taxCode", "legalName", "members", "invitations", "auditLogs"]) {
       expect(select[secret]).toBeUndefined();
     }
     expect(select._count.select.jobs.where).toMatchObject({ status: "PUBLISHED", category: { isActive: true } });
     expect(result).toEqual({ data: [expect.objectContaining({
       id: companyId, jobsCount: 2, isVerified: false,
+      logoUrl: `/api/v1/companies/${companyId}/media/logo`, coverUrl: null,
     })], pagination: { page: 2, pageSize: 10, total: 1, totalPages: 1 } });
-    expect(JSON.stringify(result)).not.toMatch(/taxCode|email|member|invitation|audit/);
+    expect(JSON.stringify(result)).not.toMatch(/taxCode|email|member|invitation|audit|private-key|logoAssetKey/);
   });
 
   it("hides inactive company details and constrains public jobs by company", async () => {

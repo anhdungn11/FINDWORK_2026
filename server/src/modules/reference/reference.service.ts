@@ -1,6 +1,19 @@
 import { Injectable } from "@nestjs/common";
+import { isISO31661Alpha2 } from "class-validator";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
-import { CertificateQueryDto, ReferenceQueryDto, SkillCategoryQueryDto, SkillQueryDto, WardQueryDto } from "./dto/reference-query.dto";
+import { CertificateQueryDto, LocationQueryDto, ReferenceQueryDto, SkillCategoryQueryDto, SkillQueryDto, WardQueryDto } from "./dto/reference-query.dto";
+
+function searchKey(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d").toLocaleLowerCase("vi").trim();
+}
+
+const countryNames = new Intl.DisplayNames(["vi"], { type: "region" });
+const englishCountryNames = new Intl.DisplayNames(["en"], { type: "region" });
+const countries = Array.from({ length: 26 * 26 }, (_, i) => String.fromCharCode(65 + Math.floor(i / 26), 65 + i % 26))
+  .filter((code) => isISO31661Alpha2(code))
+  .map((code) => ({ code, name: countryNames.of(code) ?? code, englishName: englishCountryNames.of(code) ?? code }))
+  .sort((a, b) => a.name.localeCompare(b.name, "vi") || a.code.localeCompare(b.code));
 
 @Injectable()
 export class ReferenceService {
@@ -65,8 +78,22 @@ export class ReferenceService {
     return this.result(rows.map(({ language, ...row }) => ({ ...row, languageCode: language.code })), total, query);
   }
 
-  async provinces(query: ReferenceQueryDto) {
+  countries(query: LocationQueryDto) {
+    const key = query.q ? searchKey(query.q) : null;
+    const rows = key ? countries.filter((row) => row.code.toLowerCase().includes(key) ||
+      searchKey(row.name).includes(key) || searchKey(row.englishName).includes(key)) : countries;
+    return this.result(rows.slice((query.page - 1) * query.pageSize, query.page * query.pageSize), rows.length, query);
+  }
+
+  async provinces(query: LocationQueryDto) {
     const where = this.whereActive();
+    if (query.q) {
+      const key = searchKey(query.q);
+      const rows = await this.db.province.findMany({ where, orderBy: [{ name: "asc" }, { code: "asc" }],
+        select: { id: true, code: true, name: true, divisionType: true, isActive: true } });
+      const matches = rows.filter((row) => searchKey(row.name).includes(key) || row.code.includes(key));
+      return this.result(matches.slice((query.page - 1) * query.pageSize, query.page * query.pageSize), matches.length, query);
+    }
     const [data, total] = await Promise.all([
       this.db.province.findMany({ where, orderBy: [{ name: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, name: true, divisionType: true, isActive: true } }),
       this.db.province.count({ where }),
@@ -76,6 +103,15 @@ export class ReferenceService {
 
   async wards(query: WardQueryDto) {
     const where = { ...this.whereActive(), province: { isActive: true, ...(query.provinceCode && { code: query.provinceCode }) } };
+    if (query.q) {
+      const key = searchKey(query.q);
+      const rows = await this.db.ward.findMany({ where, orderBy: [{ name: "asc" }, { code: "asc" }],
+        select: { id: true, code: true, name: true, divisionType: true, codename: true, isActive: true,
+          province: { select: { code: true } } } });
+      const matches = rows.filter((row) => searchKey(row.name).includes(key) || row.code.includes(key));
+      return this.result(matches.slice((query.page - 1) * query.pageSize, query.page * query.pageSize)
+        .map(({ province, ...row }) => ({ ...row, provinceCode: province.code })), matches.length, query);
+    }
     const [rows, total] = await Promise.all([
       this.db.ward.findMany({ where, orderBy: [{ name: "asc" }, { code: "asc" }], ...this.page(query), select: { id: true, code: true, name: true, divisionType: true, codename: true, isActive: true, province: { select: { code: true } } } }),
       this.db.ward.count({ where }),

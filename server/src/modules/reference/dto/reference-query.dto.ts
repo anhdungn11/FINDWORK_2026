@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsInt, IsOptional, Matches, Max, Min } from "class-validator";
+import { IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from "class-validator";
 
 export class ReferenceQueryDto {
   @IsOptional() @Matches(/^true$/, { message: "Public reference catalogs only support active=true." })
@@ -10,6 +10,11 @@ export class ReferenceQueryDto {
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   pageSize = 100;
+}
+
+export class LocationQueryDto extends ReferenceQueryDto {
+  @IsOptional() @IsString() @MaxLength(100)
+  q?: string;
 }
 
 export class SkillCategoryQueryDto extends ReferenceQueryDto {
@@ -27,7 +32,7 @@ export class CertificateQueryDto extends ReferenceQueryDto {
   languageCode?: string;
 }
 
-export class WardQueryDto extends ReferenceQueryDto {
+export class WardQueryDto extends LocationQueryDto {
   @IsOptional() @Matches(/^\d{2}$/)
   provinceCode?: string;
 }

@@ -8,13 +8,14 @@ import type { CreateCompanyLocationDto } from "./dto/create-company-location.dto
 import type { UpdateCompanyLocationDto } from "./dto/update-company-location.dto";
 import type { UpdateCompanyProfileDto } from "./dto/update-company-profile.dto";
 import type { CompanyMediaKind } from "./company-media.storage";
+import type { UpdateCompanyLegalDto } from "./dto/company-legal.dto";
 
 const profileSelect = {
   id: true, name: true, slug: true, legalName: true, taxCode: true,
   industryId: true, industry: { select: { id: true, code: true, name: true } },
   description: true, website: true, employeeSizeRange: true, foundedYear: true,
   logoAssetKey: true, coverAssetKey: true, verificationStatus: true,
-  verifiedAt: true, status: true, createdAt: true, updatedAt: true,
+  verifiedAt: true, verificationRejectionReason: true, status: true, createdAt: true, updatedAt: true,
 } as const;
 
 const locationSelect = {
@@ -55,6 +56,79 @@ export class CompanyProfileLocationsRepository {
       if (!company) throw notFound();
       return company;
     });
+  }
+
+  async getLegalProfile(companyId: string) {
+    const company = await this.prisma.company.findFirst({ where: { id: companyId, status: "ACTIVE" },
+      select: { id: true, legalName: true, taxCode: true, verificationStatus: true, legalProfile: true,
+        legalEvidence: { where: { deletedAt: null }, orderBy: { createdAt: "desc" },
+          select: { id: true, kind: true, originalName: true, mimeType: true, byteSize: true, sha256: true, createdAt: true } } } });
+    if (!company) throw notFound();
+    return company;
+  }
+
+  updateLegalProfile(companyId: string, actorUserId: string, dto: UpdateCompanyLegalDto) {
+    return this.mutate(companyId, actorUserId, async (tx) => {
+      const company = await tx.company.findUniqueOrThrow({ where: { id: companyId }, select: { verificationStatus: true } });
+      if (company.verificationStatus === "PENDING" || company.verificationStatus === "VERIFIED") {
+        throw conflict("COMPANY_VERIFIED_LEGAL_DETAILS_LOCKED", "Legal details cannot change during or after review.");
+      }
+      const updated = await tx.companyLegalProfile.upsert({ where: { companyId }, create: { companyId, ...dto }, update: dto });
+      await tx.auditLog.create({ data: { actorUserId, companyId, action: "company.legal.profile.update",
+        targetType: "CompanyLegalProfile", targetId: companyId, afterData: { fields: Object.keys(dto) } } });
+      return updated;
+    });
+  }
+
+  assertLegalWritable(companyId: string, actorUserId: string) {
+    return this.mutate(companyId, actorUserId, async (tx) => {
+      const company = await tx.company.findUniqueOrThrow({ where: { id: companyId }, select: { verificationStatus: true } });
+      if (company.verificationStatus === "PENDING" || company.verificationStatus === "VERIFIED") {
+        throw conflict("COMPANY_VERIFIED_LEGAL_DETAILS_LOCKED", "Legal evidence cannot change during or after review.");
+      }
+      return true;
+    });
+  }
+
+  async addLegalEvidence(companyId: string, actorUserId: string, data: {
+    kind: "BUSINESS_REGISTRATION" | "TAX_CERTIFICATE" | "REPRESENTATIVE_AUTHORIZATION";
+    originalName: string; mimeType: string; byteSize: number; sha256: string; storageKey: string;
+  }) {
+    return this.mutate(companyId, actorUserId, async (tx) => {
+      const company = await tx.company.findUniqueOrThrow({ where: { id: companyId }, select: { verificationStatus: true } });
+      if (company.verificationStatus === "PENDING" || company.verificationStatus === "VERIFIED") {
+        throw conflict("COMPANY_VERIFIED_LEGAL_DETAILS_LOCKED", "Legal evidence cannot change during or after review.");
+      }
+      const evidence = await tx.companyLegalEvidence.create({ data: { companyId, uploadedByUserId: actorUserId, ...data },
+        select: { id: true, kind: true, originalName: true, mimeType: true, byteSize: true, sha256: true, createdAt: true } });
+      await tx.auditLog.create({ data: { actorUserId, companyId, action: "company.legal.evidence.upload",
+        targetType: "CompanyLegalEvidence", targetId: evidence.id,
+        afterData: { kind: evidence.kind, byteSize: evidence.byteSize, sha256: evidence.sha256 } } });
+      return evidence;
+    });
+  }
+
+  async removeLegalEvidence(companyId: string, evidenceId: string, actorUserId: string) {
+    return this.mutate(companyId, actorUserId, async (tx) => {
+      const company = await tx.company.findUniqueOrThrow({ where: { id: companyId }, select: { verificationStatus: true } });
+      if (company.verificationStatus === "PENDING" || company.verificationStatus === "VERIFIED") {
+        throw conflict("COMPANY_VERIFIED_LEGAL_DETAILS_LOCKED", "Legal evidence cannot change during or after review.");
+      }
+      const evidence = await tx.companyLegalEvidence.findFirst({ where: { id: evidenceId, companyId, deletedAt: null } });
+      if (!evidence) throw notFound();
+      await tx.companyLegalEvidence.update({ where: { id: evidenceId }, data: { deletedAt: new Date() } });
+      await tx.auditLog.create({ data: { actorUserId, companyId, action: "company.legal.evidence.remove",
+        targetType: "CompanyLegalEvidence", targetId: evidenceId,
+        beforeData: { kind: evidence.kind, sha256: evidence.sha256 } } });
+      return { id: evidenceId, removed: true };
+    });
+  }
+
+  async getLegalEvidence(companyId: string, evidenceId: string) {
+    const evidence = await this.prisma.companyLegalEvidence.findFirst({ where: { id: evidenceId, companyId, deletedAt: null },
+      select: { storageKey: true, mimeType: true, originalName: true, sha256: true } });
+    if (!evidence) throw notFound();
+    return evidence;
   }
 
   async getPublicMediaKey(companyId: string, kind: CompanyMediaKind): Promise<string | null> {
@@ -243,12 +317,14 @@ export class CompanyProfileLocationsRepository {
       if (current.verificationStatus !== "UNVERIFIED" && current.verificationStatus !== "REJECTED") {
         throw conflict("COMPANY_VERIFICATION_STATE_CONFLICT", "Company verification is already pending or complete.");
       }
-      if (!current.legalName || !current.taxCode) {
-        throw badRequest("COMPANY_VERIFICATION_PROFILE_INCOMPLETE", "Legal name and tax code are required for review.");
+      const legal = await tx.companyLegalProfile.findUnique({ where: { companyId } });
+      const evidence = await tx.companyLegalEvidence.count({ where: { companyId, kind: "BUSINESS_REGISTRATION", deletedAt: null } });
+      if (!current.legalName || !current.taxCode || !/^\d{10}(?:-?\d{3})?$/.test(current.taxCode) || !legal || evidence === 0) {
+        throw badRequest("COMPANY_VERIFICATION_PROFILE_INCOMPLETE", "Valid legal name, Vietnamese tax code, registered entity details and business registration evidence are required.");
       }
       const changed = await tx.company.updateMany({
         where: { id: companyId, verificationStatus: current.verificationStatus, status: "ACTIVE" },
-        data: { verificationStatus: "PENDING", verifiedAt: null },
+        data: { verificationStatus: "PENDING", verifiedAt: null, verificationRejectionReason: null },
       });
       if (changed.count !== 1) throw conflict("COMPANY_VERIFICATION_STATE_CONFLICT", "Company verification state changed.");
       await tx.auditLog.create({ data: {

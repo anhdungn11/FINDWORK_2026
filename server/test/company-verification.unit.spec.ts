@@ -8,7 +8,7 @@ import { REQUIRED_COMPANY_PERMISSIONS_KEY } from "../src/modules/authorization/d
 const companyId = "33333333-3333-4333-8333-333333333333";
 const actorUserId = "11111111-1111-4111-8111-111111111111";
 
-function fixture(verificationStatus: "UNVERIFIED" | "REJECTED" | "PENDING" | "VERIFIED", legalName: string | null = "Real Legal Name", taxCode: string | null = "123456") {
+function fixture(verificationStatus: "UNVERIFIED" | "REJECTED" | "PENDING" | "VERIFIED", legalName: string | null = "Real Legal Name", taxCode: string | null = "1234567890") {
   const tx = {
     $queryRaw: jest.fn().mockResolvedValue([{ id: companyId }]),
     company: {
@@ -17,6 +17,8 @@ function fixture(verificationStatus: "UNVERIFIED" | "REJECTED" | "PENDING" | "VE
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     companyMember: { findFirst: jest.fn().mockResolvedValue({ id: "22222222-2222-4222-8222-222222222222" }) },
+    companyLegalProfile: { findUnique: jest.fn().mockResolvedValue({ companyId }) },
+    companyLegalEvidence: { count: jest.fn().mockResolvedValue(1) },
     permission: { findUnique: jest.fn().mockResolvedValue({
       isDeprecated: false, companyMemberPermissions: [], rolePermissions: [{ dataScope: "COMPANY" }],
     }) },
@@ -39,7 +41,7 @@ describe("company verification request", () => {
     await expect(repo.requestVerification(companyId, actorUserId)).resolves.toMatchObject({ verificationStatus: "PENDING" });
     expect(tx.company.updateMany).toHaveBeenCalledWith({
       where: { id: companyId, verificationStatus: "UNVERIFIED", status: "ACTIVE" },
-      data: { verificationStatus: "PENDING", verifiedAt: null },
+      data: { verificationStatus: "PENDING", verifiedAt: null, verificationRejectionReason: null },
     });
     expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
       actorUserId, companyId, action: "company.verification.request",

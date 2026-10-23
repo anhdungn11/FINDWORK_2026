@@ -4,7 +4,8 @@ import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import type { AdminCompanyQueryDto, AdminJobQueryDto, AdminPageQueryDto, AdminUserQueryDto } from "./dto/admin.dto";
 
 const userSelect = { id: true, email: true, status: true, emailVerifiedAt: true, createdAt: true, updatedAt: true } as const;
-const companySelect = { id: true, name: true, slug: true, status: true, verificationStatus: true, verifiedAt: true, createdAt: true, updatedAt: true } as const;
+const companySelect = { id: true, name: true, slug: true, status: true, verificationStatus: true, verifiedAt: true,
+  verificationRejectionReason: true, createdAt: true, updatedAt: true } as const;
 const jobSelect = { id: true, companyId: true, categoryId: true, title: true, status: true, version: true, publishedAt: true, applicationDeadline: true, createdAt: true, updatedAt: true } as const;
 const auditSelect = { id: true, actorUserId: true, companyId: true, action: true, targetType: true, targetId: true, createdAt: true } as const;
 
@@ -142,16 +143,31 @@ export class AdminService {
     });
   }
 
-  async setCompanyVerification(actorUserId: string, companyId: string, status: "VERIFIED" | "REJECTED") {
+  async setCompanyVerification(actorUserId: string, companyId: string, status: "VERIFIED" | "REJECTED", reason?: string) {
+    if (status === "REJECTED" && (!reason || reason.trim().length < 10)) {
+      throw new ConflictException({ code: "COMPANY_VERIFICATION_REASON_REQUIRED" });
+    }
     return this.db.$transaction(async (tx) => {
       const current = await tx.company.findUnique({ where: { id: companyId }, select: { status: true, verificationStatus: true } });
       if (!current) throw missing("COMPANY");
       if (current.status !== "ACTIVE" || current.verificationStatus !== "PENDING") throw conflict("COMPANY");
+      const reviewerMember = await tx.companyMember.findFirst({ where: { companyId, userId: actorUserId }, select: { id: true } });
+      if (reviewerMember) throw new ForbiddenException({ code: "COMPANY_VERIFICATION_SELF_REVIEW_FORBIDDEN" });
+      if (status === "VERIFIED") {
+        const legal = await tx.companyLegalProfile.findUnique({ where: { companyId } });
+        const evidence = await tx.companyLegalEvidence.count({ where: { companyId, kind: "BUSINESS_REGISTRATION", deletedAt: null } });
+        const identity = await tx.company.findUniqueOrThrow({ where: { id: companyId }, select: { legalName: true, taxCode: true } });
+        if (!legal || !evidence || !identity.legalName || !identity.taxCode || !/^\d{10}(?:-?\d{3})?$/.test(identity.taxCode)) {
+          throw conflict("COMPANY");
+        }
+      }
       const updated = await tx.company.updateMany({ where: { id: companyId, status: "ACTIVE", verificationStatus: "PENDING" },
-        data: { verificationStatus: status, verifiedAt: status === "VERIFIED" ? new Date() : null } });
+        data: { verificationStatus: status, verifiedAt: status === "VERIFIED" ? new Date() : null,
+          verificationRejectionReason: status === "REJECTED" ? reason!.trim() : null } });
       if (updated.count !== 1) throw conflict("COMPANY");
       await tx.auditLog.create({ data: { actorUserId, companyId, action: "admin.company.verify", targetType: "Company", targetId: companyId,
-        beforeData: { verificationStatus: current.verificationStatus }, afterData: { verificationStatus: status } } });
+        beforeData: { verificationStatus: current.verificationStatus },
+        afterData: { verificationStatus: status, reasonProvided: status === "REJECTED" } } });
       return tx.company.findUniqueOrThrow({ where: { id: companyId }, select: companySelect });
     });
   }

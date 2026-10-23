@@ -78,7 +78,7 @@ export class AdminController {
   verifyCompany(@Req() req: AuthorizedRequest, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Param("companyId", ParseUUIDPipe) companyId: string, @Body() dto: SetCompanyVerificationDto) {
     requireSystem(req, "company.verify");
-    return this.admin.setCompanyVerification(auth.userId, companyId, dto.status);
+    return this.admin.setCompanyVerification(auth.userId, companyId, dto.status, dto.reason);
   }
 
   @Patch("companies/:companyId/status")

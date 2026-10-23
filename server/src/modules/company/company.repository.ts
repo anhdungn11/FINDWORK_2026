@@ -9,10 +9,11 @@ import type { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
 function publicCompanySelect(now: Date) {
   return {
     id: true, name: true, slug: true, description: true, website: true,
+    logoAssetKey: true, coverAssetKey: true,
     employeeSizeRange: true, foundedYear: true, verificationStatus: true,
     industry: { select: { id: true, code: true, name: true } },
     locations: { where: { isHeadquarters: true }, orderBy: { id: "asc" as const }, take: 1,
-      select: { countryCode: true, province: { select: { id: true, code: true, name: true } },
+      select: { countryCode: true, addressLine: true, province: { select: { id: true, code: true, name: true } },
         ward: { select: { id: true, code: true, name: true } } } },
     _count: { select: { jobs: { where: publicJobVisibility(now) } } },
   } as const;
@@ -25,6 +26,8 @@ function publicCompany(row: PublicCompanyRow) {
     website: row.website, employeeSizeRange: row.employeeSizeRange,
     foundedYear: row.foundedYear, isVerified: row.verificationStatus === "VERIFIED",
     industry: row.industry, headquarters: row.locations[0] ?? null,
+    logoUrl: row.logoAssetKey ? `/api/v1/companies/${row.id}/media/logo` : null,
+    coverUrl: row.coverAssetKey ? `/api/v1/companies/${row.id}/media/cover` : null,
     jobsCount: row._count.jobs,
   };
 }

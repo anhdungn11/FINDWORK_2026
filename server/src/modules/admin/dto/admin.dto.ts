@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
-import { IsIn, IsInt, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => typeof value === "string" ? value.trim() : value;
 const present = (_: unknown, value: unknown) => value !== undefined;
@@ -38,5 +38,9 @@ export class AdminJobQueryDto extends AdminPageQueryDto {
 }
 
 export class SetUserStatusDto { @IsIn(["ACTIVE", "SUSPENDED"]) status!: "ACTIVE" | "SUSPENDED"; }
-export class SetCompanyVerificationDto { @IsIn(["VERIFIED", "REJECTED"]) status!: "VERIFIED" | "REJECTED"; }
+export class SetCompanyVerificationDto {
+  @IsIn(["VERIFIED", "REJECTED"]) status!: "VERIFIED" | "REJECTED";
+  @IsOptional() @IsString() @MinLength(10) @MaxLength(1000)
+  reason?: string;
+}
 export class SetCompanyStatusDto { @IsIn(["ACTIVE", "SUSPENDED"]) status!: "ACTIVE" | "SUSPENDED"; }

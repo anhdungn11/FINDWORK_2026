@@ -47,9 +47,10 @@ function normalizeHttpException(exception: HttpException): {
   const status = exception.getStatus();
   const payload = exception.getResponse();
 if (status === HttpStatus.TOO_MANY_REQUESTS) {
+  const body = typeof payload === "object" && payload !== null ? payload as Record<string, unknown> : {};
   return {
     status,
-    code: "RATE_LIMITED",
+    code: typeof body.code === "string" ? body.code : "RATE_LIMITED",
     message: "Too many requests. Please try again later.",
   };
 }

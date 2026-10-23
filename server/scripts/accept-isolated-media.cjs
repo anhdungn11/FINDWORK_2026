@@ -1,6 +1,6 @@
 // Real HTTP acceptance. Creates test-owned identities/company only in the isolated DB.
 const { randomUUID } = require("node:crypto");
-const base = "http://127.0.0.1:3002/api/v1";
+const base = process.env.FINDWORK_ACCEPT_BASE || "http://127.0.0.1:3002/api/v1";
 const origin = "http://127.0.0.1:5177";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pX8AAAAASUVORK5CYII=", "base64");
 
@@ -48,7 +48,7 @@ async function main() {
   const updatedProfile = await call("PATCH", `/companies/${companyId}/profile`, {
     token: owner, json: {
       legalName: `Integration Media Legal ${suffix}`,
-      taxCode: `INTEGRATION-${suffix}`,
+      taxCode: String(Date.now()).slice(-10),
       description: "Isolated integration test company profile",
     },
   });
@@ -64,6 +64,16 @@ async function main() {
   expectStatus(location, 201, "company location create");
   if (!location.body.isHeadquarters) throw new Error("First location was not headquarters");
   expectStatus(await call("GET", `/companies/${companyId}/locations`, { token: owner }), 200, "company locations read");
+  const legal = await call("PATCH", `/companies/${companyId}/legal`, { token: owner,
+    json: { registeredAddress: "1 Integration Street, Ha Noi, Viet Nam", representativeName: "Integration Owner",
+      representativeTitle: "Director", contactEmail: `legal-${suffix}@example.invalid`, contactPhone: "+84901234567" } });
+  expectStatus(legal, 200, "legal entity update");
+  const evidenceForm = new FormData();
+  evidenceForm.append("kind", "BUSINESS_REGISTRATION");
+  evidenceForm.append("file", new Blob([Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n")],
+    { type: "application/pdf" }), "business-registration.pdf");
+  expectStatus(await call("POST", `/companies/${companyId}/legal/evidence`, { token: outsider, form: evidenceForm }), 403, "cross-company legal evidence denied");
+  expectStatus(await call("POST", `/companies/${companyId}/legal/evidence`, { token: owner, form: evidenceForm }), 201, "private legal evidence upload");
   const verification = await call("POST", `/companies/${companyId}/verification-request`, { token: owner });
   expectStatus(verification, 200, "legal verification request");
   if (verification.body.verificationStatus !== "PENDING") throw new Error("Verification request must remain pending");
@@ -75,6 +85,9 @@ async function main() {
   const uploaded = await call("PUT", path, { token: owner, form });
   expectStatus(uploaded, 200, "owner multipart upload");
   if (uploaded.body.kind !== "logo" || uploaded.body.available !== true) throw new Error("Upload response mismatch");
+  const publicProfile = await call("GET", `/companies/${companyId}`);
+  expectStatus(publicProfile, 200, "public company response");
+  if (publicProfile.body.logoUrl !== `/api/v1/companies/${companyId}/media/logo`) throw new Error("Public logo URL missing");
   for (const label of ["public GET", "public GET after refresh"]) {
     const fetched = await call("GET", path);
     expectStatus(fetched, 200, label);
@@ -83,6 +96,8 @@ async function main() {
       throw new Error(`${label}: image bytes or safe headers mismatch`);
     }
   }
+  expectStatus(await call("PUT", path, { token: owner, form }), 200, "owner logo replacement");
+  expectStatus(await call("GET", path), 200, "public GET after replacement");
   expectStatus(await call("DELETE", path, { token: outsider }), 403, "cross-company delete denied");
   const removed = await call("DELETE", path, { token: owner });
   expectStatus(removed, 200, "owner delete");

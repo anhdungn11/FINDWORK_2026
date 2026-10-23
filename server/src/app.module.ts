@@ -19,6 +19,8 @@ import { JobsModule } from "./modules/jobs/jobs.module";
 import { ApplicationsModule } from "./modules/applications/applications.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { CareerDiscoveryModule } from "./modules/career-discovery/career-discovery.module";
+import { AiModule } from "./modules/ai/ai.module";
+import { InterviewModule } from "./modules/interviews/interview.module";
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { CareerDiscoveryModule } from "./modules/career-discovery/career-discove
     HealthModule,
     ReferenceModule,
     CareerDiscoveryModule,
+    AiModule,
+    InterviewModule,
     AuthModule,
     AuthorizationModule,
     CandidateModule,

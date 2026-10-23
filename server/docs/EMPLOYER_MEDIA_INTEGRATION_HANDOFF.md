@@ -1,5 +1,9 @@
 # Employer Media integration handoff — isolated branch
 
+**Release update (2026-10-23):** The media contract and Frontend gaps are updated in [P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md](./P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md). This document records the earlier eight-migration baseline.
+
+**Release update (2026-10-23):** The media contract and Frontend gaps are updated in [P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md](./P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md). This document records the earlier eight-migration baseline.
+
 Status (2026-10-23): **real PostgreSQL and HTTP media acceptance passed on the isolated integration environment; browser acceptance pending**. Backend 3000, Frontend 5176, `findwork_dev`, and `findwork_test` were not changed.
 
 ## Local isolation gate

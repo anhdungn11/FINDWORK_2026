@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { CertificateQueryDto, ReferenceQueryDto, SkillCategoryQueryDto, SkillQueryDto, WardQueryDto } from "./dto/reference-query.dto";
+import { CertificateQueryDto, LocationQueryDto, ReferenceQueryDto, SkillCategoryQueryDto, SkillQueryDto, WardQueryDto } from "./dto/reference-query.dto";
 import { ReferenceService } from "./reference.service";
 
 @ApiTags("Reference")
@@ -24,7 +24,10 @@ export class ReferenceController {
   certificates(@Query() query: CertificateQueryDto) { return this.reference.certificates(query); }
 
   @Get("provinces") @ApiOperation({ summary: "List provinces" })
-  provinces(@Query() query: ReferenceQueryDto) { return this.reference.provinces(query); }
+  provinces(@Query() query: LocationQueryDto) { return this.reference.provinces(query); }
+
+  @Get("countries") @ApiOperation({ summary: "List ISO 3166-1 alpha-2 countries" })
+  countries(@Query() query: LocationQueryDto) { return this.reference.countries(query); }
 
   @Get("wards") @ApiOperation({ summary: "List wards" })
   wards(@Query() query: WardQueryDto) { return this.reference.wards(query); }

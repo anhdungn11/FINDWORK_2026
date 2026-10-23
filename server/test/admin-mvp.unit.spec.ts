@@ -16,7 +16,10 @@ function fakeDb() {
     systemUserRole: { findFirst: jest.fn().mockResolvedValue(null) },
     systemUserPermission: { findFirst: jest.fn().mockResolvedValue(null) },
     authSession: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
-    company: { findUnique: jest.fn().mockResolvedValue({ status: "ACTIVE", verificationStatus: "PENDING" }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: companyId }) },
+    company: { findUnique: jest.fn().mockResolvedValue({ status: "ACTIVE", verificationStatus: "PENDING" }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: companyId, legalName: "Valid Legal Name", taxCode: "1234567890" }) },
+    companyLegalProfile: { findUnique: jest.fn().mockResolvedValue({ companyId }) },
+    companyLegalEvidence: { count: jest.fn().mockResolvedValue(1) },
+    companyMember: { findFirst: jest.fn().mockResolvedValue(null) },
     job: { findUnique: jest.fn().mockResolvedValue({ companyId, status: "PUBLISHED", version: 1 }), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: jobId }) },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
   };
@@ -86,10 +89,20 @@ describe("platform admin MVP security", () => {
     }));
   });
 
+  it("blocks reviewer decisions for their own company", async () => {
+    const { tx, db } = fakeDb();
+    tx.companyMember.findFirst.mockResolvedValueOnce({ id: "member" });
+    await expect(new AdminService(db as never).setCompanyVerification(actorId, companyId, "VERIFIED"))
+      .rejects.toMatchObject({ status: 403 });
+    expect(tx.company.updateMany).not.toHaveBeenCalled();
+    await expect(new AdminService(db as never).setCompanyVerification(actorId, companyId, "REJECTED"))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
   it("does not audit a verification decision after a competing state change", async () => {
     const { tx, db } = fakeDb();
     tx.company.updateMany.mockResolvedValueOnce({ count: 0 });
-    await expect(new AdminService(db as never).setCompanyVerification(actorId, companyId, "REJECTED"))
+    await expect(new AdminService(db as never).setCompanyVerification(actorId, companyId, "REJECTED", "Insufficient evidence"))
       .rejects.toMatchObject({ status: 409 });
     expect(tx.auditLog.create).not.toHaveBeenCalled();
   });

@@ -112,6 +112,22 @@ enum CompanyVerificationStatus {
   REJECTED
 }
 
+enum LegalEvidenceKind {
+  BUSINESS_REGISTRATION
+  TAX_CERTIFICATE
+  REPRESENTATIVE_AUTHORIZATION
+}
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+}
+
+enum InterviewSessionProvider {
+  MANUAL
+  ZOOM
+}
+
 enum CompanyMemberStatus {
   ACTIVE
   INACTIVE
@@ -260,6 +276,7 @@ model User {
   companyPermissionsGiven CompanyMemberPermission[]  @relation("CompanyPermissionAssigner")
   applicationStatusEdits  ApplicationStatusHistory[] @relation("ApplicationStatusActor")
   auditLogs               AuditLog[]                 @relation("AuditActor")
+  aiConversations         AiConversation[]
 
   @@index([status])
 }
@@ -594,6 +611,7 @@ model Company {
   coverAssetKey      String?                   @db.VarChar(512)
   verificationStatus CompanyVerificationStatus @default(UNVERIFIED)
   verifiedAt         DateTime?                 @db.Timestamptz(6)
+  verificationRejectionReason String?          @db.VarChar(1000)
   status             CompanyStatus             @default(ACTIVE)
   createdAt          DateTime                  @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime                  @updatedAt @db.Timestamptz(6)
@@ -611,6 +629,8 @@ model Company {
   assignments               ApplicationAssignment[]
   interviews                Interview[]
   auditLogs                 AuditLog[]
+  legalProfile              CompanyLegalProfile?
+  legalEvidence             CompanyLegalEvidence[]
 
   @@index([createdByUserId])
   @@index([industryId])
@@ -636,6 +656,36 @@ model CompanyLocation {
   @@index([companyId])
   @@index([provinceId])
   @@index([wardId])
+}
+
+model CompanyLegalProfile {
+  companyId          String   @id @db.Uuid
+  registeredAddress  String   @db.VarChar(500)
+  representativeName String   @db.VarChar(160)
+  representativeTitle String? @db.VarChar(160)
+  contactEmail       String   @db.VarChar(320)
+  contactPhone       String   @db.VarChar(32)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+}
+
+model CompanyLegalEvidence {
+  id               String            @id @default(uuid()) @db.Uuid
+  companyId        String            @db.Uuid
+  kind             LegalEvidenceKind
+  originalName     String            @db.VarChar(255)
+  mimeType         String            @db.VarChar(100)
+  byteSize         Int
+  sha256           String            @db.VarChar(64)
+  storageKey       String            @db.VarChar(512)
+  uploadedByUserId String            @db.Uuid
+  createdAt        DateTime          @default(now()) @db.Timestamptz(6)
+  deletedAt        DateTime?         @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, deletedAt, createdAt])
 }
 
 model CompanyMember {
@@ -965,10 +1015,73 @@ model Interview {
   company         Company                @relation(fields: [companyId], references: [id], onDelete: Restrict)
   createdByMember CompanyMember          @relation("InterviewCreator", fields: [companyId, createdByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Interview_creator_same_company_fkey")
   participants    InterviewParticipant[]
+  session         InterviewSession?
 
   @@unique([companyId, id])
   @@index([companyId, status, scheduledAt])
   @@index([applicationId, scheduledAt])
+}
+
+model InterviewSession {
+  id                String                   @id @default(uuid()) @db.Uuid
+  interviewId       String                   @unique @db.Uuid
+  provider          InterviewSessionProvider @default(MANUAL)
+  joinUrl           String?                  @db.VarChar(1000)
+  externalMeetingId String?                  @db.VarChar(255)
+  createdAt         DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                 @updatedAt @db.Timestamptz(6)
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Restrict)
+}
+
+model AiGuestSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique @db.VarChar(64)
+  ipHash    String   @db.VarChar(64)
+  expiresAt DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  conversations AiConversation[]
+  @@index([ipHash, createdAt])
+}
+
+model AiConversation {
+  id             String   @id @default(uuid()) @db.Uuid
+  ownerUserId    String?  @db.Uuid
+  guestSessionId String?  @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+
+  owner        User?           @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+  guestSession AiGuestSession? @relation(fields: [guestSessionId], references: [id], onDelete: Restrict)
+  messages     AiMessage[]
+
+  @@index([ownerUserId, createdAt])
+  @@index([guestSessionId, createdAt])
+}
+
+model AiMessage {
+  id             String        @id @default(uuid()) @db.Uuid
+  conversationId String        @db.Uuid
+  role           AiMessageRole
+  content        String        @db.Text
+  tokenCount     Int           @default(0)
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  @@index([conversationId, createdAt])
+}
+
+model AiUsageBucket {
+  ownerKey        String   @db.VarChar(80)
+  day             DateTime @db.Date
+  requestCount    Int      @default(0)
+  reservedTokens  Int      @default(0)
+  reservedCostMicros Int    @default(0)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  @@id([ownerKey, day])
 }
 
 model InterviewParticipant {

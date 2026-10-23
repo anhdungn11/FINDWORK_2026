@@ -1,5 +1,7 @@
 # AI, interview and meeting contracts — proposed, not implemented
 
+**Release update (2026-10-23):** The backend foundation and interview scheduling are now implemented. Use [P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md](./P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md) for the current endpoints and remaining provider blockers. This file preserves the earlier proposal.
+
 The integration environment has no configured AI or meeting-provider credentials. There is no AI/chat or operational interview module in this Backend. The Prisma schema already contains `Interview` and `InterviewParticipant` with company-scoped foreign keys, and the permission registry already defines `interview.create/update/cancel/view/evaluate`; no HTTP controller or approved company-role grants use them yet. The following contracts require product approval, targeted versioned database changes where identified, provider credentials, and real provider acceptance before endpoints are exposed. No endpoint below currently returns a simulated response.
 
 ## Chat vertical slice

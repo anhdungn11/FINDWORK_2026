@@ -1,5 +1,9 @@
 # Company and Admin API handoff
 
+**Release update (2026-10-23):** Legal verification, location catalogs, public media URLs, AI and interview contracts changed. Use [P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md](./P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md) for those routes and browser acceptance.
+
+**Release update (2026-10-23):** Legal verification, location catalogs, public media URLs, AI and interview contracts changed. Use [P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md](./P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md) for those routes and browser acceptance.
+
 Source: current Nest controllers, DTOs, services and selectors under `server/src/modules`. All paths below start with `/api/v1`. Protected routes use `Authorization: Bearer <accessToken>`. UUID parameters are v4. Company permissions require an active member and `COMPANY` scope; Admin permissions require `SYSTEM` scope. The API error body is `{code, message, details?, traceId, path, timestamp}`. Missing/invalid token returns 401; absent scope returns 403; validation returns 400 (`VALIDATION_ERROR`).
 
 List responses use `{data: [...], pagination: {page, pageSize, total, totalPages}}` unless stated otherwise. Default page is 1 and pageSize is 20; maximum pageSize is 100.
