@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useAuthStore } from "@/store/authStore";
-import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
-import type { MyCompanyDto } from "@/services/api/apiTypes";
+import { useAuthStore } from "../../../store/authStore";
+import { companyWorkspaceApi } from "../../../services/api/companyWorkspaceApi";
+import type { MyCompanyDto } from "../../../services/api/apiTypes";
 
 export interface EmployerMembershipState {
   isEmployer: boolean;

@@ -1,4 +1,6 @@
 import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
+import { getLocalizedApiError } from "../../i18n/errorCodes";
+import { getCurrentLocale } from "../../i18n/i18nStore";
 
 let inMemoryAccessToken: string | null = null;
 
@@ -28,15 +30,12 @@ export const apiClient: AxiosInstance = axios.create({
   baseURL: getApiBaseUrl(),
   withCredentials: true,
   timeout: 10000,
-  headers: {
-    "Accept": "application/json",
-    "Content-Type": "application/json",
-  },
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  if (inMemoryAccessToken && !config.headers.Authorization) {
-    config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
+  const token = getAuthToken();
+  if (token) {
+    config.headers.set("Authorization", `Bearer ${token}`);
   }
   if (typeof FormData !== "undefined" && config.data instanceof FormData) {
     // Clear Content-Type to let browser and Axios adapter generate multipart boundary
@@ -49,22 +48,32 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-export function extractApiErrorMessage(error: unknown, fallbackMessage = "Đã có lỗi xảy ra"): string {
+export function extractApiErrorMessage(error: unknown, fallbackMessage?: string): string {
+  const locale = getCurrentLocale();
+  const defaultFallback = fallbackMessage || (locale === "en" ? "An unexpected error occurred" : "Đã có lỗi xảy ra");
+
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<ApiErrorResponse & { details?: unknown }>;
     const data = axiosError.response?.data;
+    const code = data?.code;
+
     if (Array.isArray(data?.details) && data.details.length > 0) {
       return data.details.filter((d): d is string => typeof d === "string").join(", ");
     }
+
+    let rawMessage: string | undefined;
     if (data?.message) {
       if (Array.isArray(data.message)) {
-        return data.message.join(", ");
+        rawMessage = data.message.join(", ");
+      } else {
+        rawMessage = data.message;
       }
-      return data.message;
     }
+
+    return getLocalizedApiError(code, rawMessage || defaultFallback, locale);
   }
   if (error instanceof Error) {
     return error.message;
   }
-  return fallbackMessage;
+  return defaultFallback;
 }

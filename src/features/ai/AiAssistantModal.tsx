@@ -42,6 +42,13 @@ import {
   AiInputBlockedError,
 } from "./aiChatApi";
 import { encodeWav, resampleTo16kMono } from "./audioUtils";
+import { useI18n } from "../../i18n/i18nStore";
+import {
+  VI_CATEGORIES,
+  EN_CATEGORIES,
+  type PromptCategory,
+  type CategoryMeta,
+} from "./aiCategories";
 
 interface AiAssistantModalProps {
   isOpen: boolean;
@@ -49,98 +56,6 @@ interface AiAssistantModalProps {
   contextHint?: string;
   defaultPrompt?: string;
 }
-
-type PromptCategory =
-  | "ALL"
-  | "CV"
-  | "CAREER"
-  | "JOBS"
-  | "APPLICATION"
-  | "RECRUITING"
-  | "INTERVIEW"
-  | "FINDWORK";
-
-interface CategoryMeta {
-  key: PromptCategory;
-  label: string;
-  prompts: string[];
-}
-
-const CATEGORIES: CategoryMeta[] = [
-  {
-    key: "ALL",
-    label: "Tất cả gợi ý",
-    prompts: [
-      "Cách viết CV thu hút nhà tuyển dụng ngành công nghệ",
-      "Gợi ý 5 câu hỏi phỏng vấn vị trí Senior React Developer",
-      "Chiến lược đàm phán lương khi nhận được lời mời làm việc (Offer)",
-      "Quy trình xác minh hồ sơ pháp lý doanh nghiệp trên FINDWORK",
-    ],
-  },
-  {
-    key: "CV",
-    label: "Tạo & Tối ưu CV",
-    prompts: [
-      "Góp ý bố cục CV cho vị trí Frontend Developer chuẩn ATS",
-      "Cách nêu bật thành tích bằng số liệu (Metrics) trong phần kinh nghiệm",
-      "Những sai lầm phổ biến khiến CV bị loại ngay từ vòng lọc hồ sơ",
-    ],
-  },
-  {
-    key: "CAREER",
-    label: "Định hướng sự nghiệp",
-    prompts: [
-      "Lộ trình phát triển từ Middle lên Senior Software Engineer",
-      "Những kỹ năng cần trau dồi để chuyển hướng sang Tech Lead / Engineering Manager",
-      "Làm sao để cân bằng giữa chuyên môn sâu (Specialist) và đa năng (Generalist)?",
-    ],
-  },
-  {
-    key: "JOBS",
-    label: "Tìm kiếm việc làm",
-    prompts: [
-      "Cách tìm kiếm việc làm Remote chất lượng cao tại Việt Nam & khu vực",
-      "Tiêu chí đánh giá văn hóa công ty và chế độ đãi ngộ trước khi ứng tuyển",
-      "Cách đọc hiểu bản mô tả công việc (JD) để nhận diện yêu cầu thực tế",
-    ],
-  },
-  {
-    key: "APPLICATION",
-    label: "Thư ứng tuyển & Tiếp cận",
-    prompts: [
-      "Cách viết thư ứng tuyển (Cover Letter) ngắn gọn, chuyên nghiệp và gây ấn tượng",
-      "Nội dung email xin phép theo dõi tiến độ hồ sơ (Follow-up) sau 5 ngày ứng tuyển",
-      "Cách trả lời thư từ chối một cách lịch thiệp để giữ mối quan hệ lâu dài",
-    ],
-  },
-  {
-    key: "RECRUITING",
-    label: "Dành cho nhà tuyển dụng",
-    prompts: [
-      "Cách cấu trúc bản mô tả công việc (JD) thu hút ứng viên chất lượng",
-      "Tiêu chí đánh giá bài kiểm tra kỹ năng (Technical Assessment) công bằng",
-      "Quy chuẩn thiết lập quy trình tuyển dụng từ Sơ tuyển tới Phỏng vấn & Onboarding",
-    ],
-  },
-  {
-    key: "INTERVIEW",
-    label: "Luyện phỏng vấn",
-    prompts: [
-      "Gợi ý 5 câu hỏi tình huống thường gặp khi phỏng vấn System Design",
-      "Cách trả lời câu hỏi 'Điểm yếu lớn nhất của bạn là gì?' chân thành và thuyết phục",
-      "Bộ câu hỏi ứng viên nên hỏi ngược lại người phỏng vấn ở cuối buổi",
-    ],
-  },
-  {
-    key: "FINDWORK",
-    label: "Hỗ trợ FINDWORK",
-    prompts: [
-      "Hướng dẫn xác minh hồ sơ pháp lý công ty để nhận huy hiệu Verified",
-      "Cách thêm địa điểm trụ sở và chi nhánh có mã đơn vị hành chính chuẩn",
-      "Quy trình lên lịch phỏng vấn trực tiếp và trực tuyến cho ứng viên trên FINDWORK",
-    ],
-  },
-];
 
 export const AiAssistantModal = ({
   isOpen,
@@ -150,6 +65,9 @@ export const AiAssistantModal = ({
 }: AiAssistantModalProps) => {
   const { user } = useAuthStore();
   const isAuthenticated = Boolean(user);
+  const t = useI18n((s) => s.t);
+  const locale = useI18n((s) => s.locale);
+  const categories: CategoryMeta[] = locale === "en" ? EN_CATEGORIES : VI_CATEGORIES;
 
   // Layout & UI mode
   const [isExpanded, setIsExpanded] = useState(false);
@@ -597,7 +515,7 @@ export const AiAssistantModal = ({
 
   if (!isOpen) return null;
 
-  const activeCategoryMeta = CATEGORIES.find((c) => c.key === activeCategory) || CATEGORIES[0];
+  const activeCategoryMeta = categories.find((c) => c.key === activeCategory) || categories[0];
   const guestSession = !isAuthenticated ? getStoredGuestSession() : null;
 
   return (
@@ -605,13 +523,16 @@ export const AiAssistantModal = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="ai-assistant-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 1050,
-        backgroundColor: isExpanded ? "rgba(15, 23, 42, 0.6)" : "transparent",
+        backgroundColor: isExpanded ? "rgba(15, 23, 42, 0.6)" : "rgba(15, 23, 42, 0.25)",
         backdropFilter: isExpanded ? "blur(4px)" : "none",
-        pointerEvents: isExpanded ? "auto" : "none",
+        pointerEvents: "auto",
         display: "flex",
         alignItems: isExpanded ? "center" : "flex-end",
         justifyContent: isExpanded ? "center" : "flex-end",
@@ -924,7 +845,7 @@ export const AiAssistantModal = ({
                 backgroundColor: "#fcfdfe",
               }}
             >
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <button
                   key={cat.key}
                   type="button"
@@ -1464,7 +1385,11 @@ export const AiAssistantModal = ({
                     }
                   }}
                   rows={2}
-                  placeholder="Nhập câu hỏi của bạn... (Shift + Enter để xuống dòng)"
+                  placeholder={
+                    locale === "en"
+                      ? "Type your question or request... (Shift + Enter for new line)"
+                      : "Nhập câu hỏi của bạn... (Shift + Enter để xuống dòng)"
+                  }
                   style={{
                     flex: 1,
                     border: "none",
@@ -1482,7 +1407,7 @@ export const AiAssistantModal = ({
                 <button
                   type="submit"
                   disabled={loading || (!input.trim() && !selectedImage)}
-                  title="Gửi câu hỏi"
+                  title={t.ai.send}
                   style={{
                     padding: "8px 12px",
                     borderRadius: 8,

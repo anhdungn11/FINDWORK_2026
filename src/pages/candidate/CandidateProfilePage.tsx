@@ -92,7 +92,7 @@ const CandidateProfileScenario = ({ isDev, previewParam, setSearchParams }: Cand
   return (
     <div>
       {/* Banner hướng dẫn kiểm thử giao diện (Chỉ hiển thị trong Development) */}
-      {showDevBanner && (
+      {showDevBanner && previewParam && (
         <aside
           style={{
             background: "var(--color-surface-soft, #f1f5f9)",

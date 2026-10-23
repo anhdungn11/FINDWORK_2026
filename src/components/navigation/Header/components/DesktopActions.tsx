@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import Button from "@/components/common/Button";
 import type { AuthUser } from "@/store/authStore";
+import { useI18n } from "../../../../i18n/i18nStore";
 
 import type {
   HeaderLanguage,
@@ -23,8 +24,7 @@ interface DesktopActionsProps {
   user: AuthUser | null;
   onLanguageToggle: () => void;
   onEmployerToggle: () => void;
-  onLanguageChange:
-    (value: HeaderLanguage) => void;
+  onLanguageChange: (value: HeaderLanguage) => void;
   onClose: () => void;
   onAccountToggle: () => void;
   onAccountClose: () => void;
@@ -46,6 +46,8 @@ const DesktopActions = ({
   onAccountClose,
   onLogout,
 }: DesktopActionsProps) => {
+  const t = useI18n((s) => s.t);
+
   return (
     <div className={styles.actions}>
       <LanguageDropdown
@@ -77,15 +79,15 @@ const DesktopActions = ({
       ) : authView === "anonymous" ? (
         <>
           <Link to="/login" className={styles.loginLink} onClick={onClose}>
-            Đăng nhập
+            {t.nav.signIn}
           </Link>
           <Link to="/register" className={styles.registerLink} onClick={onClose}>
-            <Button size="small">Đăng ký</Button>
+            <Button size="small">{t.nav.register}</Button>
           </Link>
         </>
       ) : (
         <span className={styles.sessionStatus} role="status">
-          {authView === "loggingOut" ? "Đang đăng xuất..." : "Đang kiểm tra phiên..."}
+          {authView === "loggingOut" ? t.nav.loggingOut : t.access.checkingSession}
         </span>
       )}
     </div>

@@ -1,25 +1,18 @@
-import {
-  Link,
-  NavLink,
-} from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import type { AuthUser } from "@/store/authStore";
-
-import type {
-  HeaderLanguage,
-} from "../types/header.types";
-
-import styles from "../styles/HeaderMobile.module.css";
-import AccountDropdown from "./AccountDropdown";
+import { useI18n } from "../../../../i18n/i18nStore";
+import type { HeaderLanguage } from "../types/header.types";
 import type { HeaderAuthView } from "../hooks/headerAuth";
+import AccountDropdown from "./AccountDropdown";
+import styles from "../styles/HeaderMobile.module.css";
 
 interface MobilePanelProps {
-  isOpen: boolean;
-  isAccountOpen: boolean;
   authView: HeaderAuthView;
   user: AuthUser | null;
+  isOpen: boolean;
+  isAccountOpen: boolean;
   language: HeaderLanguage;
-  onLanguageChange:
-    (value: HeaderLanguage) => void;
+  onLanguageChange: (value: HeaderLanguage) => void;
   onClose: () => void;
   onAccountToggle: () => void;
   onAccountClose: () => void;
@@ -27,10 +20,10 @@ interface MobilePanelProps {
 }
 
 const MobilePanel = ({
-  isOpen,
-  isAccountOpen,
   authView,
   user,
+  isOpen,
+  isAccountOpen,
   language,
   onLanguageChange,
   onClose,
@@ -38,112 +31,48 @@ const MobilePanel = ({
   onAccountClose,
   onLogout,
 }: MobilePanelProps) => {
-  if (!isOpen) {
-    return null;
-  }
+  const t = useI18n((s) => s.t);
+  if (!isOpen) return null;
 
   const isAuthenticated = authView === "authenticated" && user !== null;
 
   return (
     <div className={styles.mobilePanel}>
-      <div
-        className={`container ${styles.mobilePanelInner}`}
-      >
+      <div className={`container ${styles.mobilePanelInner}`}>
         <nav className={styles.mobileNav}>
-          <NavLink
-            to="/jobs"
-            className={styles.mobileNavLink}
-            onClick={onClose}
-          >
-            Việc làm
+          <NavLink to="/jobs" className={styles.mobileNavLink} onClick={onClose}>
+            {t.nav.jobs}
           </NavLink>
 
-          <NavLink
-            to="/companies"
-            className={styles.mobileNavLink}
-            onClick={onClose}
-          >
-            Công ty
+          <NavLink to="/companies" className={styles.mobileNavLink} onClick={onClose}>
+            {t.nav.companies}
           </NavLink>
 
-          <NavLink
-            to="/cv"
-            className={styles.mobileNavLink}
-            onClick={onClose}
-          >
-            Tạo CV
+          <NavLink to="/cv" className={styles.mobileNavLink} onClick={onClose}>
+            {t.nav.createCv}
           </NavLink>
 
-          <NavLink
-            to="/career"
-            className={styles.mobileNavLink}
-            onClick={onClose}
-          >
-            Khám phá nghề nghiệp
+          <NavLink to="/career" className={styles.mobileNavLink} onClick={onClose}>
+            {t.nav.career}
           </NavLink>
-
-          <button
-            type="button"
-            className={styles.mobileNavLink}
-            onClick={() => {
-              onClose();
-              window.dispatchEvent(new CustomEvent("open-findwork-ai"));
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              color: "#0284c7",
-              fontWeight: 600,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              textAlign: "left",
-              padding: "12px 0",
-              width: "100%",
-              fontFamily: "inherit",
-              fontSize: "inherit",
-            }}
-          >
-            <span>✨</span>
-            <span>FINDWORK AI (Trợ lý)</span>
-          </button>
         </nav>
 
         <div className={styles.mobileSection}>
-          <span
-            className={styles.mobileLabel}
-          >
-            Ngôn ngữ
-          </span>
+          <span className={styles.mobileLabel}>Ngôn ngữ / Language</span>
 
-          <div
-            className={styles.mobileLanguage}
-          >
+          <div className={styles.mobileLanguage}>
             <button
               type="button"
-              className={
-                language === "VI"
-                  ? styles.mobileLanguageActive
-                  : undefined
-              }
-              onClick={() =>
-                onLanguageChange("VI")
-              }
+              className={language === "VI" ? styles.mobileLanguageActive : undefined}
+              onClick={() => onLanguageChange("VI")}
             >
               VI
             </button>
 
             <button
               type="button"
-              className={
-                language === "EN"
-                  ? styles.mobileLanguageActive
-                  : undefined
-              }
-              onClick={() =>
-                onLanguageChange("EN")
-              }
+              className={language === "EN" ? styles.mobileLanguageActive : undefined}
+              onClick={() => onLanguageChange("EN")}
             >
               EN
             </button>
@@ -151,46 +80,26 @@ const MobilePanel = ({
         </div>
 
         <div className={styles.mobileSection}>
-          <span
-            className={styles.mobileLabel}
-          >
-            Nhà tuyển dụng
-          </span>
+          <span className={styles.mobileLabel}>{t.nav.forEmployers}</span>
 
           {isAuthenticated ? (
             <>
-              <Link
-                to="/employer"
-                className={styles.mobileActionLink}
-                onClick={onClose}
-              >
-                Không gian tuyển dụng
+              <Link to="/employer" className={styles.mobileActionLink} onClick={onClose}>
+                {t.nav.employerWorkspace}
               </Link>
 
-              <Link
-                to="/employer/onboarding"
-                className={styles.mobileActionLink}
-                onClick={onClose}
-              >
+              <Link to="/employer/onboarding" className={styles.mobileActionLink} onClick={onClose}>
                 Đăng ký doanh nghiệp
               </Link>
             </>
           ) : (
             <>
-              <Link
-                to="/employer/login"
-                className={styles.mobileActionLink}
-                onClick={onClose}
-              >
-                Đăng nhập nhà tuyển dụng
+              <Link to="/employer/login" className={styles.mobileActionLink} onClick={onClose}>
+                {t.nav.signIn} ({t.nav.forEmployers})
               </Link>
 
-              <Link
-                to="/employer/register"
-                className={styles.mobileActionLink}
-                onClick={onClose}
-              >
-                Đăng ký doanh nghiệp
+              <Link to="/employer/register" className={styles.mobileActionLink} onClick={onClose}>
+                {t.nav.register} ({t.nav.forEmployers})
               </Link>
             </>
           )}
@@ -210,15 +119,15 @@ const MobilePanel = ({
           ) : authView === "anonymous" ? (
             <>
               <Link to="/login" className={styles.mobileLogin} onClick={onClose}>
-                Đăng nhập
+                {t.nav.signIn}
               </Link>
               <Link to="/register" className={styles.mobileRegister} onClick={onClose}>
-                Đăng ký
+                {t.nav.register}
               </Link>
             </>
           ) : (
             <span className={styles.mobileSessionStatus} role="status">
-              {authView === "loggingOut" ? "Đang đăng xuất..." : "Đang kiểm tra phiên..."}
+              {authView === "loggingOut" ? t.nav.loggingOut : t.access.checkingSession}
             </span>
           )}
         </div>

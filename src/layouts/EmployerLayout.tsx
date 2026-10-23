@@ -16,12 +16,13 @@ import {
   X,
   User,
   Sparkles,
+  Globe,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { canManageJobs } from "@/features/company/companyWorkspacePermissions";
 import { Badge } from "@/components/ui";
-import { AiAssistantModal } from "@/features/ai/AiAssistantModal";
+import { FindworkAiFloatingWidget } from "@/features/ai/FindworkAiFloatingWidget";
 import styles from "./EmployerLayout.module.css";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -35,7 +36,6 @@ const ROLE_LABEL: Record<string, string> = {
 
 const EmployerLayout = () => {
   const [open, setOpen] = useState(false);
-  const [aiModalOpen, setAiModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -138,28 +138,18 @@ const EmployerLayout = () => {
         </Link>
 
         <Link
-          to="/candidate"
+          to="/jobs"
           className={styles.viewPublicLink}
-          title="Chuyển sang không gian tìm việc (Ứng viên)"
+          title="Xem sàn việc làm công khai trên FINDWORK"
         >
-          <User size={14} />
-          <span>Không gian ứng viên</span>
+          <Globe size={14} />
+          <span>Sàn việc làm</span>
         </Link>
 
         <span className={styles.spacer} />
 
         {/* RIGHT ACTIONS */}
         <div className={styles.topbarRight}>
-          <button
-            type="button"
-            className={styles.aiAssistantBtn}
-            onClick={() => setAiModalOpen(true)}
-            title="Mở Trợ lý tuyển dụng AI"
-          >
-            <Sparkles size={16} />
-            <span>Trợ lý AI</span>
-          </button>
-
           {canManageJobs(active?.memberRoleNames) && (
             <Link to="/employer/jobs/new" className={styles.postJobBtn}>
               <Plus size={16} />
@@ -346,13 +336,13 @@ const EmployerLayout = () => {
             </ul>
           </div>
 
-          {/* CANDIDATE WORKSPACE SWITCHER */}
+          {/* PUBLIC JOBS SHORTCUT */}
           <div className={styles.navSection} style={{ marginTop: "auto", paddingTop: 16, borderTop: "1px solid var(--color-border, #e2e8f0)" }}>
-            <Link to="/candidate" className={styles.navLink} title="Chuyển sang không gian tìm việc (Ứng viên)">
+            <Link to="/jobs" className={styles.navLink} title="Xem danh sách việc làm công khai trên FINDWORK">
               <span className={styles.navIcon}>
-                <User size={18} />
+                <Globe size={18} />
               </span>
-              <span>Không gian ứng viên</span>
+              <span>Sàn việc làm công khai</span>
             </Link>
           </div>
         </aside>
@@ -362,9 +352,7 @@ const EmployerLayout = () => {
         </main>
       </div>
 
-      <AiAssistantModal
-        isOpen={aiModalOpen}
-        onClose={() => setAiModalOpen(false)}
+      <FindworkAiFloatingWidget
         contextHint={active?.name ? `Doanh nghiệp: ${active.name}` : undefined}
       />
     </div>

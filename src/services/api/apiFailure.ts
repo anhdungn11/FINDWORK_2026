@@ -1,4 +1,6 @@
 import axios from "axios";
+import { getLocalizedApiError } from "../../i18n/errorCodes";
+import { getCurrentLocale } from "../../i18n/i18nStore";
 
 export type ApiFailureKind =
   | "unauthenticated" // 401
@@ -49,7 +51,7 @@ export const kindFromStatus = (status: number): ApiFailureKind => {
   return "unknown";
 };
 
-/** Chuẩn hóa mọi lỗi HTTP/mạng thành ApiFailure với phân loại chính xác. */
+/** Chuẩn hóa mọi lỗi HTTP/mạng thành ApiFailure với phân loại chính xác và thông điệp đa ngữ. */
 export function toApiFailure(error: unknown): ApiFailure {
   if (error instanceof ApiFailure) return error;
   if (axios.isAxiosError(error)) {
@@ -68,7 +70,9 @@ export function toApiFailure(error: unknown): ApiFailure {
       serverMessage = data.message.trim();
     }
 
-    const message = serverMessage || MESSAGES[kind];
+    const locale = getCurrentLocale();
+    const localized = getLocalizedApiError(typeof data?.code === "string" ? data.code : undefined, serverMessage, locale);
+    const message = localized || MESSAGES[kind];
     return new ApiFailure(kind, status, code, message, data?.details);
   }
   return new ApiFailure("unknown", 0, "UNKNOWN", MESSAGES.unknown);
