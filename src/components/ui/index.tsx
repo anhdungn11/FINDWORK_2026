@@ -101,3 +101,5 @@ export const Pagination = ({
 export const DemoBadge = ({ children = "DỮ LIỆU MẪU (DEV) — không phải dữ liệu thật" }: { children?: ReactNode }) => (
   <div className={`${styles.notice} ${styles.noticeWarn}`} role="note" data-testid="demo-badge">{children}</div>
 );
+
+export { ConfirmationModal, type ConfirmationModalProps } from "./ConfirmationModal";

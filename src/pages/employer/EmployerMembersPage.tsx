@@ -8,7 +8,7 @@ import {
   ArrowRightLeft,
   Info,
 } from "lucide-react";
-import { Badge, Card, EmptyState, LoadingBlock, PageHeader, ui } from "@/components/ui";
+import { Badge, Card, EmptyState, LoadingBlock, PageHeader, ConfirmationModal, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
@@ -33,6 +33,15 @@ const ROLE_LABELS: Record<string, string> = {
   VIEWER: "Người xem (Viewer)",
 };
 
+interface ConfirmDialogState {
+  isOpen: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone: "danger" | "primary" | "warning";
+  action: () => Promise<void>;
+}
+
 const EmployerMembersPage = () => {
   const { active, reload: reloadWorkspace } = useCompanyWorkspace();
   const currentUser = useAuthStore((s) => s.user);
@@ -51,6 +60,16 @@ const EmployerMembersPage = () => {
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
   const [busyInvitationId, setBusyInvitationId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmLabel: "Xác nhận",
+    tone: "primary",
+    action: async () => {},
+  });
+  const [dialogLoading, setDialogLoading] = useState(false);
 
   const setTab = (tab: "members" | "invitations") => {
     const next = new URLSearchParams(params);
@@ -96,62 +115,88 @@ const EmployerMembersPage = () => {
     }
   };
 
-  const handleRemoveMember = async (member: CompanyMemberDto) => {
+  const handleRemoveMember = (member: CompanyMemberDto) => {
     const targetName = member.user?.email || member.id;
-    if (!window.confirm(`Xác nhận xóa thành viên "${targetName}" khỏi doanh nghiệp?`)) return;
-
-    setBusyMemberId(member.id);
-    setNotice(null);
-    try {
-      await companyWorkspaceApi.removeMember(active.id, member.id);
-      setNotice({ tone: "ok", text: `Đã xóa thành viên "${targetName}" khỏi doanh nghiệp.` });
-      members.reload();
-    } catch (err) {
-      setNotice({ tone: "error", text: toApiFailure(err).message });
-    } finally {
-      setBusyMemberId(null);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Xác nhận xóa thành viên",
+      description: `Bạn có chắc chắn muốn xóa thành viên "${targetName}" khỏi doanh nghiệp? Thành viên này sẽ không thể truy cập vào dữ liệu tuyển dụng của công ty nữa.`,
+      confirmLabel: "Xóa thành viên",
+      tone: "danger",
+      action: async () => {
+        setBusyMemberId(member.id);
+        setNotice(null);
+        try {
+          await companyWorkspaceApi.removeMember(active.id, member.id);
+          setNotice({ tone: "ok", text: `Đã xóa thành viên "${targetName}" khỏi doanh nghiệp.` });
+          members.reload();
+        } catch (err) {
+          setNotice({ tone: "error", text: toApiFailure(err).message });
+        } finally {
+          setBusyMemberId(null);
+        }
+      },
+    });
   };
 
-  const handleTransferOwnership = async (member: CompanyMemberDto) => {
+  const handleTransferOwnership = (member: CompanyMemberDto) => {
     const targetName = member.user?.email || member.id;
-    if (
-      !window.confirm(
-        `XÁC NHẬN CHUYỂN QUYỀN CHỦ SỞ HỮU (OWNER):\nBạn có chắc chắn muốn chuyển toàn bộ quyền Chủ sở hữu của công ty "${active.name}" cho "${targetName}"?\nSau khi chuyển, vai trò của bạn sẽ chuyển thành Quản trị viên (Admin).`
-      )
-    )
-      return;
-
-    setBusyMemberId(member.id);
-    setNotice(null);
-    try {
-      await companyWorkspaceApi.transferOwnership(active.id, member.id);
-      setNotice({
-        tone: "ok",
-        text: `Đã chuyển giao toàn bộ quyền Chủ sở hữu doanh nghiệp cho "${targetName}".`,
-      });
-      members.reload();
-      reloadWorkspace();
-    } catch (err) {
-      setNotice({ tone: "error", text: toApiFailure(err).message });
-    } finally {
-      setBusyMemberId(null);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Chuyển giao quyền Chủ sở hữu (Owner)",
+      description: `Bạn có chắc chắn muốn chuyển toàn bộ quyền Chủ sở hữu của công ty "${active.name}" cho "${targetName}"? Sau khi chuyển, vai trò của bạn sẽ chuyển thành Quản trị viên (Admin).`,
+      confirmLabel: "Chuyển quyền sở hữu",
+      tone: "danger",
+      action: async () => {
+        setBusyMemberId(member.id);
+        setNotice(null);
+        try {
+          await companyWorkspaceApi.transferOwnership(active.id, member.id);
+          setNotice({
+            tone: "ok",
+            text: `Đã chuyển giao toàn bộ quyền Chủ sở hữu doanh nghiệp cho "${targetName}".`,
+          });
+          members.reload();
+          reloadWorkspace();
+        } catch (err) {
+          setNotice({ tone: "error", text: toApiFailure(err).message });
+        } finally {
+          setBusyMemberId(null);
+        }
+      },
+    });
   };
 
-  const handleRevokeInvitation = async (inv: CompanyInvitationDto) => {
-    if (!window.confirm(`Xác nhận thu hồi lời mời gửi tới "${inv.emailNormalized}"?`)) return;
+  const handleRevokeInvitation = (inv: CompanyInvitationDto) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Thu hồi lời mời nội bộ",
+      description: `Bạn có chắc chắn muốn thu hồi lời mời gửi tới "${inv.emailNormalized}"? Liên kết lời mời đã gửi trước đây sẽ mất hiệu lực ngay lập tức.`,
+      confirmLabel: "Thu hồi lời mời",
+      tone: "warning",
+      action: async () => {
+        setBusyInvitationId(inv.id);
+        setNotice(null);
+        try {
+          await companyWorkspaceApi.revokeInvitation(active.id, inv.id);
+          setNotice({ tone: "ok", text: `Đã thu hồi lời mời gửi tới "${inv.emailNormalized}".` });
+          invitations.reload();
+        } catch (err) {
+          setNotice({ tone: "error", text: toApiFailure(err).message });
+        } finally {
+          setBusyInvitationId(null);
+        }
+      },
+    });
+  };
 
-    setBusyInvitationId(inv.id);
-    setNotice(null);
+  const handleExecuteDialog = async () => {
+    setDialogLoading(true);
     try {
-      await companyWorkspaceApi.revokeInvitation(active.id, inv.id);
-      setNotice({ tone: "ok", text: `Đã thu hồi lời mời gửi tới "${inv.emailNormalized}".` });
-      invitations.reload();
-    } catch (err) {
-      setNotice({ tone: "error", text: toApiFailure(err).message });
+      await confirmDialog.action();
+      setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
     } finally {
-      setBusyInvitationId(null);
+      setDialogLoading(false);
     }
   };
 
@@ -250,90 +295,56 @@ const EmployerMembersPage = () => {
         /* TAB 1: INTERNAL MEMBERS & ROLES                                           */
         /* ========================================================================= */
         <div style={{ display: "grid", gap: 20 }}>
-          {/* USER'S ROLE CARD */}
-          <div
-            style={{
-              padding: 16,
-              background: "var(--color-surface, #ffffff)",
-              border: "1px solid var(--color-border, #e2e8f0)",
-              borderRadius: 10,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: 12,
-            }}
-          >
-            <div>
-              <span className={ui.hint}>Tài khoản hiện tại của bạn:</span>
-              <div style={{ fontWeight: 700, fontSize: "1rem", color: "var(--color-text-primary, #1e293b)" }}>
-                {currentUser?.email || "Bạn"}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {active.memberRoleNames.map((role) => (
-                <Badge key={role} tone="info">
-                  {ROLE_LABELS[role] || role.replace(/_/g, " ")}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* INTERNAL MEMBERS TABLE */}
-          <Card title="Danh sách nhân sự quản trị doanh nghiệp">
+          <Card title="Danh sách thành viên quản trị doanh nghiệp">
             {members.loading ? (
               <LoadingBlock rows={3} label="Đang tải danh sách thành viên..." />
             ) : members.error ? (
               <ApiErrorState error={members.error} onRetry={members.reload} />
             ) : !members.data || members.data.length === 0 ? (
-              <EmptyState
-                title="Chưa có thành viên nào"
-                text="Doanh nghiệp chưa có thành viên nội bộ nào ngoài chủ sở hữu."
-              />
+              <EmptyState title="Chưa có thành viên" text="Doanh nghiệp chưa có thành viên nào." />
             ) : (
               <div className={ui.tableWrap}>
                 <table className={ui.table}>
-                  <caption className={ui.srOnly}>Danh sách thành viên quản trị nội bộ của công ty</caption>
+                  <caption className={ui.srOnly}>Danh sách thành viên quản trị nội bộ của doanh nghiệp</caption>
                   <thead>
                     <tr>
                       <th scope="col">Thành viên</th>
-                      <th scope="col">Vai trò trong công ty</th>
-                      <th scope="col">Ngày gia nhập</th>
+                      <th scope="col">Vai trò hiện tại</th>
+                      <th scope="col">Ngày tham gia</th>
                       <th scope="col">Trạng thái</th>
-                      <th scope="col">Phân quyền & Thao tác</th>
+                      <th scope="col">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {members.data.map((m) => {
-                      const isSelf = currentUser?.id && m.user?.id === currentUser.id;
-                      const isCurrentOwner = Boolean(
-                        members.data?.some((mem) => mem.isOwner && currentUser?.id && mem.user?.id === currentUser.id),
-                      );
-                      const canModify = writes && userCanManage && !m.isOwner && !isSelf;
-                      const primaryRole = m.roles?.[0]?.role?.name || "VIEWER";
+                      const isSelf = m.user?.id === currentUser?.id;
+                      const isOwner = m.isOwner;
+                      const isCurrentOwner = active.memberRoleNames.includes("COMPANY_OWNER");
+                      const canModify = userCanManage && writes && !isOwner && !isSelf;
 
                       return (
                         <tr key={m.id}>
                           <td>
-                            <div style={{ fontWeight: 600 }}>{m.user?.email || m.id}</div>
-                            {m.isOwner && (
-                              <Badge tone="success" style={{ marginTop: 4 }}>
-                                Chủ sở hữu (Owner)
-                              </Badge>
-                            )}
-                            {isSelf && (
-                              <Badge tone="neutral" style={{ marginTop: 4, marginLeft: 4 }}>
-                                Chính bạn
-                              </Badge>
-                            )}
+                            <div style={{ fontWeight: 600, color: "var(--color-text-primary, #1e293b)" }}>
+                              {m.user?.email || "Thành viên"}
+                              {isSelf && (
+                                <span style={{ marginLeft: 6, fontSize: "0.75rem", color: "var(--color-primary, #4f6ef7)" }}>
+                                  (Bạn)
+                                </span>
+                              )}
+                            </div>
+                            <div className={ui.hint}>{m.user?.email}</div>
                           </td>
                           <td>
-                            {canModify ? (
+                            {isOwner ? (
+                              <Badge tone="warning" style={{ fontWeight: 700 }}>
+                                Chủ sở hữu (Owner)
+                              </Badge>
+                            ) : canModify ? (
                               <select
-                                aria-label={`Thay đổi vai trò cho ${m.user?.email || m.id}`}
                                 className={ui.select}
-                                style={{ width: "auto", minWidth: 180, padding: "5px 10px", fontSize: "0.85rem" }}
-                                value={primaryRole}
+                                style={{ width: "auto", minWidth: 200, padding: "4px 8px", fontSize: "0.85rem" }}
+                                value={m.roles[0]?.role.name || "VIEWER"}
                                 disabled={busyMemberId === m.id}
                                 onChange={(e) => handleRoleChange(m, e.target.value as AssignableCompanyRole)}
                               >
@@ -345,7 +356,7 @@ const EmployerMembersPage = () => {
                               </select>
                             ) : (
                               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                                {m.roles && m.roles.length > 0 ? (
+                                {m.roles.length > 0 ? (
                                   m.roles.map((r) => (
                                     <Badge key={r.role.id} tone="info">
                                       {ROLE_LABELS[r.role.name] || r.role.name}
@@ -448,45 +459,41 @@ const EmployerMembersPage = () => {
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     required
-                    disabled={!writes || inviting}
+                    disabled={inviting || !writes}
                   />
                 </div>
                 <button
                   type="submit"
                   className={`${ui.btn} ${ui.btnPrimary}`}
-                  disabled={!writes || inviting || !inviteEmail.trim()}
+                  disabled={inviting || !inviteEmail.trim() || !writes}
+                  aria-disabled={!writes}
+                  title={writes ? undefined : "Cổng ghi dữ liệu đang khóa"}
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   <UserPlus size={16} />
-                  <span>{inviting ? "Đang gửi thư mời..." : "Gửi lời mời nội bộ"}</span>
+                  <span>{inviting ? "Đang gửi..." : "Gửi lời mời"}</span>
                 </button>
               </form>
             )}
-            <p style={{ margin: "10px 0 0", fontSize: "0.85rem", color: "var(--color-text-secondary, #64748b)" }}>
-              * Thành viên sau khi chấp nhận lời mời sẽ mặc định có quyền <strong>Người xem (Viewer)</strong> và có thể được phân quyền bổ sung bởi Quản trị viên.
-            </p>
           </Card>
 
-          {/* INVITATIONS TABLE */}
-          <Card title="Danh sách lời mời nội bộ đang chờ hoặc đã xử lý">
+          {/* INVITATIONS LIST */}
+          <Card title="Danh sách lời mời đã gửi">
             {invitations.loading ? (
               <LoadingBlock rows={2} label="Đang tải danh sách lời mời..." />
             ) : invitations.error ? (
               <ApiErrorState error={invitations.error} onRetry={invitations.reload} />
             ) : !invitations.data || invitations.data.length === 0 ? (
-              <EmptyState
-                title="Không có lời mời nào"
-                text="Chưa có lời mời tham gia quản trị nội bộ nào được gửi đi."
-              />
+              <EmptyState title="Chưa có lời mời nào" text="Chưa có lời mời nội bộ nào được gửi đi." />
             ) : (
               <div className={ui.tableWrap}>
                 <table className={ui.table}>
-                  <caption className={ui.srOnly}>Danh sách lời mời thành viên nội bộ</caption>
+                  <caption className={ui.srOnly}>Danh sách lời mời tham gia quản trị nội bộ</caption>
                   <thead>
                     <tr>
                       <th scope="col">Email người nhận</th>
                       <th scope="col">Ngày gửi</th>
-                      <th scope="col">Thời hạn lời mời</th>
+                      <th scope="col">Hết hạn vào</th>
                       <th scope="col">Trạng thái</th>
                       <th scope="col">Thao tác</th>
                     </tr>
@@ -495,7 +502,7 @@ const EmployerMembersPage = () => {
                     {invitations.data.map((inv) => (
                       <tr key={inv.id}>
                         <td>
-                          <div style={{ fontWeight: 600 }}>{inv.emailNormalized || "—"}</div>
+                          <strong>{inv.emailNormalized}</strong>
                         </td>
                         <td>{inv.createdAt ? new Date(inv.createdAt).toLocaleDateString("vi-VN") : "—"}</td>
                         <td>{inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString("vi-VN") : "—"}</td>
@@ -544,6 +551,18 @@ const EmployerMembersPage = () => {
           </Card>
         </div>
       )}
+
+      {/* CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={handleExecuteDialog}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmLabel={confirmDialog.confirmLabel}
+        tone={confirmDialog.tone}
+        loading={dialogLoading}
+      />
     </>
   );
 };

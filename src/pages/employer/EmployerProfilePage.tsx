@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ExternalLink,
   MapPin,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Badge, Card, EmptyState, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
@@ -27,6 +28,15 @@ const EMPLOYEE_SIZE_OPTIONS = [
   "1000+ nhân viên",
 ];
 
+interface FormErrors {
+  name?: string;
+  website?: string;
+  foundedYear?: string;
+  description?: string;
+  legalName?: string;
+  taxCode?: string;
+}
+
 const EmployerProfilePage = () => {
   const { active, reload: reloadWorkspace } = useCompanyWorkspace();
   const [params, setParams] = useSearchParams();
@@ -40,6 +50,7 @@ const EmployerProfilePage = () => {
   const [isEditingBrand, setIsEditingBrand] = useState(false);
   const [isEditingLegal, setIsEditingLegal] = useState(false);
   const [formValues, setFormValues] = useState<UpdateCompanyProfileInput>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [saving, setSaving] = useState(false);
   const [requestingVerify, setRequestingVerify] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -68,11 +79,80 @@ const EmployerProfilePage = () => {
     else next.delete("tab");
     setParams(next);
     setMessage(null);
+    setErrors({});
+  };
+
+  const validateBrandForm = (): FormErrors => {
+    const errs: FormErrors = {};
+    const name = formValues.name?.trim() || "";
+    if (!name) {
+      errs.name = "Vui lòng nhập tên thương hiệu doanh nghiệp.";
+    } else if (name.length < 2) {
+      errs.name = "Tên doanh nghiệp phải có ít nhất 2 ký tự.";
+    } else if (name.length > 255) {
+      errs.name = "Tên doanh nghiệp không được vượt quá 255 ký tự.";
+    }
+
+    if (formValues.website) {
+      const w = formValues.website.trim();
+      if (!/^https?:\/\//i.test(w)) {
+        errs.website = "Địa chỉ website phải bắt đầu bằng http:// hoặc https://";
+      } else {
+        try {
+          new URL(w);
+        } catch {
+          errs.website = "Địa chỉ website không hợp lệ.";
+        }
+      }
+    }
+
+    if (formValues.foundedYear != null && formValues.foundedYear !== ("" as unknown as number)) {
+      const year = Number(formValues.foundedYear);
+      const curYear = new Date().getFullYear();
+      if (isNaN(year) || year < 1800 || year > curYear) {
+        errs.foundedYear = `Năm thành lập phải từ 1800 đến năm hiện tại (${curYear}).`;
+      }
+    }
+
+    if (formValues.description && formValues.description.length > 20000) {
+      errs.description = "Mô tả doanh nghiệp không được vượt quá 20,000 ký tự.";
+    }
+
+    return errs;
+  };
+
+  const validateLegalForm = (): FormErrors => {
+    const errs: FormErrors = {};
+    const legalName = formValues.legalName?.trim() || "";
+    if (!legalName) {
+      errs.legalName = "Vui lòng nhập tên pháp lý doanh nghiệp.";
+    } else if (legalName.length < 2) {
+      errs.legalName = "Tên pháp lý phải có ít nhất 2 ký tự.";
+    } else if (legalName.length > 220) {
+      errs.legalName = "Tên pháp lý không được vượt quá 220 ký tự.";
+    }
+
+    const taxCode = formValues.taxCode?.trim() || "";
+    if (!taxCode) {
+      errs.taxCode = "Vui lòng nhập mã số thuế doanh nghiệp.";
+    } else if (taxCode.length < 10) {
+      errs.taxCode = "Mã số thuế doanh nghiệp phải có tối thiểu 10 ký tự.";
+    } else if (taxCode.length > 80) {
+      errs.taxCode = "Mã số thuế không được vượt quá 80 ký tự.";
+    } else if (!/^[0-9A-Za-z-]+$/.test(taxCode)) {
+      errs.taxCode = "Mã số thuế chỉ được chứa số, chữ cái và dấu gạch nối.";
+    }
+
+    return errs;
   };
 
   const handleSaveBrand = async (e: FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    const errs = validateBrandForm();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setSaving(true);
     try {
       const payload: UpdateCompanyProfileInput = {
@@ -99,6 +179,10 @@ const EmployerProfilePage = () => {
   const handleSaveLegal = async (e: FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    const errs = validateLegalForm();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setSaving(true);
     try {
       const payload: UpdateCompanyProfileInput = {
@@ -273,10 +357,11 @@ const EmployerProfilePage = () => {
           >
             <div
               style={{
-                width: 72,
-                height: 72,
-                borderRadius: 12,
-                background: "var(--color-primary-soft, #eef2ff)",
+                width: 76,
+                height: 76,
+                borderRadius: 14,
+                background: "linear-gradient(135deg, #e0e7ff 0%, #dbeafe 100%)",
+                border: "2px solid #c7d2fe",
                 color: "var(--color-primary, #4f6ef7)",
                 display: "flex",
                 alignItems: "center",
@@ -284,6 +369,7 @@ const EmployerProfilePage = () => {
                 fontSize: "1.75rem",
                 fontWeight: 800,
                 flexShrink: 0,
+                boxShadow: "0 4px 10px rgba(79, 110, 247, 0.12)",
               }}
             >
               {companyInitials}
@@ -305,7 +391,10 @@ const EmployerProfilePage = () => {
                 <button
                   type="button"
                   className={`${ui.btn} ${ui.btnPrimary}`}
-                  onClick={() => setIsEditingBrand(true)}
+                  onClick={() => {
+                    setIsEditingBrand(true);
+                    setErrors({});
+                  }}
                 >
                   Chỉnh sửa thông tin thương hiệu
                 </button>
@@ -313,13 +402,57 @@ const EmployerProfilePage = () => {
             </div>
           </div>
 
-          {/* NOTICE REGARDING LOGO / BANNER PERSISTENCE CONTRACT */}
-          <div
-            className={ui.notice}
-            style={{ fontSize: "0.85rem", background: "var(--color-surface-soft, #f8fafc)" }}
-          >
-            <strong>Lưu ý về định dạng nhận diện thương hiệu:</strong> Dữ liệu định danh, giới thiệu và địa điểm được đồng bộ trực tiếp tới máy chủ và trang tuyển dụng công khai. Hiện tại máy chủ chưa hỗ trợ lưu trữ tệp ảnh tải lên; giao diện sử dụng huy hiệu nhận diện tự động từ tên doanh nghiệp.
-          </div>
+          {/* TRUTHFUL BRAND IDENTITY & MEDIA CARD */}
+          <Card title="Hình ảnh & Nhận diện thương hiệu">
+            <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 12,
+                  background: "#f1f5f9",
+                  border: "1.5px dashed #cbd5e1",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  color: "#64748b",
+                  flexShrink: 0,
+                }}
+              >
+                <ImageIcon size={24} />
+                <span style={{ fontSize: "10px", fontWeight: 600 }}>Logo</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <h3 style={{ margin: 0, fontSize: "0.9375rem", fontWeight: 600 }}>Huy hiệu nhận diện thương hiệu chuẩn hóa</h3>
+                  <Badge tone="info">Tự động sinh theo tên</Badge>
+                </div>
+                <div
+                  className={ui.notice}
+                  style={{ fontSize: "0.85rem", background: "var(--color-surface-soft, #f8fafc)", margin: "0 0 12px" }}
+                >
+                  <strong>Lưu ý về định dạng nhận diện thương hiệu:</strong> Dữ liệu định danh, giới thiệu và địa điểm được đồng bộ trực tiếp tới máy chủ và trang tuyển dụng công khai. Hiện tại máy chủ chưa hỗ trợ lưu trữ tệp ảnh tải lên; giao diện sử dụng huy hiệu nhận diện tự động từ tên doanh nghiệp.
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    type="button"
+                    className={ui.btn}
+                    disabled
+                    aria-disabled="true"
+                    title="Chức năng tải tệp ảnh trực tiếp đang đợi dịch vụ lưu trữ media tập trung từ Backend"
+                    style={{ opacity: 0.6, cursor: "not-allowed" }}
+                  >
+                    Tải logo mới
+                  </button>
+                  <span style={{ fontSize: "0.8rem", color: "var(--color-text-secondary, #64748b)" }}>
+                    Sắp ra mắt khi Backend hoàn tất hợp đồng Media Storage.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
 
           {/* EDIT FORM OR READ-ONLY VIEW */}
           {isEditingBrand ? (
@@ -334,10 +467,23 @@ const EmployerProfilePage = () => {
                       id="b-name"
                       className={ui.input}
                       value={formValues.name || ""}
-                      onChange={(e) => setFormValues((v) => ({ ...v, name: e.target.value }))}
+                      onChange={(e) => {
+                        setFormValues((v) => ({ ...v, name: e.target.value }));
+                        if (errors.name) setErrors((err) => ({ ...err, name: undefined }));
+                      }}
                       required
+                      aria-invalid={Boolean(errors.name) || undefined}
+                      aria-describedby={errors.name ? "b-name-err" : "b-name-hint"}
                     />
-                    <span className={ui.hint}>Tên hiển thị công khai tới tất cả ứng viên và trên các tin tuyển dụng.</span>
+                    {errors.name ? (
+                      <span id="b-name-err" className={ui.fieldError} role="alert">
+                        {errors.name}
+                      </span>
+                    ) : (
+                      <span id="b-name-hint" className={ui.hint}>
+                        Tên hiển thị công khai tới tất cả ứng viên và trên các tin tuyển dụng.
+                      </span>
+                    )}
                   </div>
 
                   <div className={ui.field}>
@@ -388,15 +534,23 @@ const EmployerProfilePage = () => {
                       className={ui.input}
                       placeholder="Ví dụ: 2018"
                       min={1800}
-                      max={9999}
+                      max={new Date().getFullYear()}
                       value={formValues.foundedYear ?? ""}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormValues((v) => ({
                           ...v,
                           foundedYear: e.target.value ? Number(e.target.value) : undefined,
-                        }))
-                      }
+                        }));
+                        if (errors.foundedYear) setErrors((err) => ({ ...err, foundedYear: undefined }));
+                      }}
+                      aria-invalid={Boolean(errors.foundedYear) || undefined}
+                      aria-describedby={errors.foundedYear ? "b-year-err" : undefined}
                     />
+                    {errors.foundedYear && (
+                      <span id="b-year-err" className={ui.fieldError} role="alert">
+                        {errors.foundedYear}
+                      </span>
+                    )}
                   </div>
 
                   <div className={ui.field} style={{ gridColumn: "1 / -1" }}>
@@ -409,8 +563,22 @@ const EmployerProfilePage = () => {
                       className={ui.input}
                       placeholder="https://company.com"
                       value={formValues.website || ""}
-                      onChange={(e) => setFormValues((v) => ({ ...v, website: e.target.value }))}
+                      onChange={(e) => {
+                        setFormValues((v) => ({ ...v, website: e.target.value }));
+                        if (errors.website) setErrors((err) => ({ ...err, website: undefined }));
+                      }}
+                      aria-invalid={Boolean(errors.website) || undefined}
+                      aria-describedby={errors.website ? "b-website-err" : "b-website-hint"}
                     />
+                    {errors.website ? (
+                      <span id="b-website-err" className={ui.fieldError} role="alert">
+                        {errors.website}
+                      </span>
+                    ) : (
+                      <span id="b-website-hint" className={ui.hint}>
+                        Bắt đầu bằng http:// hoặc https:// (ví dụ: https://findwork.vn)
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -424,9 +592,22 @@ const EmployerProfilePage = () => {
                     rows={6}
                     placeholder="Giới thiệu sứ mệnh, các sản phẩm chính, môi trường văn hóa làm việc và cơ hội thăng tiến..."
                     value={formValues.description || ""}
-                    onChange={(e) => setFormValues((v) => ({ ...v, description: e.target.value }))}
+                    onChange={(e) => {
+                      setFormValues((v) => ({ ...v, description: e.target.value }));
+                      if (errors.description) setErrors((err) => ({ ...err, description: undefined }));
+                    }}
+                    aria-invalid={Boolean(errors.description) || undefined}
+                    aria-describedby={errors.description ? "b-desc-err" : "b-desc-hint"}
                   />
-                  <span className={ui.hint}>Được hiển thị tại phần Giới thiệu công ty trên trang tuyển dụng công khai.</span>
+                  {errors.description ? (
+                    <span id="b-desc-err" className={ui.fieldError} role="alert">
+                      {errors.description}
+                    </span>
+                  ) : (
+                    <span id="b-desc-hint" className={ui.hint}>
+                      Được hiển thị tại phần Giới thiệu công ty trên trang tuyển dụng công khai.
+                    </span>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
@@ -445,6 +626,7 @@ const EmployerProfilePage = () => {
                     onClick={() => {
                       setIsEditingBrand(false);
                       setMessage(null);
+                      setErrors({});
                     }}
                   >
                     Hủy bỏ
@@ -655,10 +837,23 @@ const EmployerProfilePage = () => {
                       className={ui.input}
                       placeholder="Ví dụ: CÔNG TY CỔ PHẦN CÔNG NGHỆ FINDWORK VIỆT NAM"
                       value={formValues.legalName || ""}
-                      onChange={(e) => setFormValues((v) => ({ ...v, legalName: e.target.value }))}
+                      onChange={(e) => {
+                        setFormValues((v) => ({ ...v, legalName: e.target.value }));
+                        if (errors.legalName) setErrors((err) => ({ ...err, legalName: undefined }));
+                      }}
                       required
+                      aria-invalid={Boolean(errors.legalName) || undefined}
+                      aria-describedby={errors.legalName ? "l-legalName-err" : "l-legalName-hint"}
                     />
-                    <span className={ui.hint}>Tên chính xác như trên Giấy chứng nhận đăng ký doanh nghiệp (GPKD).</span>
+                    {errors.legalName ? (
+                      <span id="l-legalName-err" className={ui.fieldError} role="alert">
+                        {errors.legalName}
+                      </span>
+                    ) : (
+                      <span id="l-legalName-hint" className={ui.hint}>
+                        Tên chính xác như trên Giấy chứng nhận đăng ký doanh nghiệp (GPKD).
+                      </span>
+                    )}
                   </div>
 
                   <div className={ui.field}>
@@ -670,10 +865,23 @@ const EmployerProfilePage = () => {
                       className={ui.input}
                       placeholder="Ví dụ: 0101234567 hoặc 0312345678-001"
                       value={formValues.taxCode || ""}
-                      onChange={(e) => setFormValues((v) => ({ ...v, taxCode: e.target.value }))}
+                      onChange={(e) => {
+                        setFormValues((v) => ({ ...v, taxCode: e.target.value }));
+                        if (errors.taxCode) setErrors((err) => ({ ...err, taxCode: undefined }));
+                      }}
                       required
+                      aria-invalid={Boolean(errors.taxCode) || undefined}
+                      aria-describedby={errors.taxCode ? "l-taxCode-err" : "l-taxCode-hint"}
                     />
-                    <span className={ui.hint}>Mã số thuế 10 hoặc 13 số do Tổng cục Thuế cấp.</span>
+                    {errors.taxCode ? (
+                      <span id="l-taxCode-err" className={ui.fieldError} role="alert">
+                        {errors.taxCode}
+                      </span>
+                    ) : (
+                      <span id="l-taxCode-hint" className={ui.hint}>
+                        Mã số thuế 10 hoặc 13 số do Tổng cục Thuế cấp.
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -693,6 +901,7 @@ const EmployerProfilePage = () => {
                     onClick={() => {
                       setIsEditingLegal(false);
                       setMessage(null);
+                      setErrors({});
                     }}
                   >
                     Hủy bỏ
@@ -731,7 +940,10 @@ const EmployerProfilePage = () => {
                     <button
                       type="button"
                       className={`${ui.btn} ${ui.btnPrimary}`}
-                      onClick={() => setIsEditingLegal(true)}
+                      onClick={() => {
+                        setIsEditingLegal(true);
+                        setErrors({});
+                      }}
                     >
                       Chỉnh sửa thông tin pháp lý
                     </button>
