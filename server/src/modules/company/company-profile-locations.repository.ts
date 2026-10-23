@@ -7,6 +7,7 @@ import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import type { CreateCompanyLocationDto } from "./dto/create-company-location.dto";
 import type { UpdateCompanyLocationDto } from "./dto/update-company-location.dto";
 import type { UpdateCompanyProfileDto } from "./dto/update-company-profile.dto";
+import type { CompanyMediaKind } from "./company-media.storage";
 
 const profileSelect = {
   id: true, name: true, slug: true, legalName: true, taxCode: true,
@@ -53,6 +54,35 @@ export class CompanyProfileLocationsRepository {
     }).then((company) => {
       if (!company) throw notFound();
       return company;
+    });
+  }
+
+  async getPublicMediaKey(companyId: string, kind: CompanyMediaKind): Promise<string | null> {
+    const company = await this.prisma.company.findFirst({
+      where: { id: companyId, status: "ACTIVE" },
+      select: { logoAssetKey: true, coverAssetKey: true },
+    });
+    if (!company) throw notFound();
+    return kind === "logo" ? company.logoAssetKey : company.coverAssetKey;
+  }
+
+  async replaceMediaKey(companyId: string, actorUserId: string, kind: CompanyMediaKind, key: string | null) {
+    return this.mutate(companyId, actorUserId, async (tx) => {
+      const before = await tx.company.findUniqueOrThrow({
+        where: { id: companyId }, select: { logoAssetKey: true, coverAssetKey: true },
+      });
+      const previousKey = kind === "logo" ? before.logoAssetKey : before.coverAssetKey;
+      if (previousKey === key) return { previousKey, changed: false };
+      await tx.company.update({
+        where: { id: companyId },
+        data: kind === "logo" ? { logoAssetKey: key } : { coverAssetKey: key },
+      });
+      await tx.auditLog.create({ data: {
+        actorUserId, companyId, action: key ? `company.media.${kind}.replace` : `company.media.${kind}.remove`,
+        targetType: "Company", targetId: companyId,
+        beforeData: { present: previousKey !== null }, afterData: { present: key !== null },
+      } });
+      return { previousKey, changed: true };
     });
   }
 

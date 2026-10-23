@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, Res, StreamableFile, UseGuards } from "@nestjs/common";
+import type { Response } from "express";
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -11,6 +12,7 @@ import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { CompanyService } from "./company.service";
+import { CompanyMediaService } from "./company-media.service";
 import { CompanyCreatedResponseDto } from "./dto/company-created-response.dto";
 import { CreateCompanyDto } from "./dto/create-company.dto";
 import { FeaturedCompanyQueryDto } from "./dto/featured-company-query.dto";
@@ -19,7 +21,7 @@ import { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
 @ApiTags("Companies")
 @Controller("companies")
 export class CompanyController {
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(private readonly companyService: CompanyService, private readonly media: CompanyMediaService) {}
 
   @ApiBearerAuth("access-token")
   @UseGuards(AccessTokenGuard)
@@ -44,6 +46,18 @@ export class CompanyController {
   @ApiOperation({ summary: "Read an active company's public profile" })
   getPublic(@Param("companyId", ParseUUIDPipe) companyId: string) {
     return this.companyService.getPublic(companyId);
+  }
+
+  @Get(":companyId/media/:kind")
+  @ApiOperation({ summary: "Read an active company's public logo or cover image" })
+  async getPublicMedia(@Param("companyId", ParseUUIDPipe) companyId: string,
+    @Param("kind") kind: string, @Res({ passthrough: true }) response: Response) {
+    const { bytes, type } = await this.media.get(companyId, kind);
+    response.setHeader("Content-Type", type);
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    response.setHeader("Cache-Control", "public, max-age=300");
+    return new StreamableFile(bytes);
   }
 
   @ApiBearerAuth("access-token")

@@ -18,6 +18,7 @@ import { CompanyProfileLocationsService } from "../src/modules/company/company-p
 import { CompanyRepository } from "../src/modules/company/company.repository";
 import { DEFAULT_COMPANY_ROLES } from "../src/modules/company/company-roles";
 import { CompanyService } from "../src/modules/company/company.service";
+import { CompanyMediaService } from "../src/modules/company/company-media.service";
 import { CompanyJobsController, PublicJobsController } from "../src/modules/jobs/jobs.controller";
 import { JobsService } from "../src/modules/jobs/jobs.service";
 
@@ -65,6 +66,11 @@ describe("candidate and employer workspace authorization", () => {
     getProfile: jest.fn().mockResolvedValue({ id: companyId }),
     updateProfile: jest.fn().mockResolvedValue({ id: companyId }),
   };
+  const media = {
+    get: jest.fn().mockResolvedValue({ bytes: Buffer.from("image"), type: "image/png" }),
+    upload: jest.fn().mockResolvedValue({ kind: "logo", available: true }),
+    remove: jest.fn().mockResolvedValue({ kind: "logo", available: false }),
+  };
   const applications = {
     listCompany: jest.fn().mockResolvedValue({ data: [], pagination: { page: 1, pageSize: 1, total: 0, totalPages: 0 } }),
     review: jest.fn().mockResolvedValue({ id: applicationId, status: "REVIEWING" }),
@@ -83,6 +89,7 @@ describe("candidate and employer workspace authorization", () => {
         { provide: PrismaService, useValue: db },
         { provide: AuthorizationRepository, useValue: grants },
         { provide: CompanyProfileLocationsService, useValue: profile },
+        { provide: CompanyMediaService, useValue: media },
         { provide: ApplicationsService, useValue: applications },
         { provide: TokenService, useValue: {
           verifyAccessToken: async (token: string) => ({ sub: token, sid: `session-${token}` }),
@@ -108,6 +115,22 @@ describe("candidate and employer workspace authorization", () => {
   beforeEach(() => jest.clearAllMocks());
 
   const bearer = (user: "candidate" | "owner") => ({ Authorization: `Bearer ${user}` });
+
+  it("allows public image reads but limits image changes to the owning company", async () => {
+    await request(app.getHttpServer()).get(`/api/v1/companies/${companyId}/media/logo`).expect(200);
+    await request(app.getHttpServer()).put(`/api/v1/companies/${companyId}/media/logo`)
+      .set(bearer("candidate")).attach("file", Buffer.from("image"), "logo.png").expect(403);
+    await request(app.getHttpServer()).put(`/api/v1/companies/${otherCompanyId}/media/logo`)
+      .set(bearer("owner")).attach("file", Buffer.from("image"), "logo.png").expect(403);
+    await request(app.getHttpServer()).put(`/api/v1/companies/${companyId}/media/logo`)
+      .set(bearer("owner")).attach("file", Buffer.from("image"), "logo.png").expect(200);
+    expect(media.upload).toHaveBeenCalledTimes(1);
+    await request(app.getHttpServer()).delete(`/api/v1/companies/${companyId}/media/logo`)
+      .set(bearer("candidate")).expect(403);
+    await request(app.getHttpServer()).delete(`/api/v1/companies/${companyId}/media/logo`)
+      .set(bearer("owner")).expect(200);
+    expect(media.remove).toHaveBeenCalledTimes(1);
+  });
 
   it("shows only active memberships and never provisions a workspace on GET", async () => {
     await request(app.getHttpServer()).get("/api/v1/companies/me").expect(401);

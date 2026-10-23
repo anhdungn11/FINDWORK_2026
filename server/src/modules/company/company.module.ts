@@ -15,6 +15,8 @@ import { CompanyInvitationsRepository } from "./company-invitations.repository";
 import { CompanyInvitationDeliveryService } from "./company-invitation-delivery.service";
 import { CompanyMembersController } from "./company-members.controller";
 import { CompanyMembersService } from "./company-members.service";
+import { CompanyMediaService } from "./company-media.service";
+import { CompanyMediaStorage, LocalCompanyMediaStorage } from "./company-media.storage";
 
 @Module({
   imports: [AuthModule, AuthorizationModule, PrismaModule, EmailDeliveryModule],
@@ -28,6 +30,8 @@ import { CompanyMembersService } from "./company-members.service";
     CompanyProfileLocationsRepository, CompanyProfileLocationsService,
     CompanyInvitationsRepository, CompanyInvitationsService, CompanyInvitationDeliveryService,
     CompanyMembersService,
+    CompanyMediaService,
+    { provide: CompanyMediaStorage, useClass: LocalCompanyMediaStorage },
   ],
 })
 export class CompanyModule {}

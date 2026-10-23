@@ -1,8 +1,10 @@
 import {
   Body, Controller, Delete, ForbiddenException, Get, HttpCode,
   Param, ParseUUIDPipe, Patch, Post, Put, Req, UseGuards,
+  UploadedFile, UseInterceptors,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
@@ -11,6 +13,7 @@ import {
   CompanyPermissionGuard, type CompanyAuthorizedRequest,
 } from "../authorization/guards/company-permission.guard";
 import { CompanyProfileLocationsService } from "./company-profile-locations.service";
+import { CompanyMediaService } from "./company-media.service";
 import { CreateCompanyLocationDto } from "./dto/create-company-location.dto";
 import { UpdateCompanyLocationDto } from "./dto/update-company-location.dto";
 import { UpdateCompanyProfileDto } from "./dto/update-company-profile.dto";
@@ -22,7 +25,7 @@ type CompanyPermission = "company.view" | "company.update";
 @Controller("companies/:companyId")
 @UseGuards(AccessTokenGuard, CompanyPermissionGuard)
 export class CompanyProfileLocationsController {
-  constructor(private readonly service: CompanyProfileLocationsService) {}
+  constructor(private readonly service: CompanyProfileLocationsService, private readonly media: CompanyMediaService) {}
 
   private requireCompanyWide(request: CompanyAuthorizedRequest, code: CompanyPermission): void {
     if (request.companyAuthorization?.permissions[code]?.scope !== "COMPANY") {
@@ -139,5 +142,38 @@ export class CompanyProfileLocationsController {
   ) {
     this.requireCompanyWide(req, "company.update");
     return this.service.deleteLocation(companyId, locationId, auth.userId);
+  }
+
+  @Put("media/:kind")
+  @ApiOperation({ summary: "Upload a company logo or cover image" })
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({ schema: { type: "object", required: ["file"], properties: {
+    file: { type: "string", format: "binary" },
+  } } })
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 2_097_152, files: 1 } }))
+  @RequireCompanyPermissions("company.update")
+  uploadMedia(
+    @Param("companyId", ParseUUIDPipe) companyId: string,
+    @Param("kind") kind: string,
+    @CurrentAuth() auth: AuthenticatedPrincipal,
+    @Req() req: CompanyAuthorizedRequest,
+    @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
+  ) {
+    this.requireCompanyWide(req, "company.update");
+    return this.media.upload(companyId, auth.userId, kind, file);
+  }
+
+  @Delete("media/:kind")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Remove a company logo or cover image" })
+  @RequireCompanyPermissions("company.update")
+  removeMedia(
+    @Param("companyId", ParseUUIDPipe) companyId: string,
+    @Param("kind") kind: string,
+    @CurrentAuth() auth: AuthenticatedPrincipal,
+    @Req() req: CompanyAuthorizedRequest,
+  ) {
+    this.requireCompanyWide(req, "company.update");
+    return this.media.remove(companyId, auth.userId, kind);
   }
 }
