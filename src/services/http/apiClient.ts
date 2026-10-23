@@ -38,6 +38,14 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (inMemoryAccessToken && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
   }
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    // Clear Content-Type to let browser and Axios adapter generate multipart boundary
+    if (config.headers && typeof config.headers.delete === "function") {
+      config.headers.delete("Content-Type");
+    } else if (config.headers) {
+      delete config.headers["Content-Type"];
+    }
+  }
   return config;
 });
 

@@ -179,13 +179,81 @@ export interface ScreeningQuestionInput {
   options?: string[];
 }
 
+export interface ProvinceDto {
+  id: string;
+  code: string;
+  name: string;
+  divisionType: string;
+  isActive: boolean;
+}
+
+export interface WardDto {
+  id: string;
+  code: string;
+  name: string;
+  divisionType: string;
+  codename: string;
+  provinceCode: string;
+  isActive: boolean;
+}
+
 export interface CompanyLocationDto {
   id: string;
   addressLine: string | null;
   provinceName: string | null;
   wardName: string | null;
   countryCode: string | null;
+  provinceId?: string | null;
+  wardId?: string | null;
+  province?: { id: string; code: string; name: string } | null;
+  ward?: { id: string; code: string; name: string } | null;
   isHeadquarters: boolean;
+}
+
+export interface CompanyLegalEvidenceDto {
+  id: string;
+  kind: "BUSINESS_REGISTRATION" | "TAX_CERTIFICATE" | "REPRESENTATIVE_AUTHORIZATION";
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  sha256: string;
+  createdAt: string;
+}
+
+export interface CompanyLegalProfileDetails {
+  registeredAddress: string;
+  representativeName: string;
+  representativeTitle: string | null;
+  contactEmail: string;
+  contactPhone: string;
+  updatedAt?: string;
+}
+
+export interface CompanyLegalDataDto {
+  id: string;
+  legalName: string | null;
+  taxCode: string | null;
+  verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
+  legalProfile: CompanyLegalProfileDetails | null;
+  legalEvidence: CompanyLegalEvidenceDto[];
+}
+
+export interface CompanyInterviewDto {
+  id: string;
+  companyId: string;
+  applicationId: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  type: "ONSITE" | "PHONE" | "VIDEO";
+  location: string | null;
+  status: "SCHEDULED" | "RESCHEDULED" | "COMPLETED" | "CANCELLED";
+  createdAt: string;
+  updatedAt: string;
+  session?: {
+    id: string;
+    provider: string;
+    joinUrl: string | null;
+  } | null;
 }
 
 export interface PublicCompanyDto {
@@ -481,12 +549,18 @@ export function normalizeCompanyInvitation(value: unknown): CompanyInvitationDto
 
 export function normalizeLocation(value: unknown): CompanyLocationDto {
   const r = obj(value);
+  const prov = obj(r.province);
+  const wrd = obj(r.ward);
   return {
     id: str(r.id) ?? "",
     addressLine: str(r.addressLine),
-    provinceName: str(obj(r.province).name) ?? str(r.provinceName),
-    wardName: str(obj(r.ward).name) ?? str(r.wardName),
+    provinceName: str(prov.name) ?? str(r.provinceName),
+    wardName: str(wrd.name) ?? str(r.wardName),
     countryCode: str(r.countryCode),
+    provinceId: str(r.provinceId) ?? (str(prov.id) || null),
+    wardId: str(r.wardId) ?? (str(wrd.id) || null),
+    province: prov.id ? { id: str(prov.id)!, code: str(prov.code) || "", name: str(prov.name) || "" } : null,
+    ward: wrd.id ? { id: str(wrd.id)!, code: str(wrd.code) || "", name: str(wrd.name) || "" } : null,
     isHeadquarters: r.isHeadquarters === true,
   };
 }

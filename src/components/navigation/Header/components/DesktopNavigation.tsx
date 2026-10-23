@@ -63,6 +63,30 @@ const DesktopNavigation = () => {
       >
         Khám phá nghề nghiệp
       </NavLink>
+
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent("open-findwork-ai"))}
+        title="Mở trợ lý thông minh FINDWORK AI"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "6px 12px",
+          borderRadius: 8,
+          background: "linear-gradient(135deg, #0284c7 0%, #6366f1 100%)",
+          color: "#ffffff",
+          fontWeight: 600,
+          fontSize: 13,
+          border: "none",
+          cursor: "pointer",
+          boxShadow: "0 2px 6px rgba(14, 165, 233, 0.35)",
+          marginLeft: 6,
+        }}
+      >
+        <span style={{ display: "inline-flex" }}>✨</span>
+        <span>FINDWORK AI</span>
+      </button>
     </nav>
   );
 };

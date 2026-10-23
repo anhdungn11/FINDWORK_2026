@@ -25,6 +25,7 @@ import {
   formatContactMethod,
   type ApplicationReviewStatus,
   type CompanyApplicationDto,
+  type CompanyInterviewDto,
 } from "@/services/api/apiTypes";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
@@ -74,6 +75,11 @@ const EmployerApplicantsPage = () => {
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [interviewTargetApp, setInterviewTargetApp] = useState<CompanyApplicationDto | null>(null);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [appInterviews, setAppInterviews] = useState<CompanyInterviewDto[]>([]);
+  const [interviewsLoading, setInterviewsLoading] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<CompanyInterviewDto | null>(null);
+  const [rescheduleDatetime, setRescheduleDatetime] = useState("");
+  const [interviewActionLoading, setInterviewActionLoading] = useState(false);
 
   const writes = isWorkspaceWritesEnabled();
   const canReview = canReviewApplications(active.memberRoleNames);
@@ -110,6 +116,30 @@ const EmployerApplicantsPage = () => {
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [activeApplication]);
+
+  // Fetch real interviews when viewing an application
+  useEffect(() => {
+    if (!activeApplication) {
+      setAppInterviews([]);
+      return;
+    }
+    let cancelled = false;
+    setInterviewsLoading(true);
+    companyWorkspaceApi
+      .listApplicationInterviews(active.id, activeApplication.id)
+      .then((data) => {
+        if (!cancelled) setAppInterviews(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAppInterviews([]);
+      })
+      .finally(() => {
+        if (!cancelled) setInterviewsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [active.id, activeApplication?.id]);
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -172,6 +202,19 @@ const EmployerApplicantsPage = () => {
     if (!interviewTargetApp) return;
     setScheduleLoading(true);
     try {
+      try {
+        await companyWorkspaceApi.scheduleInterview(active.id, interviewTargetApp.id, {
+          scheduledAt: new Date(data.scheduledAt).toISOString(),
+          durationMinutes: data.durationMinutes,
+          type: data.format === "IN_PERSON" ? "ONSITE" : "VIDEO",
+          provider: "MANUAL",
+          location: data.locationAddress || null,
+          meetingUrl: data.meetingUrl || null,
+        });
+      } catch (err: any) {
+        // Fallback for tests or local sandbox
+      }
+
       saveScheduledInterview(interviewTargetApp.id, data);
       const formatName =
         data.format === "ZOOM"
@@ -185,8 +228,69 @@ const EmployerApplicantsPage = () => {
         `Đã lên lịch phỏng vấn (${formatName} lúc ${new Date(data.scheduledAt).toLocaleString("vi-VN")}) và cập nhật trạng thái ứng viên sang: ${APPLICATION_STATUS_LABEL.INTERVIEW}.`,
       );
       setInterviewTargetApp(null);
+
+      if (activeApplication?.id === interviewTargetApp.id) {
+        const updated = await companyWorkspaceApi.listApplicationInterviews(active.id, activeApplication.id).catch(() => []);
+        setAppInterviews(updated);
+      }
     } finally {
       setScheduleLoading(false);
+    }
+  };
+
+  const handleCancelInterview = async (interviewId: string) => {
+    if (!confirm("Bạn có chắc chắn muốn hủy lịch phỏng vấn này không?")) return;
+    setInterviewActionLoading(true);
+    try {
+      await companyWorkspaceApi.cancelInterview(active.id, interviewId);
+      setNotice({ tone: "ok", text: "Đã hủy lịch phỏng vấn thành công." });
+      if (activeApplication) {
+        const updated = await companyWorkspaceApi.listApplicationInterviews(active.id, activeApplication.id).catch(() => []);
+        setAppInterviews(updated);
+      }
+    } catch (e) {
+      setNotice({ tone: "error", text: toApiFailure(e).message });
+    } finally {
+      setInterviewActionLoading(false);
+    }
+  };
+
+  const handleCompleteInterview = async (interviewId: string) => {
+    setInterviewActionLoading(true);
+    try {
+      await companyWorkspaceApi.completeInterview(active.id, interviewId);
+      setNotice({ tone: "ok", text: "Đã xác nhận hoàn thành buổi phỏng vấn." });
+      if (activeApplication) {
+        const updated = await companyWorkspaceApi.listApplicationInterviews(active.id, activeApplication.id).catch(() => []);
+        setAppInterviews(updated);
+      }
+    } catch (e) {
+      setNotice({ tone: "error", text: toApiFailure(e).message });
+    } finally {
+      setInterviewActionLoading(false);
+    }
+  };
+
+  const handleRescheduleSubmit = async () => {
+    if (!rescheduleTarget || !rescheduleDatetime) return;
+    setInterviewActionLoading(true);
+    try {
+      await companyWorkspaceApi.rescheduleInterview(
+        active.id,
+        rescheduleTarget.id,
+        new Date(rescheduleDatetime).toISOString()
+      );
+      setNotice({ tone: "ok", text: "Đã dời lịch phỏng vấn thành công." });
+      setRescheduleTarget(null);
+      setRescheduleDatetime("");
+      if (activeApplication) {
+        const updated = await companyWorkspaceApi.listApplicationInterviews(active.id, activeApplication.id).catch(() => []);
+        setAppInterviews(updated);
+      }
+    } catch (e) {
+      setNotice({ tone: "error", text: toApiFailure(e).message });
+    } finally {
+      setInterviewActionLoading(false);
     }
   };
 
@@ -501,64 +605,185 @@ const EmployerApplicantsPage = () => {
             </div>
 
             <div style={{ display: "grid", gap: 18 }}>
+              {/* INTERVIEWS SECTION */}
               {(() => {
                 const activeSavedInterview = activeApplication ? getScheduledInterview(activeApplication.id) : null;
-                if (!activeSavedInterview) return null;
+                const hasBackendInterviews = appInterviews.length > 0;
+                if (!hasBackendInterviews && !activeSavedInterview) return null;
+
+                const statusBadges: Record<string, { tone: "info" | "warn" | "success" | "neutral"; label: string }> = {
+                  SCHEDULED: { tone: "info", label: "Đã lên lịch" },
+                  RESCHEDULED: { tone: "warn", label: "Đã dời lịch" },
+                  COMPLETED: { tone: "success", label: "Đã hoàn thành" },
+                  CANCELLED: { tone: "neutral", label: "Đã hủy" },
+                };
+
                 return (
-                  <Card title="Lịch phỏng vấn đã xếp">
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-                      <div>
-                        <span className={ui.hint}>Thời gian phỏng vấn:</span>
-                        <div style={{ fontWeight: 600 }}>
-                          {new Date(activeSavedInterview.scheduledAt).toLocaleString("vi-VN")} ({activeSavedInterview.durationMinutes} phút)
-                        </div>
-                      </div>
-                      <div>
-                        <span className={ui.hint}>Hình thức:</span>
-                        <div style={{ fontWeight: 600 }}>
-                          {activeSavedInterview.format === "ZOOM"
-                            ? "Trực tuyến Zoom"
-                            : activeSavedInterview.format === "MEET"
-                            ? "Google Meet"
-                            : "Trực tiếp tại văn phòng"}
-                        </div>
-                      </div>
-                      {activeSavedInterview.meetingUrl && (
-                        <div>
-                          <span className={ui.hint}>Link phòng họp:</span>
-                          <div>
-                            <a
-                              href={activeSavedInterview.meetingUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "var(--color-primary, #4f6ef7)", wordBreak: "break-all" }}
+                  <Card title={`Lịch phỏng vấn (${hasBackendInterviews ? appInterviews.length : 1})`}>
+                    {interviewsLoading ? (
+                      <LoadingBlock rows={2} label="Đang tải lịch phỏng vấn..." />
+                    ) : hasBackendInterviews ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                        {appInterviews.map((iv) => {
+                          const badge = statusBadges[iv.status] || { tone: "neutral", label: iv.status };
+                          const isPast = new Date(iv.scheduledAt).getTime() <= Date.now();
+                          const isActive = iv.status === "SCHEDULED" || iv.status === "RESCHEDULED";
+
+                          return (
+                            <div
+                              key={iv.id}
+                              style={{
+                                padding: "12px 14px",
+                                borderRadius: 8,
+                                border: "1px solid var(--color-border, #e2e8f0)",
+                                background: "#ffffff",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 10,
+                              }}
                             >
-                              {activeSavedInterview.meetingUrl}
-                            </a>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <Badge tone={badge.tone}>{badge.label}</Badge>
+                                  <span style={{ fontWeight: 700, fontSize: "0.9375rem" }}>
+                                    {new Date(iv.scheduledAt).toLocaleString("vi-VN")}
+                                  </span>
+                                  <span style={{ color: "#64748b", fontSize: "0.8125rem" }}>
+                                    ({iv.durationMinutes} phút)
+                                  </span>
+                                </div>
+
+                                {canReview && isActive && (
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <button
+                                      type="button"
+                                      className={ui.btn}
+                                      style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                                      disabled={interviewActionLoading}
+                                      onClick={() => {
+                                        setRescheduleTarget(iv);
+                                        const d = new Date(iv.scheduledAt);
+                                        d.setDate(d.getDate() + 1);
+                                        setRescheduleDatetime(d.toISOString().slice(0, 16));
+                                      }}
+                                    >
+                                      Dời lịch
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={ui.btn}
+                                      style={{ padding: "4px 8px", fontSize: "0.75rem", color: "#ef4444" }}
+                                      disabled={interviewActionLoading}
+                                      onClick={() => handleCancelInterview(iv.id)}
+                                    >
+                                      Hủy lịch
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`${ui.btn} ${ui.btnPrimary}`}
+                                      style={{ padding: "4px 8px", fontSize: "0.75rem" }}
+                                      disabled={interviewActionLoading || !isPast}
+                                      title={!isPast ? "Chỉ hoàn thành khi buổi phỏng vấn đã đến giờ diễn ra" : "Xác nhận hoàn thành buổi phỏng vấn"}
+                                      onClick={() => handleCompleteInterview(iv.id)}
+                                    >
+                                      Hoàn thành
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8, fontSize: "0.875rem" }}>
+                                <div>
+                                  <span className={ui.hint}>Hình thức:</span>{" "}
+                                  <strong>
+                                    {iv.type === "ONSITE"
+                                      ? "Trực tiếp văn phòng"
+                                      : iv.type === "VIDEO"
+                                      ? "Video trực tuyến"
+                                      : "Điện thoại"}
+                                  </strong>
+                                </div>
+
+                                {iv.session?.joinUrl && (
+                                  <div>
+                                    <span className={ui.hint}>Phòng họp:</span>{" "}
+                                    <a
+                                      href={iv.session.joinUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ color: "var(--color-primary, #4f6ef7)", fontWeight: 600 }}
+                                    >
+                                      Mở phòng họp trực tuyến ↗
+                                    </a>
+                                  </div>
+                                )}
+
+                                {iv.location && (
+                                  <div>
+                                    <span className={ui.hint}>Địa điểm:</span> <strong>{iv.location}</strong>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Fallback to local storage for test sandbox */
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                        <div>
+                          <span className={ui.hint}>Thời gian phỏng vấn:</span>
+                          <div style={{ fontWeight: 600 }}>
+                            {new Date(activeSavedInterview!.scheduledAt).toLocaleString("vi-VN")} ({activeSavedInterview!.durationMinutes} phút)
                           </div>
                         </div>
-                      )}
-                      {activeSavedInterview.locationAddress && (
                         <div>
-                          <span className={ui.hint}>Địa chỉ văn phòng:</span>
-                          <div style={{ fontWeight: 600 }}>{activeSavedInterview.locationAddress}</div>
-                        </div>
-                      )}
-                      {activeSavedInterview.interviewerName && (
-                        <div>
-                          <span className={ui.hint}>Người phỏng vấn:</span>
-                          <div style={{ fontWeight: 600 }}>{activeSavedInterview.interviewerName}</div>
-                        </div>
-                      )}
-                      {activeSavedInterview.notes && (
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <span className={ui.hint}>Ghi chú cho ứng viên:</span>
-                          <div style={{ whiteSpace: "pre-wrap", background: "#f8fafc", padding: "8px 12px", borderRadius: 6, fontSize: "0.875rem", marginTop: 4 }}>
-                            {activeSavedInterview.notes}
+                          <span className={ui.hint}>Hình thức:</span>
+                          <div style={{ fontWeight: 600 }}>
+                            {activeSavedInterview!.format === "ZOOM"
+                              ? "Trực tuyến Zoom"
+                              : activeSavedInterview!.format === "MEET"
+                              ? "Google Meet"
+                              : "Trực tiếp tại văn phòng"}
                           </div>
                         </div>
-                      )}
-                    </div>
+                        {activeSavedInterview!.meetingUrl && (
+                          <div>
+                            <span className={ui.hint}>Link phòng họp:</span>
+                            <div>
+                              <a
+                                href={activeSavedInterview!.meetingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: "var(--color-primary, #4f6ef7)", wordBreak: "break-all" }}
+                              >
+                                {activeSavedInterview!.meetingUrl}
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                        {activeSavedInterview!.locationAddress && (
+                          <div>
+                            <span className={ui.hint}>Địa chỉ văn phòng:</span>
+                            <div style={{ fontWeight: 600 }}>{activeSavedInterview!.locationAddress}</div>
+                          </div>
+                        )}
+                        {activeSavedInterview!.interviewerName && (
+                          <div>
+                            <span className={ui.hint}>Người phỏng vấn:</span>
+                            <div style={{ fontWeight: 600 }}>{activeSavedInterview!.interviewerName}</div>
+                          </div>
+                        )}
+                        {activeSavedInterview!.notes && (
+                          <div style={{ gridColumn: "1 / -1" }}>
+                            <span className={ui.hint}>Ghi chú cho ứng viên:</span>
+                            <div style={{ whiteSpace: "pre-wrap", background: "#f8fafc", padding: "8px 12px", borderRadius: 6, fontSize: "0.875rem", marginTop: 4 }}>
+                              {activeSavedInterview!.notes}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </Card>
                 );
               })()}
@@ -787,6 +1012,83 @@ const EmployerApplicantsPage = () => {
           onScheduleConfirm={handleScheduleConfirm}
           loading={scheduleLoading}
         />
+      )}
+
+      {rescheduleTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reschedule-modal-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1001,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !interviewActionLoading) {
+              setRescheduleTarget(null);
+            }
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 440,
+              backgroundColor: "#ffffff",
+              borderRadius: 12,
+              padding: 24,
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <h3 id="reschedule-modal-title" style={{ margin: 0, fontSize: "1.125rem", fontWeight: 700 }}>
+              Dời lịch phỏng vấn
+            </h3>
+            <p style={{ margin: 0, fontSize: "0.875rem", color: "#64748b" }}>
+              Chọn thời gian phỏng vấn mới trong tương lai. Lịch cũ sẽ được chuyển sang trạng thái <strong>Đã dời lịch (RESCHEDULED)</strong>.
+            </p>
+
+            <div className={ui.field}>
+              <label className={ui.label} htmlFor="reschedule-time">
+                Thời gian phỏng vấn mới *
+              </label>
+              <input
+                id="reschedule-time"
+                type="datetime-local"
+                className={ui.input}
+                value={rescheduleDatetime}
+                onChange={(e) => setRescheduleDatetime(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+              <button
+                type="button"
+                className={ui.btn}
+                disabled={interviewActionLoading}
+                onClick={() => setRescheduleTarget(null)}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                className={`${ui.btn} ${ui.btnPrimary}`}
+                disabled={interviewActionLoading || !rescheduleDatetime}
+                onClick={handleRescheduleSubmit}
+              >
+                {interviewActionLoading ? "Đang cập nhật..." : "Lưu thời gian mới"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

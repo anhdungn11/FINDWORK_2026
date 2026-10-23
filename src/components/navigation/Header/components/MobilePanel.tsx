@@ -81,6 +81,33 @@ const MobilePanel = ({
           >
             Khám phá nghề nghiệp
           </NavLink>
+
+          <button
+            type="button"
+            className={styles.mobileNavLink}
+            onClick={() => {
+              onClose();
+              window.dispatchEvent(new CustomEvent("open-findwork-ai"));
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              color: "#0284c7",
+              fontWeight: 600,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+              padding: "12px 0",
+              width: "100%",
+              fontFamily: "inherit",
+              fontSize: "inherit",
+            }}
+          >
+            <span>✨</span>
+            <span>FINDWORK AI (Trợ lý)</span>
+          </button>
         </nav>
 
         <div className={styles.mobileSection}>

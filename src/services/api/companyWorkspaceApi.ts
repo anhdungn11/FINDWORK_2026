@@ -10,7 +10,25 @@ import {
   type CompanyApplicationDto, type ApplicationReviewStatus,
   type CompanyMemberDto, type CompanyInvitationDto, type AssignableCompanyRole,
   type ScreeningQuestionDto, type ScreeningQuestionInput, type CompanyMediaKind, type CompanyMediaResponse,
+  type CompanyLegalDataDto, type CompanyLegalEvidenceDto, type CompanyInterviewDto,
 } from "./apiTypes";
+
+export interface UpdateCompanyLegalInput {
+  registeredAddress: string;
+  representativeName: string;
+  representativeTitle?: string | null;
+  contactEmail: string;
+  contactPhone: string;
+}
+
+export interface ScheduleInterviewInput {
+  scheduledAt: string;
+  durationMinutes: number;
+  type: "ONSITE" | "PHONE" | "VIDEO";
+  provider?: "MANUAL" | "ZOOM";
+  location?: string | null;
+  meetingUrl?: string | null;
+}
 
 export interface JobInput {
   categoryId: string;
@@ -297,6 +315,99 @@ export const companyWorkspaceApi = {
         `/companies/${encodeURIComponent(companyId)}/media/${kind}`,
       );
       return res.data;
+    });
+  },
+
+  getLegalData: (companyId: string, signal?: AbortSignal): Promise<CompanyLegalDataDto> =>
+    run(async () => unwrapData((await apiClient.get(`/companies/${encodeURIComponent(companyId)}/legal`, { signal })).data) as CompanyLegalDataDto),
+
+  updateLegalProfile: (companyId: string, input: UpdateCompanyLegalInput): Promise<any> => {
+    guardWrite("cập nhật thông tin pháp lý");
+    return run(async () => unwrapData((await apiClient.patch(`/companies/${encodeURIComponent(companyId)}/legal`, input)).data));
+  },
+
+  uploadLegalEvidence: async (
+    companyId: string,
+    kind: "BUSINESS_REGISTRATION" | "TAX_CERTIFICATE" | "REPRESENTATIVE_AUTHORIZATION",
+    file: File,
+  ): Promise<CompanyLegalEvidenceDto> => {
+    guardWrite("tải lên chứng từ pháp lý");
+    return run(async () => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kind", kind);
+      const res = await apiClient.post(
+        `/companies/${encodeURIComponent(companyId)}/legal/evidence`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        },
+      );
+      return unwrapData(res.data) as CompanyLegalEvidenceDto;
+    });
+  },
+
+  deleteLegalEvidence: async (companyId: string, evidenceId: string): Promise<{ id: string; removed: boolean }> => {
+    guardWrite("xóa chứng từ pháp lý");
+    return run(async () => {
+      const res = await apiClient.delete(`/companies/${encodeURIComponent(companyId)}/legal/evidence/${encodeURIComponent(evidenceId)}`);
+      return unwrapData(res.data) as { id: string; removed: boolean };
+    });
+  },
+
+  adminSetCompanyVerification: async (companyId: string, status: "VERIFIED" | "REJECTED"): Promise<any> => {
+    guardWrite("phê duyệt xác minh doanh nghiệp");
+    return run(async () => {
+      const res = await apiClient.patch(`/admin/companies/${encodeURIComponent(companyId)}/verification`, { status });
+      return unwrapData(res.data);
+    });
+  },
+
+  scheduleInterview: async (
+    companyId: string,
+    applicationId: string,
+    input: ScheduleInterviewInput,
+  ): Promise<CompanyInterviewDto> => {
+    guardWrite("lên lịch phỏng vấn ứng viên");
+    return run(async () => {
+      const res = await apiClient.post(
+        `/companies/${encodeURIComponent(companyId)}/applications/${encodeURIComponent(applicationId)}/interviews`,
+        input,
+      );
+      return unwrapData(res.data) as CompanyInterviewDto;
+    });
+  },
+
+  listApplicationInterviews: async (
+    companyId: string,
+    applicationId: string,
+    signal?: AbortSignal,
+  ): Promise<CompanyInterviewDto[]> =>
+    run(async () => items((await apiClient.get(`/companies/${encodeURIComponent(companyId)}/applications/${encodeURIComponent(applicationId)}/interviews`, { signal })).data) as CompanyInterviewDto[]),
+
+  cancelInterview: async (companyId: string, interviewId: string): Promise<any> => {
+    guardWrite("hủy lịch phỏng vấn");
+    return run(async () => {
+      const res = await apiClient.patch(`/companies/${encodeURIComponent(companyId)}/interviews/${encodeURIComponent(interviewId)}/cancel`);
+      return unwrapData(res.data);
+    });
+  },
+
+  completeInterview: async (companyId: string, interviewId: string): Promise<any> => {
+    guardWrite("hoàn thành phỏng vấn");
+    return run(async () => {
+      const res = await apiClient.patch(`/companies/${encodeURIComponent(companyId)}/interviews/${encodeURIComponent(interviewId)}/complete`);
+      return unwrapData(res.data);
+    });
+  },
+
+  rescheduleInterview: async (companyId: string, interviewId: string, scheduledAt: string): Promise<any> => {
+    guardWrite("dời lịch phỏng vấn");
+    return run(async () => {
+      const res = await apiClient.patch(`/companies/${encodeURIComponent(companyId)}/interviews/${encodeURIComponent(interviewId)}/reschedule`, { scheduledAt });
+      return unwrapData(res.data);
     });
   },
 };

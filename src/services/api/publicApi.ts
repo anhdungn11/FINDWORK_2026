@@ -13,6 +13,8 @@ import {
   type SkillDto,
   type JobCategoryDto,
   type JobDto,
+  type ProvinceDto,
+  type WardDto,
   type Paged,
   type PublicCompanyDto,
   type PublicCompanyQuery,
@@ -158,6 +160,25 @@ export const publicApi = {
       if (query.pageSize) params.pageSize = query.pageSize;
       const res = await apiClient.get("/reference/skills", { params, signal });
       return normalizePaged(res.data, normalizeSkill);
+    } catch (e) {
+      throw toApiFailure(e);
+    }
+  },
+  async listProvinces(signal?: AbortSignal): Promise<ProvinceDto[]> {
+    try {
+      const res = await apiClient.get("/reference/provinces", { params: { pageSize: 100 }, signal });
+      const raw = res.data?.data || res.data;
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) {
+      throw toApiFailure(e);
+    }
+  },
+  async listWards(provinceCode: string, signal?: AbortSignal): Promise<WardDto[]> {
+    try {
+      if (!provinceCode) return [];
+      const res = await apiClient.get("/reference/wards", { params: { provinceCode, pageSize: 100 }, signal });
+      const raw = res.data?.data || res.data;
+      return Array.isArray(raw) ? raw : [];
     } catch (e) {
       throw toApiFailure(e);
     }
