@@ -38,6 +38,14 @@ export interface JobDto {
   companyId: string | null;
   companyName: string | null;
   companySlug: string | null;
+  companyLogoUrl?: string | null;
+  locations?: Array<{
+    id: string;
+    isPrimary?: boolean;
+    addressLine?: string | null;
+    province?: { code: string; name: string } | null;
+    ward?: { code: string; name: string } | null;
+  }> | null;
   categoryId: string | null;
   categoryName: string | null;
   title: string;
@@ -404,6 +412,19 @@ export function normalizeJob(value: unknown): JobDto {
     companyId: str(r.companyId) ?? str(company.id),
     companyName: str(r.companyName) ?? str(company.name),
     companySlug: str(r.companySlug) ?? str(company.slug),
+    companyLogoUrl: str(r.companyLogoUrl) ?? str(company.logoUrl) ?? null,
+    locations: Array.isArray(r.locations) ? r.locations.map((loc) => {
+      const l = typeof loc === "object" && loc !== null ? loc : {};
+      const prov = typeof l.province === "object" && l.province !== null ? l.province : {};
+      const w = typeof l.ward === "object" && l.ward !== null ? l.ward : {};
+      return {
+        id: String(l.id || ""),
+        isPrimary: l.isPrimary === true,
+        addressLine: typeof l.addressLine === "string" ? l.addressLine : null,
+        province: prov.code ? { code: String(prov.code), name: String(prov.name || "") } : null,
+        ward: w.code ? { code: String(w.code), name: String(w.name || "") } : null,
+      };
+    }) : null,
     categoryId: str(r.categoryId) ?? str(category.id),
     categoryName: str(r.categoryName) ?? str(category.name),
     title: str(r.title) ?? "(Không có tiêu đề)",

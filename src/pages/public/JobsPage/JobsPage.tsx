@@ -1,282 +1,307 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { useLocation } from "react-router-dom";
-
-import {
-  jobs as rawMockJobs,
-} from "@/data/mock/jobs.mock";
-import { publicApi } from "@/services/api/publicApi";
-import {
-  EMPLOYMENT_TYPE_LABEL,
-  WORKPLACE_TYPE_LABEL,
-  formatSalary,
-} from "@/services/api/apiTypes";
-import type { JobRecord } from "@/features/jobs/types/job.types";
-import { isDemoFixturesAllowed } from "@/config/featureFlags";
-
-import JobActiveFilters from "@/features/jobs/components/JobActiveFilters/JobActiveFilters";
-import JobAdvancedFilters from "@/features/jobs/components/JobAdvancedFilters/JobAdvancedFilters";
-import JobDiscoveryCard from "@/features/jobs/components/JobDiscoveryCard/JobDiscoveryCard";
-import JobQuickFilters from "@/features/jobs/components/JobQuickFilters/JobQuickFilters";
-import JobSearchBar from "@/features/jobs/components/JobSearchBar/JobSearchBar";
-
-import {
-  useJobFilters,
-} from "@/features/jobs/hooks/useJobFilters";
-
-import JobsHero from "./components/JobsHero";
-import JobsResults from "./components/JobsResults";
-import JobsResultsSection from "./components/JobsResultsSection";
-import JobsSidebar from "./components/JobsSidebar";
-
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { publicApi, type PublicJobQuery } from "@/services/api/publicApi";
+import type { JobDto, JobCategoryDto, ProvinceDto } from "@/services/api/apiTypes";
+import CompactJobCard from "@/features/jobs/components/CompactJobCard/CompactJobCard";
+import JobPagination from "@/features/jobs/components/JobPagination/JobPagination";
+import JobsFilterBar from "./components/JobsFilterBar";
 import styles from "./styles/JobsPageLayout.module.css";
 
-const mockJobs: JobRecord[] = rawMockJobs.map((j) => ({
-  ...j,
-  isMock: true,
-}));
+const PAGE_SIZE = 12; // 3 columns x 4 rows on desktop
 
-const JobsPage = () => {
-  const routerLocation = useLocation();
-  const allowDemo = isDemoFixturesAllowed(routerLocation.search);
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [dataSource, setDataSource] = useState<"live" | "demo">("live");
-  const [liveJobs, setLiveJobs] = useState<JobRecord[]>([]);
-  const [isLoadingLive, setIsLoadingLive] = useState(true);
-  const [liveError, setLiveError] = useState<string | null>(null);
+const parseSalaryParams = (
+  salaryRange: string
+): { salaryAtLeast?: string; salaryAtMost?: string } => {
+  switch (salaryRange) {
+    case "under10":
+      return { salaryAtMost: "10000000" };
+    case "10to20":
+      return { salaryAtLeast: "10000000", salaryAtMost: "20000000" };
+    case "20to30":
+      return { salaryAtLeast: "20000000", salaryAtMost: "30000000" };
+    case "above30":
+      return { salaryAtLeast: "30000000" };
+    default:
+      return {};
+  }
+};
 
-  const fetchLiveJobs = () => {
-    setIsLoadingLive(true);
-    setLiveError(null);
+export const JobsPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // URL Query Parameters
+  const pageParam = parseInt(searchParams.get("page") || "1", 10);
+  const currentPage = Number.isSafeInteger(pageParam) && pageParam >= 1 ? pageParam : 1;
+  const pageSizeParam = parseInt(searchParams.get("pageSize") || "12", 10);
+  const pageSize = Number.isSafeInteger(pageSizeParam) && pageSizeParam >= 1 && pageSizeParam <= 100 ? pageSizeParam : PAGE_SIZE;
+  const keyword = searchParams.get("q") || "";
+  const provinceCode = searchParams.get("province") || "";
+  const categoryCode = searchParams.get("category") || searchParams.get("categoryCode") || "";
+  const workplaceType = searchParams.get("workplace") || searchParams.get("workplaceType") || "";
+  const employmentType = searchParams.get("type") || searchParams.get("employmentType") || "";
+  const salaryRange = searchParams.get("salary") || "";
+  const sortBy = searchParams.get("sort") || "newest";
+
+  // Data states
+  const [jobs, setJobs] = useState<JobDto[]>([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Catalogs
+  const [categories, setCategories] = useState<JobCategoryDto[]>([]);
+  const [provinces, setProvinces] = useState<ProvinceDto[]>([]);
+
+  // Load Catalogs on mount
+  useEffect(() => {
+    publicApi
+      .listJobCategories()
+      .then((cats) => setCategories(cats))
+      .catch(() => {});
 
     publicApi
-      .listJobs({ page: 1, pageSize: 50 })
-      .then((paged) => {
-        const mapped: JobRecord[] = paged.data.map((dto) => ({
-          id: dto.id,
-          title: dto.title,
-          company: dto.companyName || "Doanh nghiệp",
-          category: dto.categoryName || "Chung",
-          skills: [],
-          location: "Việt Nam",
-          workplace: dto.workplaceType ? WORKPLACE_TYPE_LABEL[dto.workplaceType] : "Tại văn phòng",
-          type: dto.employmentType ? EMPLOYMENT_TYPE_LABEL[dto.employmentType] : "Toàn thời gian",
-          experience: dto.experienceMinMonths
-            ? `${Math.floor(dto.experienceMinMonths / 12)} năm kinh nghiệm`
-            : "Không yêu cầu",
-          salary: formatSalary(dto),
-          postedAt: dto.publishedAt ? new Date(dto.publishedAt).toLocaleDateString("vi-VN") : "Mới đăng",
-          matchScore: 0,
-          isMock: false,
-        }));
-        setLiveJobs(mapped);
-        setIsLoadingLive(false);
-      })
-      .catch((err) => {
-        setLiveError(err?.message || "Không thể kết nối đến máy chủ tin tuyển dụng.");
-        setIsLoadingLive(false);
-      });
-  };
-
-  useEffect(() => {
-    fetchLiveJobs();
+      .listProvinces({ pageSize: 100 })
+      .then((p) => setProvinces(p.data))
+      .catch(() => {});
   }, []);
 
-  const activeJobs = useMemo(() => {
-    if (allowDemo && dataSource === "demo") return mockJobs;
-    return liveJobs;
-  }, [allowDemo, dataSource, liveJobs]);
+  // Fetch Jobs based on active query params
+  useEffect(() => {
+    let isCancelled = false;
+    setIsLoading(true);
+    setError(null);
 
-  const jobFilters = useJobFilters(activeJobs);
+    const { salaryAtLeast, salaryAtMost } = parseSalaryParams(salaryRange);
 
-  const {
+    const query: PublicJobQuery = {
+      page: currentPage,
+      pageSize,
+      q: keyword.trim() || undefined,
+      provinceCode: provinceCode || undefined,
+      categoryCode: categoryCode || undefined,
+      workplaceType: workplaceType || undefined,
+      employmentType: employmentType || undefined,
+      salaryAtLeast,
+      salaryAtMost,
+      sort: (sortBy as any) || "newest",
+    };
+
+    publicApi
+      .listJobs(query)
+      .then((paged) => {
+        if (isCancelled) return;
+        setJobs(paged.data);
+        setPagination(paged.pagination);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        if (isCancelled) return;
+        setError(err?.message || "Không thể tải danh sách việc làm từ máy chủ.");
+        setIsLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    currentPage,
     keyword,
-    location,
+    provinceCode,
+    categoryCode,
+    workplaceType,
+    employmentType,
+    salaryRange,
     sortBy,
-    advancedFilters,
+    pageSize,
+  ]);
 
-    locations,
-    categories,
-    jobTypes,
-    workplaces,
-    experiences,
+  // Check if any filter is active
+  const hasActiveFilters = Boolean(
+    keyword ||
+      provinceCode ||
+      categoryCode ||
+      workplaceType ||
+      employmentType ||
+      salaryRange ||
+      (sortBy && sortBy !== "newest")
+  );
 
-    filteredJobs,
+  // Handler for filter changes (resets page to 1)
+  const handleFilterChange = (key: string, value: string) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) {
+          next.set(key, value);
+        } else {
+          next.delete(key);
+        }
+        // Reset page to 1 on filter modification
+        next.set("page", "1");
+        return next;
+      },
+      { replace: false }
+    );
+  };
 
-    isRemote,
-    isFresher,
-    isInternship,
+  // Handler for Clear All
+  const handleClearAll = () => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams();
+        next.set("page", "1");
+        return next;
+      },
+      { replace: false }
+    );
+  };
 
-    activeFilterCount,
-    hasActiveFilters,
+  // Handler for pagination page click
+  const handlePageChange = (newPage: number) => {
+    if (newPage === currentPage || newPage < 1 || newPage > pagination.totalPages) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("page", String(newPage));
+        return next;
+      },
+      { replace: false }
+    );
 
-    setKeyword,
-    setLocation,
-    setSortBy,
-
-    updateAdvancedFilter,
-    applyAdvancedFilters,
-    getAdvancedFilterResultCount,
-
-    toggleRemote,
-    toggleFresher,
-    toggleInternship,
-
-    clearAdvancedFilters,
-  } = jobFilters;
+    // Scroll up smoothly to results header
+    if (resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   return (
     <div className={styles.page}>
-      {allowDemo && (
-        <aside className={styles.sourceToggleBar} role="region" aria-label="Nguồn dữ liệu việc làm">
-          <div className={`container ${styles.sourceToggleContainer}`}>
-            <div className={styles.sourceNotice}>
-              {dataSource === "live" ? (
-                <span>
-                  <strong>Nguồn dữ liệu:</strong> Đang kết nối trực tiếp với Backend API (GET /api/v1/jobs)
-                  {isLoadingLive && " — Đang tải dữ liệu..."}
-                  {liveError && ` — Lỗi kết nối: ${liveError}`}
-                  {!isLoadingLive && !liveError && ` (${liveJobs.length} tin tuyển dụng thực tế)`}
-                </span>
-              ) : (
-                <span>
-                  <strong>Nguồn dữ liệu:</strong> Đang xem bộ dữ liệu mẫu minh họa (Demo fixtures - {mockJobs.length} tin)
-                </span>
-              )}
-            </div>
-
-            <div className={styles.sourceButtons}>
-              <button
-                type="button"
-                className={`${styles.sourceToggleBtn} ${dataSource === "live" ? styles.sourceToggleBtnActive : ""}`}
-                onClick={() => setDataSource("live")}
-              >
-                Tin thật từ Backend ({liveJobs.length})
-              </button>
-              <button
-                type="button"
-                className={`${styles.sourceToggleBtn} ${dataSource === "demo" ? styles.sourceToggleBtnActive : ""}`}
-                onClick={() => setDataSource("demo")}
-              >
-                Bản tin mẫu Demo ({mockJobs.length})
-              </button>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      <JobsHero
-        searchContent={
-          <JobSearchBar
-            keyword={keyword}
-            location={location}
-            locations={locations}
-            onKeywordChange={setKeyword}
-            onLocationChange={setLocation}
-          />
-        }
-        filterContent={
-          <>
-            <JobQuickFilters
-              sortBy={sortBy}
-              isRemote={isRemote}
-              isFresher={isFresher}
-              isInternship={isInternship}
-              isFilterPanelOpen={isFilterPanelOpen}
-              activeFilterCount={activeFilterCount}
-              onSortChange={setSortBy}
-              onToggleRemote={toggleRemote}
-              onToggleFresher={toggleFresher}
-              onToggleInternship={toggleInternship}
-              onToggleFilterPanel={() => setIsFilterPanelOpen((current) => !current)}
-            />
-
-            <JobAdvancedFilters
-              isOpen={isFilterPanelOpen}
-              filters={advancedFilters}
-              categories={categories}
-              jobTypes={jobTypes}
-              workplaces={workplaces}
-              experiences={experiences}
-              getResultCount={getAdvancedFilterResultCount}
-              onClose={() => setIsFilterPanelOpen(false)}
-              onApply={applyAdvancedFilters}
-            />
-
-            <JobActiveFilters
-              keyword={keyword}
-              location={location}
-              filters={advancedFilters}
-              onKeywordChange={setKeyword}
-              onLocationChange={setLocation}
-              onUpdateFilter={updateAdvancedFilter}
-              onClearAdvancedFilters={clearAdvancedFilters}
-            />
-          </>
-        }
+      {/* Search & Multi-criteria Filter Bar */}
+      <JobsFilterBar
+        keyword={keyword}
+        provinceCode={provinceCode}
+        categoryCode={categoryCode}
+        workplaceType={workplaceType}
+        employmentType={employmentType}
+        salaryRange={salaryRange}
+        sortBy={sortBy}
+        categories={categories}
+        provinces={provinces}
+        onFilterChange={handleFilterChange}
+        onClearAll={handleClearAll}
+        hasActiveFilters={hasActiveFilters}
       />
 
-      <JobsResultsSection
-        resultsContent={
-          isLoadingLive ? (
-            <div style={{ padding: "48px 24px", textAlign: "center" }}>
-              <p style={{ color: "var(--color-text-secondary)" }}>Đang tải danh sách việc làm...</p>
+      {/* Main Results Section */}
+      <section className={styles.resultsSection} ref={resultsRef} aria-label="Danh sách việc làm">
+        <div className="container">
+          {/* Header Row: Title & Total Count */}
+          <div className={styles.resultsHeader}>
+            <h1 className={styles.resultsTitle}>
+              <span>Khám phá việc làm nổi bật</span>
+              {!isLoading && (
+                <span className={styles.resultsCountBadge} data-testid="job-results-count">
+                  {pagination.total} việc làm
+                </span>
+              )}
+            </h1>
+          </div>
+
+          {/* Loading Skeleton */}
+          {isLoading && (
+            <div className={styles.loadingGrid} aria-busy="true" aria-label="Đang tải việc làm">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className={styles.skeletonCard}>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 10,
+                        backgroundColor: "#f1f5f9",
+                      }}
+                    />
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div className={styles.skeletonLine} style={{ width: "60%" }} />
+                      <div className={styles.skeletonLine} style={{ width: "90%" }} />
+                    </div>
+                  </div>
+                  <div className={styles.skeletonLine} style={{ width: "40%", margin: "8px 0" }} />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div className={styles.skeletonLine} style={{ width: "30%" }} />
+                    <div className={styles.skeletonLine} style={{ width: "30%" }} />
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : liveError && dataSource === "live" ? (
-            <div style={{ padding: "48px 24px", textAlign: "center", background: "var(--color-surface)", borderRadius: "14px", border: "1px solid var(--color-border)" }}>
-              <h3 style={{ margin: "0 0 10px", fontSize: "18px", color: "var(--color-danger, #ef4444)" }}>
+          )}
+
+          {/* Error State */}
+          {!isLoading && error && (
+            <div className={styles.emptyCard}>
+              <h3 className={styles.emptyTitle} style={{ color: "var(--color-danger, #ef4444)" }}>
                 Không thể tải danh sách việc làm
               </h3>
-              <p style={{ margin: "0 0 20px", fontSize: "14px", color: "var(--color-text-secondary)" }}>
-                {liveError}
-              </p>
+              <p className={styles.emptyText}>{error}</p>
               <button
                 type="button"
-                className={styles.sourceToggleBtnActive}
-                style={{ padding: "10px 20px", borderRadius: "10px", cursor: "pointer", border: "none", fontWeight: 700 }}
-                onClick={() => fetchLiveJobs()}
+                className={styles.resetBtn}
+                onClick={() => handleFilterChange("page", String(currentPage))}
               >
-                Thử lại
+                Tải lại trang
               </button>
             </div>
-          ) : dataSource === "live" && liveJobs.length === 0 ? (
-            <div style={{ padding: "48px 24px", textAlign: "center", background: "var(--color-surface)", borderRadius: "14px", border: "1px solid var(--color-border)" }}>
-              <h3 style={{ margin: "0 0 10px", fontSize: "18px", color: "var(--color-text-primary)" }}>
-                Hiện chưa có tin tuyển dụng nào được xuất bản
-              </h3>
-              <p style={{ margin: "0 0 20px", fontSize: "14px", color: "var(--color-text-secondary)" }}>
-                Các doanh nghiệp đang cập nhật các cơ hội việc làm mới. Bạn có thể quay lại sau hoặc làm mới trang.
+          )}
+
+          {/* Empty Results State */}
+          {!isLoading && !error && jobs.length === 0 && (
+            <div className={styles.emptyCard} data-testid="jobs-empty-state">
+              <h3 className={styles.emptyTitle}>Không tìm thấy việc làm phù hợp</h3>
+              <p className={styles.emptyText}>
+                {hasActiveFilters
+                  ? "Hãy thử nới lỏng từ khóa tìm kiếm hoặc bỏ chọn một số bộ lọc địa điểm / mức lương để thấy nhiều cơ hội hơn."
+                  : "Hiện tại hệ thống đang cập nhật thêm các tin tuyển dụng mới. Vui lòng quay lại sau."}
               </p>
-              <button
-                type="button"
-                className={styles.sourceToggleBtnActive}
-                style={{ padding: "10px 20px", borderRadius: "10px", cursor: "pointer", border: "none", fontWeight: 700 }}
-                onClick={() => fetchLiveJobs()}
-              >
-                Tải lại danh sách
-              </button>
-            </div>
-          ) : (
-            <JobsResults
-              jobs={filteredJobs}
-              sortBy={sortBy}
-              hasActiveFilters={hasActiveFilters}
-              onSortChange={setSortBy}
-              onClearAdvancedFilters={clearAdvancedFilters}
-              renderJob={(job) => (
-                <JobDiscoveryCard
-                  key={job.id}
-                  job={job}
-                />
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className={styles.resetBtn}
+                  onClick={handleClearAll}
+                  data-testid="reset-filters-btn"
+                >
+                  Xóa tất cả bộ lọc
+                </button>
               )}
-            />
-          )
-        }
-        sidebarContent={<JobsSidebar />}
-      />
+            </div>
+          )}
+
+          {/* Populated 3-Column Job Grid */}
+          {!isLoading && !error && jobs.length > 0 && (
+            <>
+              <div className={styles.jobsGrid} data-testid="jobs-grid">
+                {jobs.map((job) => (
+                  <CompactJobCard key={job.id} job={job} />
+                ))}
+              </div>
+
+              {/* Real Job Pagination */}
+              <JobPagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.total}
+                pageSize={pagination.pageSize}
+                onPageChange={handlePageChange}
+              />
+            </>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

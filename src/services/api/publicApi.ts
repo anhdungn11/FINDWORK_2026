@@ -30,6 +30,10 @@ export interface PublicJobQuery {
   employmentType?: string;
   workplaceType?: string;
   companyId?: string;
+  provinceCode?: string;
+  salaryAtLeast?: string;
+  salaryAtMost?: string;
+  sort?: "newest" | "salary_asc" | "salary_desc";
 }
 
 /** Chỉ gửi tham số có giá trị — không để chuỗi rỗng làm sai bộ lọc Backend. */
@@ -37,9 +41,24 @@ export const buildJobQueryParams = (query: PublicJobQuery): Record<string, strin
   const out: Record<string, string | number> = {};
   if (query.page && query.page > 1) out.page = query.page;
   if (query.pageSize) out.pageSize = query.pageSize;
-  for (const key of ["q", "categoryCode", "employmentType", "workplaceType", "companyId"] as const) {
-    const v = query[key]?.trim();
-    if (v) out[key] = v;
+  for (const key of [
+    "q",
+    "categoryCode",
+    "employmentType",
+    "workplaceType",
+    "companyId",
+    "provinceCode",
+    "salaryAtLeast",
+    "salaryAtMost",
+    "sort",
+  ] as const) {
+    const val = query[key];
+    if (typeof val === "string") {
+      const v = val.trim();
+      if (v) out[key] = v;
+    } else if (typeof val === "number") {
+      out[key] = val;
+    }
   }
   return out;
 };

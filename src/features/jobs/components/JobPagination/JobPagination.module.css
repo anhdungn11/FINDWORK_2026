@@ -1,0 +1,117 @@
+.paginationContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.summaryText {
+  font-size: 13px;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.controlsRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.navButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  min-height: 38px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #cbd5e1);
+  color: var(--color-text-primary, #1e293b);
+  cursor: pointer;
+  transition: all 160ms ease;
+  user-select: none;
+}
+
+.navButton:hover:not(:disabled) {
+  border-color: #6366f1;
+  background-color: #f5f3ff;
+  color: #4f46e5;
+}
+
+.navButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.pageButton {
+  min-width: 38px;
+  height: 38px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #cbd5e1);
+  color: var(--color-text-primary, #1e293b);
+  cursor: pointer;
+  transition: all 160ms ease;
+  user-select: none;
+}
+
+.pageButton:hover:not(.activePage) {
+  border-color: #6366f1;
+  background-color: #f5f3ff;
+  color: #4f46e5;
+}
+
+.activePage {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+  border-color: #4f46e5 !important;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+.ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 38px;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 600;
+  user-select: none;
+}
+
+@media (max-width: 640px) {
+  .paginationContainer {
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 18px;
+  }
+
+  .navButton {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .pageButton {
+    min-width: 34px;
+    height: 34px;
+    font-size: 12px;
+    padding: 0 6px;
+  }
+}
