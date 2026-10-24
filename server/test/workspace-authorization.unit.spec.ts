@@ -60,7 +60,8 @@ describe("candidate and employer workspace authorization", () => {
     job: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
     company: { create: jest.fn() },
     candidateProfile: { create: jest.fn() },
-    $transaction: jest.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction)),
+    $transaction: jest.fn(async (callback: ((tx: typeof transaction) => Promise<unknown>) | Promise<unknown>[]) =>
+      Array.isArray(callback) ? Promise.all(callback) : callback(transaction)),
   };
   const grants = {
     findActiveCompanyMember: jest.fn(async (userId: string, targetCompanyId: string) =>
@@ -236,7 +237,7 @@ describe("candidate and employer workspace authorization", () => {
       where: expect.objectContaining({ status: "PUBLISHED", company: { status: "ACTIVE" } }),
     }));
     expect(db.candidateProfile.create).not.toHaveBeenCalled();
-    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ isolationLevel: "RepeatableRead" }));
   });
 
   it("keeps Candidate Workspace available to Candidate and legacy users only", async () => {

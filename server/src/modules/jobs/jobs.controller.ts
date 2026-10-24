@@ -72,7 +72,7 @@ export class CompanyJobsController {
   }
 
   @Patch(":jobId")
-  @ApiOperation({ summary: "Edit a draft job using optimistic versioning" })
+  @ApiOperation({ summary: "Edit a draft, published, or paused job using optimistic versioning" })
   @RequireCompanyPermissions("company.update")
   update(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest, @Body() dto: UpdateJobDto) {

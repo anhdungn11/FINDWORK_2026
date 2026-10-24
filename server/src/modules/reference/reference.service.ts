@@ -5,7 +5,7 @@ import { CertificateQueryDto, LocationQueryDto, ReferenceQueryDto, SkillCategory
 
 function searchKey(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[đĐ]/g, "d").toLocaleLowerCase("vi").trim();
+    .replace(/[\u0111\u0110]/g, "d").toLocaleLowerCase("vi").trim();
 }
 
 const countryNames = new Intl.DisplayNames(["vi"], { type: "region" });

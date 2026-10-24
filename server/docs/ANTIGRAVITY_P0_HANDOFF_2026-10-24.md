@@ -2,6 +2,8 @@
 
 **Next-sprint update:** [Official ward snapshot, current AI sequence and Freemium gates](./P0_WARD_AI_NEXT_SPRINT_HANDOFF_2026-10-24.md) supersedes the ward and AI readiness statements below. The media contract and prior HTTP evidence remain valid.
 
+**Recruitment release update:** [Job directory pagination, employer publishing, Candidate application and optional demo dataset](./RECRUITMENT_P0_RELEASE_HANDOFF_2026-10-24.md) is the current Backend contract for Antigravity. The updated build is running on 3002; read-only HTTP job acceptance passed after the cutover.
+
 Branch `feat/backend-release-integration`; API base `http://127.0.0.1:3002/api/v1`; integration PostgreSQL database `findwork_employer_media_3002`. This document records today's live 3002 evidence. The broader [release contract](./P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md) defines the existing legal and interview APIs. Do not point acceptance scripts at `findwork_dev` or `findwork_test`.
 
 ## P0-01 logo and cover: backend HTTP/storage PASS, browser pending

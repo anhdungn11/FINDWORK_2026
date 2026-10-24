@@ -5,7 +5,7 @@ import {
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import type {
-  CompanyJobQueryDto, CreateJobDto, PublicJobQueryDto, UpdateJobDto,
+  CompanyJobQueryDto, CreateJobDto, JobLocationDto, PublicJobQueryDto, UpdateJobDto,
 } from "./dto/job.dto";
 import type { ReplaceScreeningQuestionsDto } from "./dto/screening-question.dto";
 import { applicantQuestionSelect, jobSelect } from "./job-select";
@@ -14,6 +14,13 @@ import { normalizeScreeningQuestions } from "./screening-question.rules";
 
 type JobRow = Prisma.JobGetPayload<{ select: typeof jobSelect }>;
 type JobChanges = Partial<CreateJobDto>;
+const publicJobSelect = {
+  ...jobSelect,
+  company: { select: { id: true, name: true, slug: true, logoAssetKey: true } },
+  locations: { select: { id: true, isPrimary: true, addressLine: true,
+    province: { select: { code: true, name: true } },
+    ward: { select: { code: true, name: true } } }, orderBy: [{ isPrimary: "desc" }, { id: "asc" }] },
+} satisfies Prisma.JobSelect;
 
 function badRequest(code: string, message: string): BadRequestException {
   return new BadRequestException({ code, message });
@@ -45,6 +52,24 @@ export class JobsService {
     if (!category) throw badRequest("JOB_CATEGORY_INVALID", "An active job category is required.");
   }
 
+  private async resolveLocation(tx: Prisma.TransactionClient, location: JobLocationDto) {
+    const province = await tx.province.findFirst({ where: { code: location.provinceCode, isActive: true }, select: { id: true } });
+    if (!province) throw badRequest("JOB_PROVINCE_INVALID", "An active province is required.");
+    let wardId: string | null = null;
+    if (location.wardCode) {
+      const ward = await tx.ward.findFirst({ where: { code: location.wardCode, provinceId: province.id, isActive: true }, select: { id: true } });
+      if (!ward) throw badRequest("JOB_WARD_INVALID", "An active ward in the selected province is required.");
+      wardId = ward.id;
+    }
+    return { countryCode: "VN", provinceId: province.id, wardId, addressLine: location.addressLine ?? null, isPrimary: true };
+  }
+
+  private toPublicJob<T extends { company: { logoAssetKey: string | null; id: string } }>(row: T) {
+    const { logoAssetKey, ...company } = row.company;
+    return { ...row, company: { ...company,
+      logoUrl: logoAssetKey ? `/api/v1/companies/${company.id}/media/logo` : null } };
+  }
+
   private checkValues(input: JobChanges, current?: JobRow): void {
     const minMonths = input.experienceMinMonths !== undefined ? input.experienceMinMonths : current?.experienceMinMonths;
     const maxMonths = input.experienceMaxMonths !== undefined ? input.experienceMaxMonths : current?.experienceMaxMonths;
@@ -69,6 +94,7 @@ export class JobsService {
     return this.db.$transaction(async (tx) => {
       const member = await this.requireActor(tx, companyId, userId);
       await this.requireCategory(tx, dto.categoryId);
+      const location = dto.location ? await this.resolveLocation(tx, dto.location) : null;
       const created = await tx.job.create({
         data: {
           companyId, createdByMemberId: member.id, categoryId: dto.categoryId,
@@ -79,6 +105,7 @@ export class JobsService {
           currency: dto.currency, salaryPeriod: dto.salaryPeriod,
           salaryNegotiable: dto.salaryNegotiable, showSalary: dto.showSalary,
           applicationDeadline: dto.applicationDeadline ? new Date(dto.applicationDeadline) : null,
+          ...(location && { locations: { create: location } }),
         },
         select: { id: true },
       });
@@ -156,14 +183,24 @@ export class JobsService {
     return this.db.$transaction(async (tx) => {
       await this.requireActor(tx, companyId, userId);
       const current = await this.ownedJob(tx, companyId, jobId);
-      if (current.status !== "DRAFT") throw conflict("JOB_STATE_CONFLICT", "Only draft jobs can be edited.");
+      if (current.status !== "DRAFT" && current.status !== "PUBLISHED" && current.status !== "PAUSED") {
+        throw conflict("JOB_STATE_CONFLICT", "This job cannot be edited.");
+      }
       if (current.version !== version) throw conflict("JOB_VERSION_CONFLICT", "Job version is stale.");
       if (changes.categoryId !== undefined) await this.requireCategory(tx, changes.categoryId);
       this.checkValues(changes, current);
+      const deadline = changes.applicationDeadline !== undefined
+        ? changes.applicationDeadline ? new Date(changes.applicationDeadline) : null
+        : current.applicationDeadline;
+      if (current.status === "PUBLISHED" && deadline && deadline <= new Date()) {
+        throw conflict("JOB_DEADLINE_EXPIRED", "A published job deadline must be in the future.");
+      }
+      const { location: locationInput, ...jobChanges } = changes;
+      const location = locationInput ? await this.resolveLocation(tx, locationInput) : null;
       const updated = await tx.job.updateMany({
-        where: { id: jobId, companyId, status: "DRAFT", version },
+        where: { id: jobId, companyId, status: current.status, version },
         data: {
-          ...changes,
+          ...jobChanges,
           ...(changes.applicationDeadline !== undefined && {
             applicationDeadline: changes.applicationDeadline ? new Date(changes.applicationDeadline) : null,
           }),
@@ -171,6 +208,11 @@ export class JobsService {
         },
       });
       if (updated.count !== 1) throw conflict("JOB_VERSION_CONFLICT", "Job changed during update.");
+      if (location) {
+        const currentLocation = await tx.jobLocation.findFirst({ where: { jobId, isPrimary: true }, select: { id: true } });
+        if (currentLocation) await tx.jobLocation.update({ where: { id: currentLocation.id }, data: location });
+        else await tx.jobLocation.create({ data: { ...location, jobId } });
+      }
       await tx.auditLog.create({ data: {
         actorUserId: userId, companyId, action: "job.update", targetType: "Job", targetId: jobId,
         metadata: { changedFields: Object.keys(changes), fromVersion: version },
@@ -210,33 +252,57 @@ export class JobsService {
   }
 
   private publicWhere(query?: PublicJobQueryDto): Prisma.JobWhereInput {
+    const salaryFilter = query?.salaryAtLeast !== undefined || query?.salaryAtMost !== undefined ||
+      query?.currency !== undefined || query?.salaryPeriod !== undefined ||
+      query?.sort === "salary_asc" || query?.sort === "salary_desc";
     return {
       ...publicJobVisibility(new Date()), company: { status: "ACTIVE" },
-      ...(query?.q && { title: { contains: query.q, mode: "insensitive" } }),
+      ...(query?.q && { OR: [
+        { title: { contains: query.q, mode: "insensitive" } },
+        { description: { contains: query.q, mode: "insensitive" } },
+        { company: { name: { contains: query.q, mode: "insensitive" } } },
+      ] satisfies Prisma.JobWhereInput[] }),
       ...(query?.companyId && { companyId: query.companyId }),
       ...(query?.categoryCode && { category: { isActive: true, code: query.categoryCode } }),
       ...(query?.employmentType && { employmentType: query.employmentType }),
       ...(query?.workplaceType && { workplaceType: query.workplaceType }),
+      ...(query?.provinceCode && { locations: { some: { province: { code: query.provinceCode, isActive: true } } } }),
+      ...(salaryFilter && { showSalary: true, salaryNegotiable: false,
+        currency: query?.currency ?? "VND", salaryPeriod: query?.salaryPeriod ?? "MONTH" }),
+      ...(query?.salaryAtLeast && { salaryMax: { gte: query.salaryAtLeast } }),
+      ...(query?.salaryAtMost && { salaryMin: { lte: query.salaryAtMost } }),
+      ...((query?.sort === "salary_asc" || query?.sort === "salary_desc") && { salaryMin: {
+        ...(query?.salaryAtMost && { lte: query.salaryAtMost }), not: null,
+      } }),
     };
   }
 
   async listPublic(query: PublicJobQueryDto) {
+    if (query.salaryAtLeast && query.salaryAtMost &&
+        new Prisma.Decimal(query.salaryAtLeast).greaterThan(new Prisma.Decimal(query.salaryAtMost))) {
+      throw badRequest("JOB_INVALID_RANGE", "Salary minimum exceeds maximum.");
+    }
     const where = this.publicWhere(query);
-    const [data, total] = await Promise.all([
-      this.db.job.findMany({ where, select: jobSelect, orderBy: [{ publishedAt: "desc" }, { id: "desc" }], skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
+    const orderBy: Prisma.JobOrderByWithRelationInput[] = query.sort === "salary_asc"
+      ? [{ salaryMin: "asc" }, { publishedAt: "desc" }, { id: "desc" }]
+      : query.sort === "salary_desc"
+        ? [{ salaryMin: "desc" }, { publishedAt: "desc" }, { id: "desc" }]
+        : [{ publishedAt: "desc" }, { id: "desc" }];
+    const [data, total] = await this.db.$transaction([
+      this.db.job.findMany({ where, select: publicJobSelect, orderBy, skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
       this.db.job.count({ where }),
-    ]);
-    return { data, pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } };
+    ], { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+    return { data: data.map((row) => this.toPublicJob(row)), pagination: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) } };
   }
 
   async getPublic(jobId: string) {
     const job = await this.db.job.findFirst({ where: { id: jobId, ...this.publicWhere() },
-      select: { ...jobSelect, screeningQuestions: {
+      select: { ...publicJobSelect, screeningQuestions: {
         where: { isActive: true }, select: applicantQuestionSelect,
         orderBy: [{ displayOrder: "asc" }, { id: "asc" }],
       } },
     });
     if (!job) throw notFound();
-    return job;
+    return this.toPublicJob(job);
   }
 }

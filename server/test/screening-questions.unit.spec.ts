@@ -56,7 +56,9 @@ function jobDb() {
     auditLog: { create: jest.fn().mockResolvedValue({}) },
   };
   const db = { $transaction: jest.fn(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx)),
-    job: { findFirst: jest.fn().mockResolvedValue({ id: jobId, version: 1 }) },
+    job: { findFirst: jest.fn().mockResolvedValue({ id: jobId, version: 1,
+      company: { id: companyId, name: "Demo", slug: "demo", logoAssetKey: null },
+      locations: [], screeningQuestions: [] }) },
     screeningQuestion: { findMany: jest.fn().mockResolvedValue([]) } };
   return { tx, db, service: new JobsService(db as never) };
 }

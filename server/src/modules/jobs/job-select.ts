@@ -8,6 +8,9 @@ export const jobSelect = {
   version: true, createdAt: true, updatedAt: true,
   company: { select: { id: true, name: true, slug: true } },
   category: { select: { id: true, code: true, name: true } },
+  locations: { select: { id: true, isPrimary: true, addressLine: true,
+    province: { select: { code: true, name: true } },
+    ward: { select: { code: true, name: true } } }, orderBy: { isPrimary: "desc" } },
 } as const;
 
 export const applicantQuestionSelect = {

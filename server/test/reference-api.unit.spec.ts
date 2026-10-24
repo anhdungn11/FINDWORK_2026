@@ -80,6 +80,15 @@ describe("shared reference API", () => {
     expect(response.body.data[0].code).toBe("01");
   });
 
+  it("finds Vietnamese D-bar province names with accentless search", async () => {
+    provinceFind.mockResolvedValue([{ id: "official-province-fixture", code: "75",
+      name: "\u0110\u1ed3ng Nai", divisionType: "centrally-governed-city", isActive: true }]);
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/reference/provinces?q=Dong%20Nai&pageSize=10").expect(200);
+    expect(response.body.pagination.total).toBe(1);
+    expect(response.body.data[0].code).toBe("75");
+  });
+
   it("passes language and province parent filters through to persisted relations", async () => {
     await request(app.getHttpServer()).get("/api/v1/reference/language-certificate-types?languageCode=en").expect(200);
     await request(app.getHttpServer()).get("/api/v1/reference/wards?provinceCode=01").expect(200);

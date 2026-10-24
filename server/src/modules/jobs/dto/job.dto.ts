@@ -1,14 +1,15 @@
 import { ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
-  IsDateString, IsIn, IsInt, IsString, IsUUID, Matches,
-  Max, MaxLength, Min, MinLength, ValidateIf,
+  IsDateString, IsIn, IsInt, IsObject, IsString, IsUUID, Matches,
+  Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested,
 } from "class-validator";
 
 export const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "INTERNSHIP", "CONTRACT", "FREELANCE", "TEMPORARY", "VOLUNTEER"] as const;
 export const WORKPLACE_TYPES = ["ONSITE", "HYBRID", "REMOTE"] as const;
 export const SALARY_PERIODS = ["HOUR", "DAY", "WEEK", "MONTH", "YEAR"] as const;
 export const JOB_STATUSES = ["DRAFT", "PUBLISHED", "PAUSED", "CLOSED", "EXPIRED", "ARCHIVED"] as const;
+export const PUBLIC_JOB_SORTS = ["newest", "salary_asc", "salary_desc"] as const;
 
 const trim = ({ value }: { value: unknown }) => typeof value === "string" ? value.trim() : value;
 // Browser job forms send integer salaries as JSON numbers. Convert only values that
@@ -17,6 +18,13 @@ const salary = ({ value }: { value: unknown }) =>
   typeof value === "number" && Number.isSafeInteger(value) ? String(value) : value;
 const present = (_: unknown, value: unknown) => value !== undefined;
 const nonNull = (_: unknown, value: unknown) => value !== undefined && value !== null;
+
+export class JobLocationDto {
+  @Matches(/^\d{2}$/) provinceCode!: string;
+  @ApiPropertyOptional() @ValidateIf(present) @Matches(/^\d{5}$/) wardCode?: string;
+  @ApiPropertyOptional() @Transform(trim) @ValidateIf(present) @IsString() @MinLength(1) @MaxLength(255)
+  addressLine?: string;
+}
 
 export class CreateJobDto {
   @IsUUID("4") categoryId!: string;
@@ -43,6 +51,9 @@ export class CreateJobDto {
   @ApiPropertyOptional() @ValidateIf(present) @IsIn([true, false]) showSalary?: boolean;
   @ApiPropertyOptional({ nullable: true }) @ValidateIf(nonNull) @IsDateString()
   applicationDeadline?: string | null;
+
+  @ApiPropertyOptional({ type: () => JobLocationDto }) @ValidateIf(present) @IsObject() @ValidateNested()
+  @Type(() => JobLocationDto) location?: JobLocationDto;
 }
 
 export class UpdateJobDto extends PartialType(CreateJobDto) {
@@ -74,4 +85,12 @@ export class PublicJobQueryDto extends JobPageQueryDto {
   employmentType?: (typeof EMPLOYMENT_TYPES)[number];
   @ApiPropertyOptional({ enum: WORKPLACE_TYPES }) @ValidateIf(present) @IsIn(WORKPLACE_TYPES)
   workplaceType?: (typeof WORKPLACE_TYPES)[number];
+  @ApiPropertyOptional() @ValidateIf(present) @Matches(/^\d{2}$/) provinceCode?: string;
+  @ApiPropertyOptional() @ValidateIf(present) @Matches(/^\d{1,17}(?:\.\d{1,2})?$/) salaryAtLeast?: string;
+  @ApiPropertyOptional() @ValidateIf(present) @Matches(/^\d{1,17}(?:\.\d{1,2})?$/) salaryAtMost?: string;
+  @ApiPropertyOptional({ enum: SALARY_PERIODS }) @ValidateIf(present) @IsIn(SALARY_PERIODS)
+  salaryPeriod?: (typeof SALARY_PERIODS)[number];
+  @ApiPropertyOptional() @ValidateIf(present) @Matches(/^[A-Z]{3}$/) currency?: string;
+  @ApiPropertyOptional({ enum: PUBLIC_JOB_SORTS }) @ValidateIf(present) @IsIn(PUBLIC_JOB_SORTS)
+  sort?: (typeof PUBLIC_JOB_SORTS)[number];
 }

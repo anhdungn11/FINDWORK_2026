@@ -26,6 +26,9 @@ function fakeDb() {
   const tx = {
     companyMember: { findFirst: jest.fn().mockResolvedValue({ id: "member-id" }) },
     jobCategory: { findFirst: jest.fn().mockResolvedValue({ id: categoryId }) },
+    province: { findFirst: jest.fn().mockResolvedValue({ id: "province-id" }) },
+    ward: { findFirst: jest.fn().mockResolvedValue({ id: "ward-id" }) },
+    jobLocation: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn(), update: jest.fn() },
     job: {
       findFirst: jest.fn().mockResolvedValue(draft()),
       create: jest.fn().mockResolvedValue({ id: jobId }),
@@ -37,7 +40,8 @@ function fakeDb() {
   return {
     tx,
     db: {
-      $transaction: jest.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)),
+      $transaction: jest.fn(async (run: ((client: typeof tx) => Promise<unknown>) | Promise<unknown>[]) =>
+        Array.isArray(run) ? Promise.all(run) : run(tx)),
       job: {
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
@@ -86,6 +90,24 @@ describe("jobs MVP ownership and publication", () => {
     }));
   });
 
+  it("stores a verified province location and rejects an invalid ward parent", async () => {
+    const { tx, db } = fakeDb();
+    const service = new JobsService(db as never);
+    const input = { categoryId, title: "Sample nurse", description: "Care for patients in a clinic.",
+      employmentType: "FULL_TIME" as const, workplaceType: "ONSITE" as const,
+      location: { provinceCode: "01", wardCode: "00004", addressLine: "Sample office" } };
+    await service.create(companyId, userId, input);
+    expect(tx.ward.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { code: "00004", provinceId: "province-id", isActive: true },
+    }));
+    expect(tx.job.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      locations: { create: { countryCode: "VN", provinceId: "province-id", wardId: "ward-id",
+        addressLine: "Sample office", isPrimary: true } },
+    }) }));
+    tx.ward.findFirst.mockResolvedValue(null);
+    await expect(service.create(companyId, userId, input)).rejects.toMatchObject({ status: 400 });
+  });
+
   it("scopes a company job read by both job and company ID", async () => {
     const { db } = fakeDb();
     const service = new JobsService(db as never);
@@ -104,6 +126,19 @@ describe("jobs MVP ownership and publication", () => {
       where: { id: jobId, companyId, status: "DRAFT", version: 1 },
       data: expect.objectContaining({ title: "Updated nurse", version: { increment: 1 } }),
     }));
+  });
+
+  it("edits a published job without republishing and rejects an elapsed deadline", async () => {
+    const { tx, db } = fakeDb();
+    const service = new JobsService(db as never);
+    tx.job.findFirst.mockResolvedValue(draft({ status: "PUBLISHED", publishedAt: new Date("2026-10-23") }));
+    await service.update(companyId, jobId, userId, { version: 1, title: "Updated public sample job" });
+    expect(tx.job.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: jobId, companyId, status: "PUBLISHED", version: 1 },
+      data: expect.objectContaining({ title: "Updated public sample job", version: { increment: 1 } }),
+    }));
+    await expect(service.update(companyId, jobId, userId,
+      { version: 1, applicationDeadline: "2020-01-01T00:00:00.000Z" })).rejects.toMatchObject({ status: 409 });
   });
 
   it("blocks expired publication and records an authorized state change", async () => {
@@ -133,7 +168,11 @@ describe("jobs MVP ownership and publication", () => {
       where: expect.objectContaining({
         status: "PUBLISHED", company: { status: "ACTIVE" },
         category: { isActive: true, code: "healthcare" },
-        title: { contains: "nurse", mode: "insensitive" },
+        OR: expect.arrayContaining([
+          { title: { contains: "nurse", mode: "insensitive" } },
+          { description: { contains: "nurse", mode: "insensitive" } },
+          { company: { name: { contains: "nurse", mode: "insensitive" } } },
+        ]),
         employmentType: "FULL_TIME",
       }),
     }));
@@ -141,6 +180,26 @@ describe("jobs MVP ownership and publication", () => {
     expect(db.job.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: jobId, status: "PUBLISHED", company: { status: "ACTIVE" } }),
     }));
+  });
+
+  it("combines province and displayed salary filters with stable page order and public logo URL", async () => {
+    const { db } = fakeDb();
+    db.job.findMany.mockResolvedValue([{ id: jobId, company: { id: companyId, name: "Demo", slug: "demo", logoAssetKey: "private-key" }, locations: [] }]);
+    db.job.count.mockResolvedValue(23);
+    const service = new JobsService(db as never);
+    const result = await service.listPublic({ page: 2, pageSize: 10, provinceCode: "01",
+      salaryAtLeast: "10000000", salaryAtMost: "20000000", sort: "salary_desc" });
+    expect(db.job.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      skip: 10, take: 10, orderBy: [{ salaryMin: "desc" }, { publishedAt: "desc" }, { id: "desc" }],
+      where: expect.objectContaining({
+        locations: { some: { province: { code: "01", isActive: true } } },
+        showSalary: true, salaryNegotiable: false, currency: "VND", salaryPeriod: "MONTH",
+        salaryMax: { gte: "10000000" }, salaryMin: { lte: "20000000", not: null },
+      }),
+    }));
+    expect(result.pagination).toEqual({ page: 2, pageSize: 10, total: 23, totalPages: 3 });
+    expect(result.data[0]?.company).toEqual({ id: companyId, name: "Demo", slug: "demo",
+      logoUrl: `/api/v1/companies/${companyId}/media/logo` });
   });
 
   it("discovers only the authenticated user's active company memberships", async () => {
@@ -163,6 +222,17 @@ describe("jobs MVP ownership and publication", () => {
     expect((await validate(invalidJob)).length).toBeGreaterThanOrEqual(4);
     const invalidQuery = plainToInstance(PublicJobQueryDto, { page: "0", pageSize: "101" });
     expect((await validate(invalidQuery)).length).toBe(2);
+    const invalidFilters = plainToInstance(PublicJobQueryDto, {
+      provinceCode: "ZZ", salaryAtLeast: "-1", sort: "relevant", q: "x".repeat(101),
+    });
+    expect((await validate(invalidFilters)).map((error) => error.property).sort())
+      .toEqual(["provinceCode", "q", "salaryAtLeast", "sort"]);
+    const invalidLocation = plainToInstance(CreateJobDto, {
+      categoryId, title: "Sample designer", description: "Design sample user interfaces for an approved demonstration.",
+      employmentType: "FULL_TIME", workplaceType: "HYBRID",
+      location: { provinceCode: "XX", wardCode: "bad" },
+    });
+    expect((await validate(invalidLocation)).map((error) => error.property)).toContain("location");
   });
 
   it("accepts exact JSON integer salaries from the frontend and rejects unsafe numbers", async () => {

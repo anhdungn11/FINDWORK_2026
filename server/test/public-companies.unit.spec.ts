@@ -96,7 +96,8 @@ describe("public company discovery", () => {
     await expect(repo.getPublic(companyId)).rejects.toMatchObject({ status: 404, response: { code: "PUBLIC_COMPANY_NOT_FOUND" } });
     expect(company.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: companyId, status: "ACTIVE" } }));
     const job = { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) };
-    await new JobsService({ job } as never).listPublic({ page: 1, pageSize: 20, companyId });
+    await new JobsService({ job, $transaction: (queries: Promise<unknown>[]) => Promise.all(queries) } as never)
+      .listPublic({ page: 1, pageSize: 20, companyId });
     expect(job.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ companyId, status: "PUBLISHED", company: { status: "ACTIVE" } }),
     }));
