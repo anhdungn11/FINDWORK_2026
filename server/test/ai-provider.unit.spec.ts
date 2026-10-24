@@ -22,6 +22,37 @@ describe("OpenAI AI provider adapter", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("rejects unsupported provider configuration without making a request", async () => {
+    const fetchSpy = jest.spyOn(globalThis, "fetch");
+    await expect(provider({ ...configured, FINDWORK_AI_PROVIDER: "gemini" }).generate([], "Hello"))
+      .rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [401, "AI_PROVIDER_AUTH_INVALID"], [403, "AI_PROVIDER_AUTH_INVALID"],
+    [429, "AI_PROVIDER_RATE_LIMITED"], [503, "AI_PROVIDER_UNAVAILABLE"],
+    [400, "AI_PROVIDER_REQUEST_REJECTED"],
+  ])("maps provider HTTP %i to safe %s without relaying its body", async (status, code) => {
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response("secret provider detail", { status }));
+    try { await provider().generate([], "Hello"); throw new Error("Expected provider failure"); }
+    catch (error) {
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect((error as ServiceUnavailableException).getResponse()).toMatchObject({ code });
+      expect(JSON.stringify((error as ServiceUnavailableException).getResponse())).not.toContain("secret provider detail");
+    }
+  });
+
+  it("reports a provider timeout without leaking the underlying message", async () => {
+    jest.spyOn(globalThis, "fetch").mockRejectedValue(new DOMException("private timeout context", "TimeoutError"));
+    try { await provider().generate([], "Hello"); throw new Error("Expected timeout"); }
+    catch (error) {
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect((error as ServiceUnavailableException).getResponse()).toMatchObject({ code: "AI_PROVIDER_TIMEOUT" });
+      expect(JSON.stringify((error as ServiceUnavailableException).getResponse())).not.toContain("private timeout context");
+    }
+  });
+
   it("sends owned text history and actual image bytes to Responses without provider retention", async () => {
     const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
       output: [{ type: "message", content: [{ type: "output_text", text: "Interview guidance" }] }],

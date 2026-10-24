@@ -149,7 +149,7 @@ export function validateAdministrativeWardImport(
 ): void {
   validateAdministrativeProvinceSnapshot(provinces);
   if (input.version !== `vn-admin-wards-${input.asOf}` || !validDate(input.asOf) ||
-      input.asOf !== provinces.asOf || input.provinceVersion !== provinces.version ||
+      input.asOf < provinces.asOf || input.provinceVersion !== provinces.version ||
       !Number.isInteger(input.expectedCount) || input.expectedCount <= 0 ||
       input.wards.length !== input.expectedCount) {
     throw new Error("Ward coverage or administrative version is incomplete or mixed");

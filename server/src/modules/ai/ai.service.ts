@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createHash, randomBytes } from "node:crypto";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
@@ -16,6 +16,11 @@ const rateLimit = (code: string) => new HttpException({ code }, 429);
 export class AiService {
   constructor(private readonly db: PrismaService, private readonly provider: AiProviderService,
     private readonly config: ConfigService) {}
+
+  private requirePremiumEntitlement() {
+    // No payment-derived entitlement exists yet. The future check must also enforce expiry and quota.
+    throw new ForbiddenException({ code: "AI_PREMIUM_ENTITLEMENT_REQUIRED" });
+  }
 
   async guest(ip: string) {
     // Purge a bounded batch of expired guest history before issuing another session.
@@ -98,6 +103,7 @@ export class AiService {
   async send(identity: AiIdentity, conversationId: string, content: string,
     image?: { buffer: Buffer; mimetype: string }) {
     await this.requireConversation(identity, conversationId);
+    if (image) this.requirePremiumEntitlement();
     const prompt = content.trim();
     if (!prompt || prompt.length > 4000) throw new BadRequestException({ code: "AI_MESSAGE_INVALID" });
     if (Buffer.byteLength(prompt, "utf8") > 4000) throw new BadRequestException({ code: "AI_MESSAGE_TOO_LARGE" });
@@ -141,6 +147,7 @@ export class AiService {
   }
 
   async transcribe(identity: AiIdentity, file?: { buffer: Buffer; mimetype: string }) {
+    this.requirePremiumEntitlement();
     const bytes = file?.buffer;
     if (!bytes || file.mimetype !== "audio/wav" || bytes.length < 44 || bytes.length > 2_000_000 ||
       bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WAVE") {

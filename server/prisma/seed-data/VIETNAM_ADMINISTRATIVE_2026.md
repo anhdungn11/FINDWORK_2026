@@ -1,5 +1,7 @@
 # Vietnam administrative reference preparation, as of 2026-10-16
 
+**24/10/2026 update:** A complete dated official SOAP snapshot with 3,321 wards has been captured and validated offline. See [P0 ward and AI handoff](../../docs/P0_WARD_AI_NEXT_SPRINT_HANDOFF_2026-10-24.md) and `vietnam-wards-2026-10-24.json`. The historical 16/10 blocker below records the earlier state. No ward import has been applied to PostgreSQL; the integration DB still has zero wards pending explicit approval and backup review.
+
 `vietnam-administrative-2026-10-16.json` contains 34 reviewed provincial codes and no ward rows. The guarded `db:seed:reference:2026` command now previews or, after separate approval, inserts these provinces together with the 67-skill and 30-certificate catalogs. It never writes wards. Run the offline validator from `server` with `npm run validate:admin:2026`; it never opens a database connection.
 
 ## Official evidence matrix

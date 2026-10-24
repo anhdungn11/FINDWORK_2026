@@ -7,12 +7,20 @@ type ProviderMessage = { role: Role; content: string };
 @Injectable()
 export class AiProviderService {
   constructor(private readonly config: ConfigService) {}
+  private unavailable(response: Response): never {
+    const code = response.status === 401 || response.status === 403 ? "AI_PROVIDER_AUTH_INVALID"
+      : response.status === 429 ? "AI_PROVIDER_RATE_LIMITED"
+      : response.status >= 500 ? "AI_PROVIDER_UNAVAILABLE" : "AI_PROVIDER_REQUEST_REJECTED";
+    // Never relay provider response bodies: they may contain request or account details.
+    throw new ServiceUnavailableException({ code });
+  }
   private settings() {
+    const provider = this.config.get<string>("FINDWORK_AI_PROVIDER") ?? "openai";
     const key = this.config.get<string>("FINDWORK_AI_API_KEY");
     const model = this.config.get<string>("FINDWORK_AI_MODEL");
     const inputPrice = Number(this.config.get<string>("FINDWORK_AI_INPUT_USD_PER_MILLION"));
     const outputPrice = Number(this.config.get<string>("FINDWORK_AI_OUTPUT_USD_PER_MILLION"));
-    if (!key || !model || !Number.isFinite(inputPrice) || inputPrice <= 0 || inputPrice > 100 ||
+    if (provider !== "openai" || !key || !model || !Number.isFinite(inputPrice) || inputPrice <= 0 || inputPrice > 100 ||
       !Number.isFinite(outputPrice) || outputPrice <= 0 || outputPrice > 100) {
       throw new ServiceUnavailableException({ code: "AI_PROVIDER_NOT_CONFIGURED", message: "AI provider credentials, model and pricing are required." });
     }
@@ -34,8 +42,9 @@ export class AiProviderService {
           instructions: "You are FINDWORK's career and recruitment assistant. Give practical, honest guidance. Do not claim access to private company, candidate, or job data. Do not request passwords, tax documents, or sensitive identity data. Reply in the user's language.",
           input: [...history.map((m) => ({ role: m.role, content: m.content })), { role: "user", content }] }),
       });
-    } catch { throw new ServiceUnavailableException({ code: "AI_PROVIDER_UNAVAILABLE" }); }
-    if (!response.ok) throw new ServiceUnavailableException({ code: "AI_PROVIDER_UNAVAILABLE" });
+    } catch (error) { throw new ServiceUnavailableException({ code: error !== null && typeof error === "object" && "name" in error && error.name === "TimeoutError"
+      ? "AI_PROVIDER_TIMEOUT" : "AI_PROVIDER_UNAVAILABLE" }); }
+    if (!response.ok) this.unavailable(response);
     let body: { output?: Array<{ type: string; content?: Array<{ type: string; text?: string }> }>;
       usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } };
     try { body = await response.json(); }
@@ -59,8 +68,9 @@ export class AiProviderService {
     let response: Response;
     try { response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(30_000),
-    }); } catch { throw new ServiceUnavailableException({ code: "AI_PROVIDER_UNAVAILABLE" }); }
-    if (!response.ok) throw new ServiceUnavailableException({ code: "AI_PROVIDER_UNAVAILABLE" });
+    }); } catch (error) { throw new ServiceUnavailableException({ code: error !== null && typeof error === "object" && "name" in error && error.name === "TimeoutError"
+      ? "AI_PROVIDER_TIMEOUT" : "AI_PROVIDER_UNAVAILABLE" }); }
+    if (!response.ok) this.unavailable(response);
     let result: { text?: string };
     try { result = await response.json(); }
     catch { throw new ServiceUnavailableException({ code: "AI_PROVIDER_RESPONSE_INVALID" }); }

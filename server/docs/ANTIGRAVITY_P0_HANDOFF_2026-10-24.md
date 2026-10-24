@@ -1,5 +1,7 @@
 # FINDWORK backend P0 integration handoff — 2026-10-24
 
+**Next-sprint update:** [Official ward snapshot, current AI sequence and Freemium gates](./P0_WARD_AI_NEXT_SPRINT_HANDOFF_2026-10-24.md) supersedes the ward and AI readiness statements below. The media contract and prior HTTP evidence remain valid.
+
 Branch `feat/backend-release-integration`; API base `http://127.0.0.1:3002/api/v1`; integration PostgreSQL database `findwork_employer_media_3002`. This document records today's live 3002 evidence. The broader [release contract](./P0_BACKEND_RELEASE_CONTRACT_2026-10-23.md) defines the existing legal and interview APIs. Do not point acceptance scripts at `findwork_dev` or `findwork_test`.
 
 ## P0-01 logo and cover: backend HTTP/storage PASS, browser pending
@@ -17,7 +19,7 @@ Browser example: construct `FormData`, append exactly `file`, and call `apiClien
 
 Today's read-only inspection of company `c49eaf31-68b5-4b33-9b22-02bcce25453b`: logo file and HTTP GET both 197,565 bytes, SHA-256 `0a20ae65d26790bf5260dedb13d730636a133b860b72ced34e3c90b4d3c19b2f`; cover both 105,510 bytes, SHA-256 `043d9251c202d9112bab35e6eee9bcdd3bcf3f2c80e4b878f4ed61e3960e2232`. Both returned HTTP 200, `image/png`, `no-store`, and `Access-Control-Allow-Origin: http://127.0.0.1:5177`. Public company GET returned both relative URLs. `node scripts/accept-isolated-media.cjs` passed upload, repeat GET, replacement, deletion, subsequent 404, and cross-company 403 on a new test-owned company.
 
-After that PASS, two invalid-location assertions were added to the same acceptance script. The immediate rerun stopped at registration with HTTP 429 `RATE_LIMITED` before reaching those assertions. They remain pending a normal throttle reset; the earlier media pass is unaffected. Public reference query validation returned HTTP 400 for `provinceCode=ZZ`.
+The invalid-location assertions have been separated into `accept-isolated-location-validation.cjs`, which reuses an existing employer token and company ID without registration. No reusable token was available during this pass, so authenticated invalid-address HTTP checks remain pending. Public query validation returned HTTP 400 for `provinceCode=ZZ`; the media pass is unaffected.
 
 The separate Frontend checkout currently sets a bare multipart header in `src/services/api/companyWorkspaceApi.ts`, drops `logoUrl`/`coverUrl` in `normalizePublicCompany`, and sets `logo:null`/`cover:null` on the UUID public company detail page. Map and resolve these fields against backend origin. The Employer Profile preview builds the correct URL, but its actual browser request/element state has not been captured. Capture the PUT request boundary/status/body, GET URL/status/MIME, image `src`, and state after F5, replace and delete before marking browser PASS. Keep `127.0.0.1` consistent across frontend and backend.
 
