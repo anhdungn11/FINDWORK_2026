@@ -58,6 +58,14 @@ async function main() {
   if (reloadedProfile.body.description !== "Isolated integration test company profile") {
     throw new Error("Updated company profile did not persist");
   }
+  const invalidProvince = await call("POST", `/companies/${companyId}/locations`, {
+    token: owner, json: { countryCode: "VN", provinceId: randomUUID(), addressLine: "Invalid province" },
+  });
+  expectStatus(invalidProvince, 400, "invalid province location denied");
+  if (invalidProvince.body.code !== "COMPANY_LOCATION_REFERENCE_INVALID") throw new Error("Invalid reference accepted");
+  const emptyLocation = await call("POST", `/companies/${companyId}/locations`, { token: owner, json: {} });
+  expectStatus(emptyLocation, 400, "empty location denied");
+  if (emptyLocation.body.code !== "COMPANY_LOCATION_EMPTY") throw new Error("Empty location accepted");
   const location = await call("POST", `/companies/${companyId}/locations`, {
     token: owner, json: { addressLine: "Isolated integration location" },
   });
