@@ -26,6 +26,21 @@ export const getApiBaseUrl = (): string => {
   return "/api/v1";
 };
 
+export const resolveApiUrl = (pathOrUrl: string | null | undefined): string | null => {
+  if (!pathOrUrl) return null;
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  const baseUrl = getApiBaseUrl();
+  if (/^https?:\/\//i.test(baseUrl)) {
+    try {
+      const origin = new URL(baseUrl).origin;
+      return `${origin}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+    } catch {
+      return pathOrUrl;
+    }
+  }
+  return pathOrUrl;
+};
+
 export const apiClient: AxiosInstance = axios.create({
   baseURL: getApiBaseUrl(),
   withCredentials: true,

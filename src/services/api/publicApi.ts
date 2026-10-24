@@ -164,6 +164,15 @@ export const publicApi = {
       throw toApiFailure(e);
     }
   },
+  async listCountries(signal?: AbortSignal): Promise<Array<{ code: string; name: string; englishName?: string }>> {
+    try {
+      const res = await apiClient.get("/reference/countries", { params: { pageSize: 100 }, signal });
+      const raw = res.data?.data || res.data;
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) {
+      throw toApiFailure(e);
+    }
+  },
   async listProvinces(signal?: AbortSignal): Promise<ProvinceDto[]> {
     try {
       const res = await apiClient.get("/reference/provinces", { params: { pageSize: 100 }, signal });

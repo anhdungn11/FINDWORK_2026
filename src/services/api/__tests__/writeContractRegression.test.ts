@@ -496,7 +496,8 @@ describe("P0-01 Backend API Contract & HTTP Method Regression", () => {
         assert.equal(recordedUrl, `/companies/${companyId}/media/logo`);
         assert.equal(res.kind, "logo");
         assert.equal(res.available, true);
-        assert.ok((recordedConfig as { headers?: Record<string, string> })?.headers?.["Content-Type"]?.includes("multipart/form-data"));
+        // Do not set bare multipart/form-data without boundary: browser/Axios adapter supplies boundary
+        assert.ok(!recordedConfig || !(recordedConfig as { headers?: Record<string, string> })?.headers?.["Content-Type"]);
       } finally {
         apiClient.put = originalPut;
         setWorkspaceWritesForTesting(null);

@@ -23,6 +23,8 @@ import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext"
 import { canManageJobs } from "@/features/company/companyWorkspacePermissions";
 import { Badge } from "@/components/ui";
 import { FindworkAiFloatingWidget } from "@/features/ai/FindworkAiFloatingWidget";
+import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
+import { useI18n } from "@/i18n/i18nStore";
 import styles from "./EmployerLayout.module.css";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -41,6 +43,12 @@ const EmployerLayout = () => {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const { companies, active, setActiveId } = useCompanyWorkspace();
+  const { locale, toggleLocale } = useI18n();
+  const [sidebarLogoError, setSidebarLogoError] = useState(false);
+
+  useEffect(() => {
+    setSidebarLogoError(false);
+  }, [active?.id]);
 
   useEffect(() => setOpen(false), [location.pathname, location.search]);
 
@@ -168,6 +176,28 @@ const EmployerLayout = () => {
 
           <button
             type="button"
+            onClick={toggleLocale}
+            title={locale === "vi" ? "Chuyển sang Tiếng Anh (EN)" : "Switch to Vietnamese (VI)"}
+            style={{
+              padding: "4px 8px",
+              borderRadius: 6,
+              border: "1px solid var(--color-border, #cbd5e1)",
+              background: "transparent",
+              color: "inherit",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "0.8125rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <Globe size={14} />
+            <span>{locale.toUpperCase()}</span>
+          </button>
+
+          <button
+            type="button"
             className={styles.logoutBtn}
             onClick={handleLogout}
             title="Đăng xuất khỏi tài khoản"
@@ -190,7 +220,18 @@ const EmployerLayout = () => {
         >
           {/* COMPANY MINI CARD */}
           <div className={styles.sidebarCompanyCard}>
-            <div className={styles.companyAvatar}>{companyInitials}</div>
+            <div className={styles.companyAvatar} style={{ overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {!sidebarLogoError ? (
+                <img
+                  src={companyWorkspaceApi.getMediaUrl(active.id, "logo")}
+                  alt={active.name}
+                  onError={() => setSidebarLogoError(true)}
+                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                />
+              ) : (
+                companyInitials
+              )}
+            </div>
             <div className={styles.companyDetails}>
               <div className={styles.companyTitle} title={active.name}>
                 {active.name}

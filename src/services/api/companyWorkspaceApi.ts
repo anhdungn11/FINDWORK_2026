@@ -295,11 +295,6 @@ export const companyWorkspaceApi = {
       const res = await apiClient.put<CompanyMediaResponse>(
         `/companies/${encodeURIComponent(companyId)}/media/${kind}`,
         formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        },
       );
       return res.data;
     });
@@ -339,11 +334,6 @@ export const companyWorkspaceApi = {
       const res = await apiClient.post(
         `/companies/${encodeURIComponent(companyId)}/legal/evidence`,
         formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        },
       );
       return unwrapData(res.data) as CompanyLegalEvidenceDto;
     });

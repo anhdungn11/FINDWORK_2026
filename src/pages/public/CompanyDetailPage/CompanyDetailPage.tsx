@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useLocation } from "react-router-dom";
 
 import { parseCompanyId } from "@/app/router/companyId";
+import { resolveApiUrl } from "@/services/http/apiClient";
 import { companies } from "@/data/mock/companies.mock";
 import { publicApi } from "@/services/api/publicApi";
 import { isDemoFixturesAllowed } from "@/config/featureFlags";
@@ -128,8 +129,8 @@ const BackendCompanyDetailPage = ({ companyId }: { companyId: string }) => {
     foundedYear: company.foundedYear || "Chưa cập nhật",
     website: company.website || "Chưa cập nhật",
     isVerified: company.isVerified,
-    logo: null,
-    cover: null,
+    logo: resolveApiUrl(company.logoUrl),
+    cover: resolveApiUrl(company.coverUrl),
   };
 
   return (

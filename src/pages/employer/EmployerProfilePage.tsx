@@ -224,8 +224,8 @@ const EmployerProfilePage = () => {
   // Initialize media flags from profile
   useEffect(() => {
     if (profile.data) {
-      setHasCustomLogo(Boolean(profile.data.logoAssetKey));
-      setHasCustomCover(Boolean(profile.data.coverAssetKey));
+      setHasCustomLogo(Boolean(profile.data.logoAssetKey || profile.data.logoUrl));
+      setHasCustomCover(Boolean(profile.data.coverAssetKey || profile.data.coverUrl));
       setFormValues({
         name: profile.data.name || "",
         legalName: profile.data.legalName || "",
@@ -476,18 +476,20 @@ const EmployerProfilePage = () => {
         setDialogLoading(true);
         try {
           await companyWorkspaceApi.deleteMedia(active.id, kind);
+          const now = Date.now();
           if (isLogo) {
             setHasCustomLogo(false);
-            setLogoBust(Date.now());
+            setLogoBust(now);
           } else {
             setHasCustomCover(false);
-            setCoverBust(Date.now());
+            setCoverBust(now);
           }
           setMediaNotice({
             tone: "ok",
             text: isLogo ? "Đã xóa logo thành công." : "Đã xóa ảnh bìa thành công.",
           });
-          profile.reload();
+          await profile.reload();
+          reloadWorkspace();
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         } catch (err) {
           setMediaNotice({ tone: "error", text: mapMediaError(err) });
@@ -519,29 +521,25 @@ const EmployerProfilePage = () => {
 
     setUploadingKind(kind);
     try {
-      await companyWorkspaceApi.uploadMedia(active.id, kind, file);
-      const now = Date.now();
-      const mediaUrl = companyWorkspaceApi.getMediaUrl(active.id, kind, now);
-
-      // Verify actual bytes can be fetched cleanly
-      try {
-        await fetch(mediaUrl, { cache: "no-store" });
-      } catch {
-        // Fallback gracefully
-      }
-
-      if (kind === "logo") {
-        setHasCustomLogo(true);
-        setLogoBust(now);
+      const res = await companyWorkspaceApi.uploadMedia(active.id, kind, file);
+      if (res && res.available) {
+        const now = Date.now();
+        if (kind === "logo") {
+          setHasCustomLogo(true);
+          setLogoBust(now);
+        } else {
+          setHasCustomCover(true);
+          setCoverBust(now);
+        }
+        setMediaNotice({
+          tone: "ok",
+          text: kind === "logo" ? "Tải lên logo doanh nghiệp thành công." : "Tải lên ảnh bìa doanh nghiệp thành công.",
+        });
+        await profile.reload();
+        reloadWorkspace();
       } else {
-        setHasCustomCover(true);
-        setCoverBust(now);
+        throw new Error("Không nhận được phản hồi khả dụng từ máy chủ.");
       }
-      setMediaNotice({
-        tone: "ok",
-        text: kind === "logo" ? "Tải lên logo doanh nghiệp thành công." : "Tải lên ảnh bìa doanh nghiệp thành công.",
-      });
-      profile.reload();
     } catch (err) {
       setMediaNotice({
         tone: "error",

@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import { Link } from "react-router-dom";
-import { Briefcase, Menu } from "lucide-react";
+import { Briefcase, Menu, Globe } from "lucide-react";
+import { useI18n } from "@/i18n/i18nStore";
 import { CandidateAccountMenu } from "./CandidateAccountMenu";
 import styles from "../styles/CandidateWorkspace.module.css";
 
@@ -15,6 +16,7 @@ export const CandidateHeader = ({
   isMobileDrawerOpen,
   onToggleMobileDrawer,
 }: CandidateHeaderProps) => {
+  const { locale, toggleLocale } = useI18n();
   return (
     <header className={styles.header}>
       <div className={styles.headerLeft}>
@@ -45,6 +47,28 @@ export const CandidateHeader = ({
           <Briefcase size={15} aria-hidden="true" />
           <span className={styles.quickJobText}>Tìm việc làm</span>
         </Link>
+
+        <button
+          type="button"
+          onClick={toggleLocale}
+          title={locale === "vi" ? "Chuyển sang Tiếng Anh (EN)" : "Switch to Vietnamese (VI)"}
+          style={{
+            padding: "4px 8px",
+            borderRadius: 6,
+            border: "1px solid var(--color-border, #cbd5e1)",
+            background: "transparent",
+            color: "inherit",
+            cursor: "pointer",
+            fontWeight: 600,
+            fontSize: "0.8125rem",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <Globe size={14} />
+          <span>{locale.toUpperCase()}</span>
+        </button>
 
         <CandidateAccountMenu />
       </div>

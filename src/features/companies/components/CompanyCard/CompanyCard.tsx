@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { resolveApiUrl } from "@/services/http/apiClient";
 
 import type { Company } from "@/data/mock/companies.mock";
 import type { PublicCompanyDto } from "@/services/api/apiTypes";
@@ -23,6 +25,9 @@ interface CompanyCardProps {
 }
 
 const CompanyCard = ({ company }: CompanyCardProps) => {
+  const [imgError, setImgError] = useState(false);
+  const rawLogo = "logoUrl" in company && company.logoUrl ? company.logoUrl : "logo" in company && typeof company.logo === "string" ? company.logo : null;
+  const logoUrl = resolveApiUrl(rawLogo);
   const industryText =
     typeof company.industry === "string"
       ? company.industry
@@ -45,7 +50,16 @@ const CompanyCard = ({ company }: CompanyCardProps) => {
         className={styles.cardLink}
       >
         <div className={styles.logo}>
-          {company.name.charAt(0)}
+          {logoUrl && !imgError ? (
+            <img
+              src={logoUrl}
+              alt={company.name}
+              onError={() => setImgError(true)}
+              style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "inherit" }}
+            />
+          ) : (
+            company.name.charAt(0)
+          )}
         </div>
 
         <div className={styles.content}>

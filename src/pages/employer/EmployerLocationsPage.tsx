@@ -25,6 +25,7 @@ const EmployerLocationsPage = () => {
   const { active } = useCompanyWorkspace();
   const locations = useAsyncData((s) => companyWorkspaceApi.listLocations(active.id, s), [active.id]);
   const provinces = useAsyncData((s) => publicApi.listProvinces(s), []);
+  const countries = useAsyncData((s) => publicApi.listCountries(s), []);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingLocation, setEditingLocation] = useState<CompanyLocationDto | null>(null);
@@ -340,14 +341,35 @@ const EmployerLocationsPage = () => {
                   disabled={submitting}
                 >
                   <option value="VN">Việt Nam (VN)</option>
+                  {(countries.data || []).filter((c) => c.code !== "VN").map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name} ({c.code})
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* SEARCHABLE PROVINCE SELECTOR */}
               <div className={ui.field}>
-                <label className={ui.label} htmlFor="loc-province">
-                  Tỉnh / Thành phố *
-                </label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label className={ui.label} htmlFor="loc-province">
+                    Tỉnh / Thành phố *
+                  </label>
+                  <span className={ui.hint} style={{ fontSize: "0.75rem" }}>
+                    {filteredProvinces.length} lựa chọn
+                  </span>
+                </div>
+                <div style={{ position: "relative", marginBottom: 6 }}>
+                  <input
+                    type="text"
+                    className={ui.input}
+                    placeholder="Lọc tỉnh/thành phố..."
+                    value={provinceSearch}
+                    onChange={(e) => setProvinceSearch(e.target.value)}
+                    style={{ fontSize: "0.85rem", padding: "6px 10px" }}
+                    aria-label="Lọc danh sách tỉnh thành"
+                  />
+                </div>
                 {provinces.loading ? (
                   <div className={ui.hint} style={{ padding: "8px 0" }}>Đang tải 34 tỉnh thành...</div>
                 ) : (
@@ -399,9 +421,24 @@ const EmployerLocationsPage = () => {
                       </option>
                     ))}
                   </select>
+                ) : selectedProvinceId ? (
+                  <div
+                    style={{
+                      padding: "8px 10px",
+                      background: "#fffbeb",
+                      border: "1px solid #fef3c7",
+                      borderRadius: 6,
+                      fontSize: "0.8125rem",
+                      color: "#92400e",
+                      lineHeight: 1.4,
+                    }}
+                    role="status"
+                  >
+                    <strong>Thông báo hệ thống danh mục:</strong> Dữ liệu phường/xã chưa có trong cơ sở dữ liệu (0 kết quả từ API <code>/reference/wards</code>). Quý doanh nghiệp vui lòng ghi rõ phường/xã tại ô địa chỉ chi tiết bên dưới.
+                  </div>
                 ) : (
                   <div style={{ padding: "8px 10px", background: "var(--color-surface-soft, #f8fafc)", borderRadius: 6, border: "1px dashed var(--color-border, #cbd5e1)", fontSize: "0.8125rem", color: "var(--color-text-secondary, #64748b)" }}>
-                    {selectedProvinceId ? "Danh mục phường/xã chính thức đang cập nhật từ hệ thống (0 dữ liệu). Ghi rõ phường/xã tại ô bên dưới." : "Vui lòng chọn Tỉnh/Thành phố trước."}
+                    Vui lòng chọn Tỉnh/Thành phố trước.
                   </div>
                 )}
               </div>
@@ -483,14 +520,35 @@ const EmployerLocationsPage = () => {
                   disabled={submitting}
                 >
                   <option value="VN">Việt Nam (VN)</option>
+                  {(countries.data || []).filter((c) => c.code !== "VN").map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name} ({c.code})
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* SEARCHABLE PROVINCE SELECTOR */}
               <div className={ui.field}>
-                <label className={ui.label} htmlFor="edit-loc-province">
-                  Tỉnh / Thành phố
-                </label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label className={ui.label} htmlFor="edit-loc-province">
+                    Tỉnh / Thành phố
+                  </label>
+                  <span className={ui.hint} style={{ fontSize: "0.75rem" }}>
+                    {editFilteredProvinces.length} lựa chọn
+                  </span>
+                </div>
+                <div style={{ position: "relative", marginBottom: 6 }}>
+                  <input
+                    type="text"
+                    className={ui.input}
+                    placeholder="Lọc tỉnh/thành phố..."
+                    value={editProvinceSearch}
+                    onChange={(e) => setEditProvinceSearch(e.target.value)}
+                    style={{ fontSize: "0.85rem", padding: "6px 10px" }}
+                    aria-label="Lọc danh sách tỉnh thành chỉnh sửa"
+                  />
+                </div>
                 {provinces.loading ? (
                   <div className={ui.hint} style={{ padding: "8px 0" }}>Đang tải danh mục...</div>
                 ) : (
@@ -536,9 +594,24 @@ const EmployerLocationsPage = () => {
                       </option>
                     ))}
                   </select>
+                ) : editProvinceId ? (
+                  <div
+                    style={{
+                      padding: "8px 10px",
+                      background: "#fffbeb",
+                      border: "1px solid #fef3c7",
+                      borderRadius: 6,
+                      fontSize: "0.8125rem",
+                      color: "#92400e",
+                      lineHeight: 1.4,
+                    }}
+                    role="status"
+                  >
+                    <strong>Thông báo hệ thống danh mục:</strong> Dữ liệu phường/xã chưa có trong cơ sở dữ liệu (0 kết quả từ API <code>/reference/wards</code>). Quý doanh nghiệp vui lòng ghi rõ phường/xã tại ô địa chỉ chi tiết bên dưới.
+                  </div>
                 ) : (
                   <div style={{ padding: "8px 10px", background: "var(--color-surface-soft, #f8fafc)", borderRadius: 6, border: "1px dashed var(--color-border, #cbd5e1)", fontSize: "0.8125rem", color: "var(--color-text-secondary, #64748b)" }}>
-                    {editProvinceId ? "Danh mục phường/xã đang cập nhật từ hệ thống (0 dữ liệu). Ghi rõ phường/xã tại ô bên dưới." : "Vui lòng chọn Tỉnh/Thành phố trước."}
+                    Vui lòng chọn Tỉnh/Thành phố trước.
                   </div>
                 )}
               </div>

@@ -127,6 +127,10 @@ export interface CompanyProfileDto {
   foundedYear: number | null;
   verificationStatus: string | null;
   status: string | null;
+  logoAssetKey?: string | null;
+  coverAssetKey?: string | null;
+  logoUrl?: string | null;
+  coverUrl?: string | null;
 }
 
 export type CompanyMediaKind = "logo" | "cover";
@@ -272,6 +276,8 @@ export interface PublicCompanyDto {
     ward: { id: string; code: string; name: string } | null;
   } | null;
   jobsCount: number;
+  logoUrl?: string | null;
+  coverUrl?: string | null;
 }
 
 export interface PublicCompanyQuery {
@@ -500,6 +506,10 @@ export function normalizeCompanyProfile(value: unknown): CompanyProfileDto {
     foundedYear: num(r.foundedYear),
     verificationStatus: str(r.verificationStatus),
     status: str(r.status),
+    logoAssetKey: str(r.logoAssetKey),
+    coverAssetKey: str(r.coverAssetKey),
+    logoUrl: str(r.logoUrl) ?? (r.logoAssetKey ? `/companies/${str(r.id)}/media/logo` : null),
+    coverUrl: str(r.coverUrl) ?? (r.coverAssetKey ? `/companies/${str(r.id)}/media/cover` : null),
   };
 }
 
@@ -608,6 +618,8 @@ export function normalizePublicCompany(value: unknown): PublicCompanyDto {
       } : null,
     } : null,
     jobsCount: num(r.jobsCount) ?? (typeof r._count === "object" && r._count !== null && "jobs" in r._count ? num((r._count as Record<string, unknown>).jobs) ?? 0 : 0),
+    logoUrl: str(r.logoUrl) ?? (r.logoAssetKey ? `/companies/${str(r.id)}/media/logo` : null),
+    coverUrl: str(r.coverUrl) ?? (r.coverAssetKey ? `/companies/${str(r.id)}/media/cover` : null),
   };
 }
 
