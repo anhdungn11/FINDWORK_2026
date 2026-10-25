@@ -197,6 +197,11 @@ describe("jobs MVP ownership and publication", () => {
         salaryMax: { gte: "10000000" }, salaryMin: { lte: "20000000", not: null },
       }),
     }));
+    const listedWhere = db.job.findMany.mock.calls[0][0].where;
+    const countedWhere = db.job.count.mock.calls[0][0].where;
+    expect(countedWhere).toEqual(listedWhere);
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Array),
+      { isolationLevel: "RepeatableRead" });
     expect(result.pagination).toEqual({ page: 2, pageSize: 10, total: 23, totalPages: 3 });
     expect(result.data[0]?.company).toEqual({ id: companyId, name: "Demo", slug: "demo",
       logoUrl: `/api/v1/companies/${companyId}/media/logo` });

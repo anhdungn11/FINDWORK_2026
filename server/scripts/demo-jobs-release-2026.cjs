@@ -132,13 +132,17 @@ async function main() {
   }).map((job) => job.key);
   const pending = catalog.jobs.filter((job) => !existingByTitle.has(job.title));
   const preview = { mode, database: "findwork_employer_media_3002/public", companyId: companyId || null,
-    company,
+    company, affectedCompanyIds: pending.length && companyId ? [companyId] : [],
+    provinceOnlyLocations: catalog.jobs.filter((job) => !job.wardCode).length,
     sourceSha256, count: catalog.jobs.length, alreadyPublished: catalog.jobs.length - pending.length,
     pending: pending.length, missingCategories, missingProvinces, conflicts,
     jobs: catalog.jobs.map(({ key, title, categoryCode, provinceCode, employmentType, workplaceType, salaryMin, salaryMax }) =>
       ({ key, title, categoryCode, provinceCode, employmentType, workplaceType, salaryMin, salaryMax })) };
   if (mode === "--dry-run") { console.log(JSON.stringify(preview, null, 2)); return; }
   if (missingCategories.length || missingProvinces.length || conflicts.length) throw new Error("Dry-run conflicts must be resolved before apply");
+  if (!company || company.status !== "ACTIVE" || company.activeOwnerMembers < 1) {
+    throw new Error("Selected company must be active and retain an active OWNER member");
+  }
   if (process.env.FINDWORK_DEMO_APPROVED !== "YES" ||
       process.env.FINDWORK_DEMO_APPROVED_SHA256 !== sourceSha256 ||
       !companyId || !process.env.FINDWORK_DEMO_OWNER_TOKEN) {
