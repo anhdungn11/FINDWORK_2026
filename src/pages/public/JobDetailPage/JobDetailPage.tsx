@@ -54,6 +54,8 @@ const BackendJobDetailPage = ({ jobId }: { jobId: string }) => {
           id: dto.id,
           title: dto.title,
           company: dto.companyName || "Doanh nghiệp",
+          companyId: dto.companyId || null,
+          companySlug: dto.companySlug || null,
           companyLogoUrl: dto.companyLogoUrl || null,
           category: dto.categoryName || "Chung",
           skills: [],

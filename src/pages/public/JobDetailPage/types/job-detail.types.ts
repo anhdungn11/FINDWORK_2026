@@ -12,4 +12,6 @@ import type {
  */
 export type JobDetailRecord = JobRecord & {
   companyLogoUrl?: string | null;
+  companyId?: string | null;
+  companySlug?: string | null;
 };

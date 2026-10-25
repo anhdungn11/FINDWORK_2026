@@ -48,7 +48,7 @@ const FeaturedJobs = () => {
             company: dto.companyName || (locale === "en" ? "Employer" : "Doanh nghiệp"),
             category: dto.categoryName || (locale === "en" ? "General" : "Chung"),
             skills: [],
-            location: locale === "en" ? "Vietnam" : "Việt Nam",
+            location: dto.locations?.[0]?.province?.name || (locale === "en" ? "Vietnam" : "Việt Nam"),
             workplace: dto.workplaceType
               ? WORKPLACE_TYPE_LABEL[dto.workplaceType]
               : (locale === "en" ? "On-site" : "Tại văn phòng"),
