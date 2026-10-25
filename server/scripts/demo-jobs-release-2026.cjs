@@ -33,6 +33,11 @@ function verifySource() {
   for (const job of catalog.jobs) {
     assert.ok(job.title.startsWith("[DEMO FINDWORK] "));
     assert.ok(job.description.startsWith(catalog.disclaimer));
+    assert.ok(job.title.length <= 220);
+    assert.ok(job.description.length >= 20 && job.description.length <= 20_000);
+    assert.match(job.provinceCode, /^\d{2}$/);
+    assert.match(job.salaryMin, /^\d{1,17}(?:\.\d{1,2})?$/);
+    assert.match(job.salaryMax, /^\d{1,17}(?:\.\d{1,2})?$/);
     assert.ok(Number(job.salaryMin) <= Number(job.salaryMax));
     assert.ok(["FULL_TIME", "PART_TIME", "CONTRACT"].includes(job.employmentType));
     assert.ok(["ONSITE", "HYBRID", "REMOTE"].includes(job.workplaceType));
@@ -86,7 +91,12 @@ async function main() {
     categories = (await db.query('SELECT id, code FROM "JobCategory" WHERE "isActive"=true')).rows;
     provinces = (await db.query('SELECT id, code FROM "Province" WHERE "isActive"=true')).rows;
     if (companyId) {
-      existing = (await db.query('SELECT title, description, status FROM "Job" WHERE "companyId"=$1', [companyId])).rows;
+      existing = (await db.query(`SELECT j.id, j.title, j.description, j.status,
+        j."categoryId", j."employmentType", j."workplaceType", j."salaryMin", j."salaryMax",
+        j.currency, j."salaryPeriod", j."showSalary", j."salaryNegotiable",
+        (SELECT p.code FROM "JobLocation" l JOIN "Province" p ON p.id=l."provinceId"
+         WHERE l."jobId"=j.id AND l."isPrimary"=true ORDER BY l.id LIMIT 1) AS "provinceCode"
+        FROM "Job" j WHERE j."companyId"=$1`, [companyId])).rows;
     }
     await db.query("ROLLBACK");
   } finally { await db.end(); }
@@ -94,10 +104,21 @@ async function main() {
   const provinceByCode = new Map(provinces.map((row) => [row.code, row.id]));
   const missingCategories = [...new Set(catalog.jobs.map((job) => job.categoryCode).filter((code) => !categoryByCode.has(code)))];
   const missingProvinces = [...new Set(catalog.jobs.map((job) => job.provinceCode).filter((code) => !provinceByCode.has(code)))];
-  const existingByTitle = new Map(existing.map((row) => [row.title, row]));
+  const existingByTitle = new Map();
+  for (const row of existing) {
+    const rows = existingByTitle.get(row.title) || [];
+    rows.push(row);
+    existingByTitle.set(row.title, rows);
+  }
+  const matchesPublished = (job, row) => row.status === "PUBLISHED" &&
+    row.description === job.description && row.categoryId === categoryByCode.get(job.categoryCode) &&
+    row.employmentType === job.employmentType && row.workplaceType === job.workplaceType &&
+    Number(row.salaryMin) === Number(job.salaryMin) && Number(row.salaryMax) === Number(job.salaryMax) &&
+    row.currency === "VND" && row.salaryPeriod === "MONTH" &&
+    row.showSalary === true && row.salaryNegotiable === false && row.provinceCode === job.provinceCode;
   const conflicts = catalog.jobs.filter((job) => {
-    const row = existingByTitle.get(job.title);
-    return row && (row.description !== job.description || row.status !== "PUBLISHED");
+    const rows = existingByTitle.get(job.title) || [];
+    return rows.length > 1 || (rows.length === 1 && !matchesPublished(job, rows[0]));
   }).map((job) => job.key);
   const pending = catalog.jobs.filter((job) => !existingByTitle.has(job.title));
   const preview = { mode, database: "findwork_employer_media_3002/public", companyId: companyId || null,

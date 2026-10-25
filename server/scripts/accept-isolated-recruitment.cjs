@@ -82,9 +82,12 @@ async function main() {
     const categoryId = categories.data.find((row) => row.code === "software-development")?.id;
     if (!categoryId) throw new Error("Demo software-development category missing");
     await request("GET", `/companies/${companyId}/jobs?pageSize=1`, undefined, undefined, 401);
+    await request("GET", `/companies/${companyId}/jobs?pageSize=1`, candidateToken, undefined, 403);
+    await request("GET", `/candidate/resumes/${resumeId}`, employerToken, undefined, 403);
     console.log(JSON.stringify({ mode, api, database: before.database, schema: before.schema,
       before: { jobs: before.jobs, applications: before.applications }, owner: "PASS", readyResumeVersion: "PASS",
-      anonymousCompanyRead: 401, category: "software-development" }));
+      anonymousCompanyRead: 401, candidateCompanyRead: 403, employerCandidateResumeRead: 403,
+      category: "software-development" }));
     if (mode === "--preflight") return;
     if (process.env.FINDWORK_RECRUITMENT_APPROVED !== "YES") throw new Error("Run requires explicit user approval gate");
     verifyBackup();
@@ -118,6 +121,10 @@ async function main() {
       coverLetter: "Bài ứng tuyển thử được chủ tài khoản Candidate chấp thuận.", answers: [],
     }, 201);
     assert.equal(applied.status, "SUBMITTED");
+    await request("POST", `/jobs/${created.id}/applications`, candidateToken, {
+      resumeId, resumeVersionId, details: { contact: candidateContact, availability: "immediately", preferredContactMethod: "email" },
+      answers: [],
+    }, 409);
     const employerList = await request("GET", `/companies/${companyId}/jobs/${created.id}/applications`, employerToken, undefined, 200);
     assert.ok(employerList.data.some((row) => row.id === applied.id));
     const employerDetail = await request("GET", `/companies/${companyId}/jobs/${created.id}/applications/${applied.id}`,
@@ -138,16 +145,18 @@ async function main() {
     await db.query("BEGIN READ ONLY");
     const rows = (await db.query(`SELECT j.status AS job_status, j."publishedAt" IS NOT NULL AS published,
       a.status AS application_status, a."resumeVersionId"=$3::uuid AS version_matches,
-      (SELECT count(*)::int FROM "ApplicationStatusHistory" h WHERE h."applicationId"=a.id) AS history_count
+      (SELECT count(*)::int FROM "ApplicationStatusHistory" h WHERE h."applicationId"=a.id) AS history_count,
+      (SELECT count(*)::int FROM "Application" duplicate_check WHERE duplicate_check."jobId"=j.id) AS job_application_count
       FROM "Job" j JOIN "Application" a ON a."jobId"=j.id WHERE j.id=$1::uuid AND a.id=$2::uuid`,
       [created.id, applied.id, resumeVersionId])).rows;
     await db.query("ROLLBACK");
     assert.deepEqual(rows[0], { job_status: "CLOSED", published: true, application_status: "REVIEWING",
-      version_matches: true, history_count: 2 });
+      version_matches: true, history_count: 2, job_application_count: 1 });
     console.log(JSON.stringify({ status: "PASS", jobId: created.id, applicationId: applied.id,
       publicListed: true, savedAndUnsaved: true, employerReview: 200, candidateFreshRead: 200,
       jobFinalStatus: rows[0].job_status, applicationFinalStatus: rows[0].application_status,
-      historyCount: rows[0].history_count }));
+      historyCount: rows[0].history_count, duplicateApplication: 409,
+      jobApplicationCount: rows[0].job_application_count }));
   } finally { await db.end(); }
 }
 main().catch((error) => { console.error(`RECRUITMENT_ACCEPTANCE_BLOCKED ${error.message}`); process.exitCode = 1; });
