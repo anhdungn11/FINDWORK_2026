@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
+import {
+  APPLICATION_STATUS_LABEL,
+  type ApplicationStatus,
+  type ApplicationReviewStatus,
+} from "../../../services/api/apiTypes.ts";
 
 describe("Final Accelerated Frontend Release Sprint P0 & P1 Regression", () => {
   it("JobsFilterBar uses exact Backend query parameter names and ONSITE workplace type", () => {
@@ -137,5 +142,62 @@ describe("Final Accelerated Frontend Release Sprint P0 & P1 Regression", () => {
       aiModalSrc.includes("Chưa mở bán (Thanh toán chưa khả dụng)"),
       "AiAssistantModal must display honest unpurchasable state for paid tiers"
     );
+    assert.ok(
+      aiModalSrc.includes("CHƯA được ban hành chính thức"),
+      "AiAssistantModal must explicitly disclose that prices are not yet officially approved"
+    );
+  });
+
+  it("AppRouter defines canonical /candidate/saved-jobs route and provides alias redirect for /candidate/savedJobs", () => {
+    const routerSrc = readFileSync(
+      new URL("../AppRouter.tsx", import.meta.url),
+      "utf8"
+    );
+
+    assert.ok(
+      routerSrc.includes('path="saved-jobs"'),
+      "AppRouter must declare canonical path='saved-jobs'"
+    );
+    assert.ok(
+      routerSrc.includes('path="savedJobs"'),
+      "AppRouter must declare path='savedJobs' redirect"
+    );
+    assert.ok(
+      routerSrc.includes('to="/candidate/saved-jobs" replace'),
+      "savedJobs route must redirect to /candidate/saved-jobs with replace"
+    );
+  });
+
+  it("Applicant statuses in frontend exactly match Backend REVIEW_STATUSES and APPLICATION_STATUSES", () => {
+    const expectedStatuses: ApplicationStatus[] = [
+      "SUBMITTED",
+      "REVIEWING",
+      "SHORTLISTED",
+      "INTERVIEW",
+      "OFFERED",
+      "REJECTED",
+      "WITHDRAWN",
+    ];
+
+    const expectedReviewStatuses: ApplicationReviewStatus[] = [
+      "REVIEWING",
+      "SHORTLISTED",
+      "INTERVIEW",
+      "OFFERED",
+      "REJECTED",
+    ];
+
+    for (const status of expectedStatuses) {
+      assert.ok(
+        APPLICATION_STATUS_LABEL[status],
+        `APPLICATION_STATUS_LABEL must have human label for ${status}`
+      );
+    }
+
+    assert.equal(APPLICATION_STATUS_LABEL["REVIEWING"], "Đang xem xét");
+    assert.equal(APPLICATION_STATUS_LABEL["SHORTLISTED"], "Đạt sơ tuyển");
+    assert.equal(APPLICATION_STATUS_LABEL["INTERVIEW"], "Phỏng vấn");
+    assert.equal(APPLICATION_STATUS_LABEL["OFFERED"], "Đã gửi offer");
+    assert.equal(APPLICATION_STATUS_LABEL["REJECTED"], "Đã từ chối");
   });
 });

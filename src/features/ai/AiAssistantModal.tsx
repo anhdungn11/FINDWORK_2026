@@ -871,7 +871,7 @@ export const AiAssistantModal = ({
                     Lộ trình P1
                   </span>
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#0369a1" }}>99.000đ <span style={{ fontSize: 11, fontWeight: 400 }}>/ tháng</span></div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#0369a1" }}>Sắp ra mắt <span style={{ fontSize: 11, fontWeight: 400, color: "#0284c7" }}>(Mức giá dự kiến chưa phê duyệt)</span></div>
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#0369a1", lineHeight: 1.6 }}>
                   <li>Tối ưu bố cục CV theo chuẩn ATS</li>
                   <li>Phân tích mức độ phù hợp với JD</li>
@@ -918,7 +918,7 @@ export const AiAssistantModal = ({
                     Lộ trình P1
                   </span>
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#4338ca" }}>499.000đ <span style={{ fontSize: 11, fontWeight: 400 }}>/ cty / tháng</span></div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#4338ca" }}>Sắp ra mắt <span style={{ fontSize: 11, fontWeight: 400, color: "#6366f1" }}>(Mức giá dự kiến chưa phê duyệt)</span></div>
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#4338ca", lineHeight: 1.6 }}>
                   <li>Tự động soạn thảo JD chuẩn ngành</li>
                   <li>Sinh bộ câu hỏi sàng lọc ứng viên</li>
@@ -949,7 +949,7 @@ export const AiAssistantModal = ({
             </div>
 
             <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, backgroundColor: "#fffbeb", border: "1px solid #fde68a", fontSize: 11, color: "#92400e" }}>
-              <strong>Lưu ý minh bạch:</strong> FINDWORK không giả lập giao dịch mua gói hoặc kết quả AI phản hồi tự tạo. Cổng thanh toán trực tuyến sẽ được kết nối sau khi hoàn thiện kiểm thử tuyển dụng P0.
+              <strong>Lưu ý minh bạch:</strong> Bảng giá trên chỉ mang tính chất minh họa theo đề xuất lộ trình P1 và CHƯA được ban hành chính thức. FINDWORK không kích hoạt cổng thanh toán hay tạo giao dịch giả mạo khi chưa có phê duyệt chính thức.
             </div>
           </div>
         )}
