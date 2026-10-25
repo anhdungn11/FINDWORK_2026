@@ -88,7 +88,7 @@ const EmployerMembersPage = () => {
     setInviting(true);
     try {
       await companyWorkspaceApi.createInvitation(active.id, email);
-      setNotice({ tone: "ok", text: `Đã gửi lời mời tham gia quản trị nội bộ thành công tới "${email}".` });
+      setNotice({ tone: "ok", text: `Lời mời tham gia đã được tạo và đưa vào hàng đợi gửi email tới "${email}".` });
       setInviteEmail("");
       invitations.reload();
     } catch (err) {

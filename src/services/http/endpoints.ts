@@ -7,6 +7,10 @@ export const API_ENDPOINTS = {
     LOGOUT: "/auth/logout",
     ME: "/auth/me",
   },
+  EMAIL_VERIFICATION: {
+    REQUEST: "/auth/email-verification/request",
+    CONFIRM: "/auth/email-verification/confirm",
+  },
   CANDIDATE: {
     BOOTSTRAP: "/candidate/bootstrap",
     PROFILE: "/candidate/profile",
