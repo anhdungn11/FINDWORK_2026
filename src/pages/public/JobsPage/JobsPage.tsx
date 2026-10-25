@@ -36,7 +36,7 @@ export const JobsPage = () => {
   const pageSizeParam = parseInt(searchParams.get("pageSize") || "12", 10);
   const pageSize = Number.isSafeInteger(pageSizeParam) && pageSizeParam >= 1 && pageSizeParam <= 100 ? pageSizeParam : PAGE_SIZE;
   const keyword = searchParams.get("q") || "";
-  const provinceCode = searchParams.get("province") || "";
+  const provinceCode = searchParams.get("province") || searchParams.get("provinceCode") || "";
   const categoryCode = searchParams.get("category") || searchParams.get("categoryCode") || "";
   const workplaceType = searchParams.get("workplace") || searchParams.get("workplaceType") || "";
   const employmentType = searchParams.get("type") || searchParams.get("employmentType") || "";

@@ -22,9 +22,10 @@ const POPULAR_PROVINCES = [
   { code: "01", name: "Hà Nội" },
   { code: "79", name: "TP. Hồ Chí Minh" },
   { code: "48", name: "Đà Nẵng" },
-  { code: "74", name: "Bình Dương" },
+  { code: "31", name: "Hải Phòng" },
   { code: "24", name: "Bắc Ninh" },
   { code: "75", name: "Đồng Nai" },
+  { code: "92", name: "Cần Thơ" },
 ];
 
 export const JobsFilterBar = ({
