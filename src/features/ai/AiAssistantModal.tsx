@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Sparkles,
+  CreditCard,
   Send,
   Trash2,
   X,
@@ -71,6 +72,7 @@ export const AiAssistantModal = ({
 
   // Layout & UI mode
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
   const [showHistorySidebar, setShowHistorySidebar] = useState(false);
   const [activeCategory, setActiveCategory] = useState<PromptCategory>("ALL");
 
@@ -593,7 +595,11 @@ export const AiAssistantModal = ({
                     letterSpacing: "-0.01em",
                   }}
                 >
-                  FINDWORK AI
+                  {user?.accountType === "EMPLOYER"
+                    ? "BUSINESS AI"
+                    : user?.accountType === "CANDIDATE"
+                    ? "CANDIDATE PRO AI"
+                    : "FINDWORK AI"}
                 </h2>
                 <span
                   style={{
@@ -601,12 +607,16 @@ export const AiAssistantModal = ({
                     fontWeight: 600,
                     padding: "2px 6px",
                     borderRadius: 999,
-                    backgroundColor: "rgba(14, 165, 233, 0.2)",
-                    color: "#38bdf8",
-                    border: "1px solid rgba(56, 189, 248, 0.3)",
+                    backgroundColor: user?.accountType === "EMPLOYER" ? "rgba(99, 102, 241, 0.25)" : "rgba(14, 165, 233, 0.2)",
+                    color: user?.accountType === "EMPLOYER" ? "#a5b4fc" : "#38bdf8",
+                    border: user?.accountType === "EMPLOYER" ? "1px solid rgba(165, 180, 252, 0.3)" : "1px solid rgba(56, 189, 248, 0.3)",
                   }}
                 >
-                  Trợ lý Thông minh
+                  {user?.accountType === "EMPLOYER"
+                    ? "Doanh nghiệp (Company-scoped)"
+                    : user?.accountType === "CANDIDATE"
+                    ? "Ứng viên (Candidate Pro)"
+                    : "Gói Miễn Phí"}
                 </span>
               </div>
               <p
@@ -616,14 +626,39 @@ export const AiAssistantModal = ({
                   margin: "2px 0 0",
                 }}
               >
-                {isAuthenticated
-                  ? `Đang đăng nhập (${user?.email})`
+                {user?.accountType === "EMPLOYER"
+                  ? `Không gian tuyển dụng doanh nghiệp (${user?.email})`
+                  : user?.accountType === "CANDIDATE"
+                  ? `Trợ lý sự nghiệp & CV cá nhân (${user?.email})`
                   : "Chế độ Khách (Guest Session — Không bắt buộc tài khoản)"}
               </p>
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            {/* Pricing / Product Tier Button */}
+            <button
+              type="button"
+              onClick={() => setShowPricingModal((prev) => !prev)}
+              title="Xem thông tin các gói sản phẩm AI & lộ trình"
+              style={{
+                padding: "6px 10px",
+                borderRadius: 6,
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                backgroundColor: showPricingModal ? "rgba(14, 165, 233, 0.3)" : "rgba(255, 255, 255, 0.08)",
+                color: "#f8fafc",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              <CreditCard size={14} />
+              <span>Gói AI</span>
+            </button>
+
             {/* New Conversation Button */}
             <button
               type="button"
@@ -733,6 +768,189 @@ export const AiAssistantModal = ({
                 Hạn phiên: {new Date(guestSession.expiresAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
+          </div>
+        )}
+
+        {/* ================= PRICING / PRODUCT ROADMAP VIEW ================= */}
+        {showPricingModal && (
+          <div
+            style={{
+              padding: "16px 20px",
+              backgroundColor: "#f8fafc",
+              borderBottom: "1px solid #e2e8f0",
+              overflowY: "auto",
+              maxHeight: "60vh",
+              zIndex: 10,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                  Bảng giá & Phân biệt Sản phẩm AI FINDWORK
+                </h3>
+                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>
+                  Minh bạch tuyệt đối: Thanh toán trực tuyến đang trong lộ trình phát triển.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPricingModal(false)}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  backgroundColor: "#ffffff",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+              {/* Free Plan */}
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 12,
+                  border: "1px solid #e2e8f0",
+                  backgroundColor: "#ffffff",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Gói Cơ Bản (Free)</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 999, backgroundColor: "#dcfce7", color: "#15803d" }}>
+                    Khả dụng
+                  </span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>0đ</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#64748b", lineHeight: 1.6 }}>
+                  <li>Tra cứu thông tin tuyển dụng FINDWORK</li>
+                  <li>Cẩm nang gợi ý phỏng vấn chung</li>
+                  <li>Dành cho cả tài khoản Khách & Đăng ký</li>
+                </ul>
+                <div style={{ marginTop: "auto", paddingTop: 8 }}>
+                  <button
+                    type="button"
+                    disabled
+                    style={{
+                      width: "100%",
+                      padding: "6px 0",
+                      borderRadius: 6,
+                      border: "1px solid #cbd5e1",
+                      backgroundColor: "#f1f5f9",
+                      color: "#475569",
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Đang áp dụng
+                  </button>
+                </div>
+              </div>
+
+              {/* Candidate AI Pro */}
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 12,
+                  border: "1px solid #bae6fd",
+                  backgroundColor: "#f0f9ff",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#0369a1" }}>Candidate AI Pro</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 999, backgroundColor: "#e0f2fe", color: "#0284c7" }}>
+                    Lộ trình P1
+                  </span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#0369a1" }}>99.000đ <span style={{ fontSize: 11, fontWeight: 400 }}>/ tháng</span></div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#0369a1", lineHeight: 1.6 }}>
+                  <li>Tối ưu bố cục CV theo chuẩn ATS</li>
+                  <li>Phân tích mức độ phù hợp với JD</li>
+                  <li>Luyện phỏng vấn chuyên sâu cá nhân hóa</li>
+                  <li>Không áp dụng cho tài khoản Doanh nghiệp</li>
+                </ul>
+                <div style={{ marginTop: "auto", paddingTop: 8 }}>
+                  <button
+                    type="button"
+                    disabled
+                    title="Cổng thanh toán chưa kích hoạt"
+                    style={{
+                      width: "100%",
+                      padding: "6px 0",
+                      borderRadius: 6,
+                      border: "1px dashed #7dd3fc",
+                      backgroundColor: "#e0f2fe",
+                      color: "#0369a1",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "not-allowed",
+                    }}
+                  >
+                    Chưa mở bán (Thanh toán chưa khả dụng)
+                  </button>
+                </div>
+              </div>
+
+              {/* Employer Business AI */}
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 12,
+                  border: "1px solid #c7d2fe",
+                  backgroundColor: "#eef2ff",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#4338ca" }}>Employer Business AI</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 999, backgroundColor: "#e0e7ff", color: "#4f46e5" }}>
+                    Lộ trình P1
+                  </span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#4338ca" }}>499.000đ <span style={{ fontSize: 11, fontWeight: 400 }}>/ cty / tháng</span></div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#4338ca", lineHeight: 1.6 }}>
+                  <li>Tự động soạn thảo JD chuẩn ngành</li>
+                  <li>Sinh bộ câu hỏi sàng lọc ứng viên</li>
+                  <li>Phân quyền theo tổ chức doanh nghiệp</li>
+                  <li>Độc lập, không dùng chung với gói Ứng viên</li>
+                </ul>
+                <div style={{ marginTop: "auto", paddingTop: 8 }}>
+                  <button
+                    type="button"
+                    disabled
+                    title="Cổng thanh toán chưa kích hoạt"
+                    style={{
+                      width: "100%",
+                      padding: "6px 0",
+                      borderRadius: 6,
+                      border: "1px dashed #a5b4fc",
+                      backgroundColor: "#e0e7ff",
+                      color: "#4338ca",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "not-allowed",
+                    }}
+                  >
+                    Chưa mở bán (Thanh toán chưa khả dụng)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, backgroundColor: "#fffbeb", border: "1px solid #fde68a", fontSize: 11, color: "#92400e" }}>
+              <strong>Lưu ý minh bạch:</strong> FINDWORK không giả lập giao dịch mua gói hoặc kết quả AI phản hồi tự tạo. Cổng thanh toán trực tuyến sẽ được kết nối sau khi hoàn thiện kiểm thử tuyển dụng P0.
+            </div>
           </div>
         )}
 

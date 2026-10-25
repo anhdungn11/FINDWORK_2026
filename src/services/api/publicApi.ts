@@ -204,9 +204,26 @@ export const publicApi = {
   async listWards(provinceCode: string, signal?: AbortSignal): Promise<WardDto[]> {
     try {
       if (!provinceCode) return [];
-      const res = await apiClient.get("/reference/wards", { params: { provinceCode, pageSize: 100 }, signal });
+      const res = await apiClient.get("/reference/wards", { params: { provinceCode, pageSize: 100, page: 1 }, signal });
       const raw = res.data?.data || res.data;
-      return Array.isArray(raw) ? raw : [];
+      const allWards: WardDto[] = Array.isArray(raw) ? [...raw] : [];
+      const totalPages = res.data?.pagination?.totalPages ?? 1;
+      if (totalPages > 1) {
+        const remainingPromises = [];
+        for (let p = 2; p <= totalPages; p++) {
+          remainingPromises.push(
+            apiClient.get("/reference/wards", { params: { provinceCode, pageSize: 100, page: p }, signal })
+          );
+        }
+        const remainingResponses = await Promise.all(remainingPromises);
+        for (const remRes of remainingResponses) {
+          const remRaw = remRes.data?.data || remRes.data;
+          if (Array.isArray(remRaw)) {
+            allWards.push(...remRaw);
+          }
+        }
+      }
+      return allWards;
     } catch (e) {
       throw toApiFailure(e);
     }

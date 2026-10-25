@@ -36,10 +36,10 @@ export const JobsPage = () => {
   const pageSizeParam = parseInt(searchParams.get("pageSize") || "12", 10);
   const pageSize = Number.isSafeInteger(pageSizeParam) && pageSizeParam >= 1 && pageSizeParam <= 100 ? pageSizeParam : PAGE_SIZE;
   const keyword = searchParams.get("q") || "";
-  const provinceCode = searchParams.get("province") || searchParams.get("provinceCode") || "";
-  const categoryCode = searchParams.get("category") || searchParams.get("categoryCode") || "";
-  const workplaceType = searchParams.get("workplace") || searchParams.get("workplaceType") || "";
-  const employmentType = searchParams.get("type") || searchParams.get("employmentType") || "";
+  const provinceCode = searchParams.get("provinceCode") || searchParams.get("province") || "";
+  const categoryCode = searchParams.get("categoryCode") || searchParams.get("category") || "";
+  const workplaceType = searchParams.get("workplaceType") || searchParams.get("workplace") || "";
+  const employmentType = searchParams.get("employmentType") || searchParams.get("type") || "";
   const salaryRange = searchParams.get("salary") || "";
   const sortBy = searchParams.get("sort") || "newest";
 
@@ -137,10 +137,25 @@ export const JobsPage = () => {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (value) {
-          next.set(key, value);
+        // Clear both canonical and legacy alias keys to prevent stale duplicates
+        if (key === "provinceCode" || key === "province") {
+          next.delete("province");
+          next.delete("provinceCode");
+        } else if (key === "categoryCode" || key === "category") {
+          next.delete("category");
+          next.delete("categoryCode");
+        } else if (key === "workplaceType" || key === "workplace") {
+          next.delete("workplace");
+          next.delete("workplaceType");
+        } else if (key === "employmentType" || key === "type") {
+          next.delete("type");
+          next.delete("employmentType");
         } else {
           next.delete(key);
+        }
+
+        if (value) {
+          next.set(key, value);
         }
         // Reset page to 1 on filter modification
         next.set("page", "1");

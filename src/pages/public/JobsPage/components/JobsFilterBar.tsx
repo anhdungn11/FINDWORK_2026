@@ -77,7 +77,7 @@ export const JobsFilterBar = ({
               <select
                 className={styles.filterSelect}
                 value={provinceCode}
-                onChange={(e) => onFilterChange("province", e.target.value)}
+                onChange={(e) => onFilterChange("provinceCode", e.target.value)}
                 aria-label="Chọn tỉnh thành"
                 data-testid="job-province-select"
               >
@@ -101,7 +101,7 @@ export const JobsFilterBar = ({
               <select
                 className={styles.filterSelect}
                 value={categoryCode}
-                onChange={(e) => onFilterChange("category", e.target.value)}
+                onChange={(e) => onFilterChange("categoryCode", e.target.value)}
                 aria-label="Chọn ngành nghề"
                 data-testid="job-category-select"
               >
@@ -144,12 +144,12 @@ export const JobsFilterBar = ({
               <select
                 className={styles.filterSelect}
                 value={workplaceType}
-                onChange={(e) => onFilterChange("workplace", e.target.value)}
+                onChange={(e) => onFilterChange("workplaceType", e.target.value)}
                 aria-label="Hình thức làm việc"
                 data-testid="job-workplace-select"
               >
                 <option value="">Tất cả hình thức</option>
-                <option value="ON_SITE">Tại văn phòng</option>
+                <option value="ONSITE">Tại văn phòng</option>
                 <option value="HYBRID">Linh hoạt (Hybrid)</option>
                 <option value="REMOTE">Từ xa (Remote)</option>
               </select>
@@ -160,7 +160,7 @@ export const JobsFilterBar = ({
               <select
                 className={styles.filterSelect}
                 value={employmentType}
-                onChange={(e) => onFilterChange("type", e.target.value)}
+                onChange={(e) => onFilterChange("employmentType", e.target.value)}
                 aria-label="Loại hình công việc"
                 data-testid="job-type-select"
               >
@@ -212,7 +212,7 @@ export const JobsFilterBar = ({
                   key={p.code || "all"}
                   type="button"
                   className={`${styles.quickChip} ${isActive ? styles.quickChipActive : ""}`}
-                  onClick={() => onFilterChange("province", p.code)}
+                  onClick={() => onFilterChange("provinceCode", p.code)}
                 >
                   {p.name}
                 </button>

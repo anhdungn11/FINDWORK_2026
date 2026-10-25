@@ -44,13 +44,20 @@ const BackendJobDetailPage = ({ jobId }: { jobId: string }) => {
       .getJob(jobId)
       .then((dto) => {
         if (!active) return;
+        const primaryLoc = dto.locations?.find((l) => l.isPrimary) || dto.locations?.[0];
+        const locationText =
+          (primaryLoc?.province?.name ? [primaryLoc.addressLine, primaryLoc.province.name].filter(Boolean).join(", ") : null) ||
+          primaryLoc?.addressLine ||
+          primaryLoc?.province?.name ||
+          "Toàn quốc";
         const mapped: JobDetailRecord = {
           id: dto.id,
           title: dto.title,
           company: dto.companyName || "Doanh nghiệp",
+          companyLogoUrl: dto.companyLogoUrl || null,
           category: dto.categoryName || "Chung",
           skills: [],
-          location: "Việt Nam",
+          location: locationText,
           type: dto.employmentType ? EMPLOYMENT_TYPE_LABEL[dto.employmentType] : "Toàn thời gian",
           workplace: dto.workplaceType ? WORKPLACE_TYPE_LABEL[dto.workplaceType] : "Tại văn phòng",
           experience: dto.experienceMinMonths

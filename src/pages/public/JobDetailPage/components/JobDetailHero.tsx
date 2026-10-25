@@ -1,3 +1,4 @@
+import { resolveApiUrl } from "@/services/http/apiClient";
 import {
   Link,
   useLocation,
@@ -76,7 +77,18 @@ const JobDetailHero = ({
         <div className={styles.heroCard}>
           <div className={styles.heroMain}>
             <div className={styles.companyLogo}>
-              {job.company.charAt(0)}
+              {job.companyLogoUrl ? (
+                <img
+                  src={resolveApiUrl(job.companyLogoUrl)}
+                  alt={job.company}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                job.company.charAt(0)
+              )}
             </div>
 
             <div className={styles.heroInfo}>
