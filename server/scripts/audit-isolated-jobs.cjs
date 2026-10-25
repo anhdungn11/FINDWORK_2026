@@ -16,11 +16,20 @@ async function main() {
   try {
     await db.query("BEGIN READ ONLY");
     const identity = (await db.query(`SELECT current_database() AS database, current_schema() AS schema,
+      (SELECT count(*)::int FROM "Province") AS provinces,
+      (SELECT count(*)::int FROM "Ward") AS wards,
+      (SELECT count(*)::int FROM "User") AS users,
+      (SELECT count(*)::int FROM "Company") AS companies,
+      (SELECT count(*)::int FROM "Resume") AS resumes,
       (SELECT count(*)::int FROM "Job") AS jobs,
       (SELECT count(*)::int FROM "JobLocation") AS job_locations,
       (SELECT count(*)::int FROM "CompanyLocation") AS company_locations,
       (SELECT count(*)::int FROM "Application") AS applications,
       (SELECT count(*)::int FROM "ResumeVersion") AS resume_versions,
+      (SELECT count(*)::int FROM "Ward" w LEFT JOIN "Province" p ON p.id=w."provinceId"
+       WHERE p.id IS NULL OR p."isActive"=false) AS ward_parent_errors,
+      (SELECT count(*)::int FROM (SELECT code FROM "Ward" GROUP BY code HAVING count(*)>1) duplicates)
+        AS duplicate_ward_codes,
       (SELECT count(*)::int FROM pg_extension WHERE extname='unaccent') AS unaccent`)).rows[0];
     if (identity.database !== "findwork_employer_media_3002" || identity.schema !== "public") throw new Error("Wrong database/schema");
     const status = (await db.query('SELECT status, count(*)::int AS count FROM "Job" GROUP BY status ORDER BY status')).rows;

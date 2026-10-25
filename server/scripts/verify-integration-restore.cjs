@@ -27,7 +27,7 @@ maintenanceUrl.pathname = "/postgres";
 maintenanceUrl.search = "";
 const maintenance = new Client({ connectionString: maintenanceUrl.toString(), connectionTimeoutMillis: 5000 });
 const source = new Client({ connectionString: env.DATABASE_URL, options: "-c default_transaction_read_only=on" });
-const tables = ["Province", "Ward", "Job", "Application", "ResumeVersion", "_prisma_migrations"];
+const tables = ["Province", "Ward", "User", "Company", "CompanyLocation", "Job", "Resume", "ResumeVersion", "Application", "_prisma_migrations"];
 
 async function counts(client) {
   const result = {};

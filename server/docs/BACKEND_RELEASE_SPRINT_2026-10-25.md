@@ -1,5 +1,7 @@
 # Backend release sprint evidence — 25 October 2026
 
+**Later execution update:** The approved official ward import has now been applied and verified. See [the release execution report](./BACKEND_RELEASE_EXECUTION_2026-10-25.md). The pre-import status and backup evidence below are retained as historical checkpoints.
+
 Status: **release blocked** pending approved database writes and authorized recruitment E2E. Integration reads target `127.0.0.1:5432/findwork_employer_media_3002/public` and API port 3002. The restore rehearsal used a disposable database on that local PostgreSQL server.
 
 ## Official wards

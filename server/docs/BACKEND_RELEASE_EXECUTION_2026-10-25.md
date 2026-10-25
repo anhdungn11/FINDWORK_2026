@@ -1,0 +1,31 @@
+# Backend release execution — 25 October 2026
+
+Target: `feat/backend-release-integration`, starting HEAD `eece8a1a51e3ef16bb6c8e83be52251c49f84301`; isolated API `http://127.0.0.1:3002/api/v1`; PostgreSQL `127.0.0.1:5432/findwork_employer_media_3002/public`. The worktree was clean at the checkpoint. No migration was applied.
+
+## Approved official ward import: PASS
+
+The committed Statistics Office `DanhMucPhuongXa` snapshot has canonical UTF-8/LF SHA-256 `5c1f716a3ae1ab854a9d642e1bf82293999f7e66c8bb067edc6663b12ba18f2d`. Windows CRLF checkout bytes have a different raw hash; the importer verifies the canonical hash. The recorded 2025 and 2026 SOAP XML hashes and dated legal changes are in [the source handoff](./P0_WARD_AI_NEXT_SPRINT_HANDOFF_2026-10-24.md). The [official SOAP operation](https://danhmuchanhchinh.nso.gov.vn/DMDVHC.asmx?op=DanhMucPhuongXa) and [Statistics Office register](https://danhmuchanhchinh.nso.gov.vn/Tinh_tk_new.aspx) corroborate the source and provincial counts.
+
+The guarded, read-only dry run confirmed database/schema/server identity, 34 matching active province parents, 0 pre-existing wards, 3,321 planned inserts, 0 parent/name conflicts, 0 invalid or duplicate codes, and 0 rows needing changes. The fresh pre-import custom dump was `C:\Users\HP\AppData\Local\Temp\findwork-integration-backup-fWppQ9\findwork_employer_media_3002.dump`, 263,169 bytes, SHA-256 `d7c0ff06d01fef385c93987b2415af73afa6664d54ed1b7bbc5e41f8b29c3237`. `pg_restore --list`, archive extraction, and an actual restore into a disposable PostgreSQL database passed. Restored/source counts matched: Province 34, Ward 0, User 54, Company 21, CompanyLocation 13, Job 5, Resume 4, ResumeVersion 4, Application 4, migrations 9.
+
+The authorized `--apply` ran with the script's exact `NODE_ENV=test`, target database, artifact scope/hash, write flag, backup path/hash, and `pg_restore` gates. It inserted 3,321 rows in one serializable transaction. A subsequent read-only dry run reported 3,321 unchanged wards, 0 inserts, 0 conflicts. The post-import SQL audit found 34 provinces, 3,321 wards, 0 duplicate codes, 0 inactive/missing parents. Business counts remained User 54, Company 21, CompanyLocation 13, Job 5, Resume 4, ResumeVersion 4, Application 4.
+
+Live HTTP `GET /reference/wards` returned 3,321 total with pages 1/17/34 containing 100/100/21 rows and page 35 empty. Province `01` returned 126 wards; `provinceCode=38&q=Sam%20Son` included official code `16531`. Province and ward Unicode lookup, parent codes, CORS and invalid `provinceCode=ZZ` HTTP 400 passed. `GET /reference/provinces` remained 34.
+
+Rollback: keep the pre-import dump intact. If reversal becomes necessary, stop further writes, restore that verified dump into a **new** database, compare its data and behavior, and obtain separate cutover approval. Restoring it over the live integration database would erase later business writes.
+
+## Recruitment and job discovery
+
+The live read-only job acceptance passed against four public jobs and one closed job: first/middle/last/empty/out-of-range pages, total and totalPages, public detail, company logo/location fields, title/company/description and Vietnamese Unicode keyword queries, province/category/employment/workplace/salary filters, newest and supported salary sorts, six invalid-filter HTTP 400 cases, and anonymous private-list HTTP 401. The salary sorts had only one eligible live job, so comparative salary ordering still needs more authorized data. `JobsService.listPublic` explicitly uses a Prisma `RepeatableRead` transaction for list and count; concurrent-write behavior was code-reviewed, not stress-tested. No unsupported matching score or sort mode is advertised.
+
+Recruitment unit tests cover role/account checks, company membership, job transitions and version conflicts, owned ResumeVersion validation, duplicate application conflict, review transitions, and persisted history logic. The authenticated HTTP write E2E **has not run**: `FINDWORK_RECRUITMENT_CREDENTIALS_FILE` is unset. The guarded script requires existing OWNER and Candidate tokens, company ID, an owned ready Builder ResumeVersion, consented contact details, a fresh restored backup, and explicit approval for its one labeled job/application write. No accounts or production-looking records were created to bypass that gate. Candidate status after a new request, duplicate HTTP 409, and cross-role resume denial therefore remain live-test pending.
+
+## Demo jobs and AI
+
+The 12-row dataset SHA-256 is `fce847cacd3190298f3d5ead3c0d700f5f5d3e8d0a434416a445a5a09801e29d`. Each title begins `[DEMO FINDWORK]` and each description starts with an explicit sample/non-real disclaimer. The dry run for active `FINDWORK Demo Tech 4c2db125` (`73863172-50fb-4615-a06d-ac786f0b79af`) found one active OWNER member in PostgreSQL, 12 pending, 0 already published, 0 missing categories/provinces and 0 conflicts. It validates salary bounds, employment/workplace types, category/province codes and exact-title/idempotency rules. An OWNER bearer token has not been presented for live workspace verification. The separate bulk demo import approval has **not** been given; no demo apply ran.
+
+Free text AI has server-side daily request/token/cost reservations and owned conversations, but the provider is not configured for a real answer on this instance. Premium image/audio is denied server-side with HTTP 403 pending verified entitlement. Candidate AI Pro and company-scoped Business AI are separate proposed products in [the subscription design](./FREEMIUM_AI_PAID_INTERVIEWS_PROPOSAL_2026-10-24.md); neither paid entitlement nor Business AI workflow is live. Billing, activation and charging remain disabled.
+
+## Quality gates and verdict
+
+Prisma schema validation PASS; nine migrations current; Nest build PASS; all isolated unit suites PASS (30 suites, 257 tests); `git diff --check` PASS. The full integration Jest suite was not run because its setup explicitly targets and writes `findwork_test`, which this sprint must never modify. Live recruitment write E2E remains blocked as above. Release readiness: **P0 blocked on authenticated recruitment E2E and limited salary-sort data**, despite the successful ward import and public API checks. No 100% claim is made.

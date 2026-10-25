@@ -45,15 +45,51 @@ async function main() {
   assert.equal(search.status, 200);
   assert.equal(search.body.pagination.total, 2);
   assert.equal(search.body.data.length, 1);
+  const unicode = await get({ q: "Chúng tôi" });
+  assert.equal(unicode.status, 200);
+  assert.ok(unicode.body.data.some((row) => row.description.includes("Chúng tôi")));
+  const description = await get({ q: "tuyển dụng" });
+  assert.equal(description.status, 200);
+  assert.ok(description.body.data.some((row) => row.description.includes("tuyển dụng")));
+  const newest = await get({ sort: "newest", pageSize: "100" });
+  assert.equal(newest.status, 200);
+  assert.equal(newest.body.pagination.total, first.body.pagination.total);
+  assert.equal(newest.body.data[0].id, first.body.data[0].id);
   const company = await get({ q: first.body.data[0].company.name, pageSize: "10" });
   assert.equal(company.status, 200);
   assert.ok(company.body.data.some((row) => row.company.id === first.body.data[0].company.id));
   const location = await get({ provinceCode: "01" });
   assert.equal(location.status, 200);
-  assert.equal(location.body.pagination.total, 0);
+  assert.ok(location.body.pagination.total >= 1);
+  assert.ok(location.body.data.every((row) => row.locations.some((item) => item.province?.code === "01")));
   const salary = await get({ salaryAtLeast: "10000000", sort: "salary_desc" });
   assert.equal(salary.status, 200);
-  assert.equal(salary.body.pagination.total, 0);
+  assert.ok(salary.body.pagination.total >= 1);
+  assert.ok(salary.body.data.every((row) => row.showSalary && !row.salaryNegotiable &&
+    Number(row.salaryMax) >= 10000000));
+  const salaryCeiling = await get({ salaryAtMost: "100000000", currency: "VND", salaryPeriod: "MONTH" });
+  assert.equal(salaryCeiling.status, 200);
+  assert.ok(salaryCeiling.body.pagination.total >= 1);
+  assert.ok(salaryCeiling.body.data.every((row) => row.showSalary && !row.salaryNegotiable &&
+    row.currency === "VND" && row.salaryPeriod === "MONTH" && Number(row.salaryMin) <= 100000000));
+  const salaryAscending = await get({ sort: "salary_asc", pageSize: "100" });
+  const salaryDescending = await get({ sort: "salary_desc", pageSize: "100" });
+  assert.equal(salaryAscending.status, 200);
+  assert.equal(salaryDescending.status, 200);
+  assert.equal(salaryAscending.body.pagination.total, salaryDescending.body.pagination.total);
+  assert.ok(salaryAscending.body.data.every((row, index, all) =>
+    index === 0 || Number(all[index - 1].salaryMin) <= Number(row.salaryMin)));
+  assert.ok(salaryDescending.body.data.every((row, index, all) =>
+    index === 0 || Number(all[index - 1].salaryMin) >= Number(row.salaryMin)));
+  const category = await get({ categoryCode: location.body.data[0].category.code });
+  assert.equal(category.status, 200);
+  assert.ok(category.body.data.some((row) => row.id === location.body.data[0].id));
+  const employment = await get({ employmentType: location.body.data[0].employmentType });
+  assert.equal(employment.status, 200);
+  assert.ok(employment.body.data.some((row) => row.id === location.body.data[0].id));
+  const workplace = await get({ workplaceType: location.body.data[0].workplaceType });
+  assert.equal(workplace.status, 200);
+  assert.ok(workplace.body.data.some((row) => row.id === location.body.data[0].id));
   const empty = await get({ q: "an-impossible-job-search-term" });
   assert.equal(empty.status, 200);
   assert.equal(empty.body.pagination.total, 0);
@@ -64,11 +100,21 @@ async function main() {
   }
   const privateResponse = await fetch(`${base}/companies/${first.body.data[0].companyId}/jobs`);
   assert.equal(privateResponse.status, 401);
+  const resumeResponse = await fetch(`${base}/candidate/resumes/00000000-0000-4000-8000-000000000000`);
+  assert.equal(resumeResponse.status, 401);
+  const applicationResponse = await fetch(`${base}/candidate/applications/00000000-0000-4000-8000-000000000000`);
+  assert.equal(applicationResponse.status, 401);
   console.log(JSON.stringify({ base, status: "PASS", publicTotal: first.body.pagination.total,
     pageSize: 1, firstId: first.body.data[0].id, secondId: second.body.data[0].id,
     lastId: last.body.data[0].id, beyondPageItems: 0, searchTotal: search.body.pagination.total,
-    companySearch: "PASS", locationFilterTotal: 0, salaryFilterTotal: 0,
+    companySearch: "PASS", unicodeDescriptionSearch: "PASS", newestSort: "PASS",
+    salarySortRows: salaryAscending.body.pagination.total,
+    locationFilterTotal: location.body.pagination.total,
+    salaryFilterTotal: salary.body.pagination.total, salaryCeilingTotal: salaryCeiling.body.pagination.total,
+    categoryFilter: "PASS",
+    employmentFilter: "PASS", workplaceFilter: "PASS",
     emptySearchTotal: 0, invalidQueryChecks: 6, privateListAnonymous: 401,
+    privateResumeAnonymous: 401, privateApplicationAnonymous: 401,
     detail: 200, missingDetail: 404,
     middlePage: first.body.pagination.total >= 3 ? "PASS" : "PENDING_DEMO_DATA" }));
 }

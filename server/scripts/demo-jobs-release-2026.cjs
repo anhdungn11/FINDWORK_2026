@@ -84,6 +84,7 @@ async function main() {
   let categories;
   let provinces;
   let existing = [];
+  let company = null;
   try {
     await db.query("BEGIN READ ONLY");
     const identity = (await db.query("SELECT current_database() AS database, current_schema() AS schema")).rows[0];
@@ -91,6 +92,15 @@ async function main() {
     categories = (await db.query('SELECT id, code FROM "JobCategory" WHERE "isActive"=true')).rows;
     provinces = (await db.query('SELECT id, code FROM "Province" WHERE "isActive"=true')).rows;
     if (companyId) {
+      company = (await db.query(`SELECT c.id, c.name, c.status,
+        (SELECT count(DISTINCT m.id)::int FROM "CompanyMember" m
+         JOIN "CompanyMemberRole" mr ON mr."companyMemberId"=m.id AND mr."companyId"=m."companyId"
+         JOIN "Role" r ON r.id=mr."roleId" AND r."companyId"=m."companyId"
+         JOIN "User" u ON u.id=m."userId"
+         WHERE m."companyId"=c.id AND m.status='ACTIVE' AND m."removedAt" IS NULL
+           AND m."isOwner"=true AND u.status='ACTIVE'
+           AND r.name='OWNER' AND r."isActive"=true) AS "activeOwnerMembers"
+        FROM "Company" c WHERE c.id=$1`, [companyId])).rows[0] ?? null;
       existing = (await db.query(`SELECT j.id, j.title, j.description, j.status,
         j."categoryId", j."employmentType", j."workplaceType", j."salaryMin", j."salaryMax",
         j.currency, j."salaryPeriod", j."showSalary", j."salaryNegotiable",
@@ -122,6 +132,7 @@ async function main() {
   }).map((job) => job.key);
   const pending = catalog.jobs.filter((job) => !existingByTitle.has(job.title));
   const preview = { mode, database: "findwork_employer_media_3002/public", companyId: companyId || null,
+    company,
     sourceSha256, count: catalog.jobs.length, alreadyPublished: catalog.jobs.length - pending.length,
     pending: pending.length, missingCategories, missingProvinces, conflicts,
     jobs: catalog.jobs.map(({ key, title, categoryCode, provinceCode, employmentType, workplaceType, salaryMin, salaryMax }) =>
