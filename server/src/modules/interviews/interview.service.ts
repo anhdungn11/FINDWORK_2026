@@ -1,5 +1,6 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
+import { RecruitmentNotificationService } from "../../infrastructure/email/recruitment-notification.service";
 import type { Prisma } from "../../generated/prisma/client";
 import type { ScheduleInterviewDto } from "./interview.dto";
 
@@ -9,7 +10,7 @@ const view = { id: true, companyId: true, applicationId: true, scheduledAt: true
 
 @Injectable()
 export class InterviewService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(private readonly db: PrismaService, @Optional() private readonly notifications?: RecruitmentNotificationService) {}
 
   private async reviewer(tx: Prisma.TransactionClient, companyId: string, actorUserId: string) {
     const member = await tx.companyMember.findFirst({ where: { companyId, userId: actorUserId,
@@ -63,6 +64,8 @@ export class InterviewService {
       await tx.auditLog.create({ data: { actorUserId, companyId, action: "company.interview.schedule",
         targetType: "Interview", targetId: created.id,
         afterData: { applicationId, scheduledAt: scheduledAt.toISOString(), type: dto.type, provider: "MANUAL" } } });
+      await this.notifications?.enqueue(tx, { kind: "INTERVIEW_INVITATION", applicationId,
+        interviewId: created.id, scheduledAt });
       return created;
     });
   }

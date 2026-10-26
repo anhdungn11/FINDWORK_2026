@@ -14,6 +14,17 @@ export type InvitationProviderRequest = {
   acceptUrl: string;
   idempotencyKey: string;
 };
+export type PasswordResetProviderRequest = {
+  to: string;
+  from: string;
+  resetUrl: string;
+  idempotencyKey: string;
+};
+export type RecruitmentProviderRequest = {
+  to: string; from: string; url: string; jobTitle: string;
+  kind: "APPLICATION_CONFIRMED" | "APPLICATION_STATUS" | "INTERVIEW_INVITATION";
+  status?: string; scheduledAt?: string; idempotencyKey: string;
+};
 export class EmailProviderError extends Error {
   constructor(public readonly errorCode: string, public readonly retryable: boolean) {
     super(errorCode);
@@ -49,6 +60,31 @@ export class EmailProviderService {
       subject: "Invitation to join a company on FINDWORK",
       text: `You have been invited to join a company on FINDWORK.\n\nOpen this link to review and accept the invitation:\n${input.acceptUrl}\n\nSign in with the invited email address. If you did not expect this invitation, you can ignore this message.`,
       html: `<p>You have been invited to join a company on FINDWORK.</p><p><a href="${escapeHtml(input.acceptUrl)}">Review invitation</a></p><p>Sign in with the invited email address. If you did not expect this invitation, you can ignore this message.</p>`,
+    });
+  }
+
+  async sendPasswordReset(input: PasswordResetProviderRequest): Promise<DeliveryResult> {
+    this.settings.assertCanQueuePasswordReset();
+    return this.send(input.idempotencyKey, {
+      from: input.from, to: [input.to], subject: "Reset your FINDWORK password",
+      text: `Open this link to reset your FINDWORK password:\n${input.resetUrl}\n\nIf you did not request this, ignore this email.`,
+      html: `<p>Reset your FINDWORK password:</p><p><a href="${escapeHtml(input.resetUrl)}">Reset password</a></p><p>If you did not request this, ignore this email.</p>`,
+    });
+  }
+
+  async sendRecruitmentNotice(input: RecruitmentProviderRequest): Promise<DeliveryResult> {
+    this.settings.assertCanQueueRecruitment();
+    const title = input.jobTitle.slice(0, 200);
+    const subject = input.kind === "APPLICATION_CONFIRMED" ? "FINDWORK application received"
+      : input.kind === "APPLICATION_STATUS" ? "FINDWORK application status update"
+        : "FINDWORK interview invitation";
+    const detail = input.kind === "APPLICATION_CONFIRMED" ? `We received your application for ${title}.`
+      : input.kind === "APPLICATION_STATUS" ? `Your application for ${title} is now ${input.status}.`
+        : `Your interview for ${title} is scheduled for ${input.scheduledAt}.`;
+    return this.send(input.idempotencyKey, {
+      from: input.from, to: [input.to], subject,
+      text: `${detail}\n\nView your application: ${input.url}`,
+      html: `<p>${escapeHtml(detail)}</p><p><a href="${escapeHtml(input.url)}">View application</a></p>`,
     });
   }
 

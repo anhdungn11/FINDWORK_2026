@@ -19,6 +19,10 @@ export interface ValidatedEnvironment {
   EMAIL_VERIFY_URL: string;
   EMAIL_INVITATION_DELIVERY_ENABLED: string;
   EMAIL_INVITATION_URL: string;
+  EMAIL_PASSWORD_RESET_ENABLED: string;
+  EMAIL_RESET_URL: string;
+  EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED: string;
+  EMAIL_APPLICATION_URL: string;
   EMAIL_RESEND_API_KEY: string;
   EMAIL_FROM: string;
 }
@@ -165,6 +169,14 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
     throw new Error("EMAIL_INVITATION_DELIVERY_ENABLED invalid");
   }
   const invitationUrl = String(raw.EMAIL_INVITATION_URL ?? "");
+  const resetEnabled = String(raw.EMAIL_PASSWORD_RESET_ENABLED ?? "false");
+  const resetUrl = String(raw.EMAIL_RESET_URL ?? "");
+  const recruitmentEnabled = String(raw.EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED ?? "false");
+  const applicationUrl = String(raw.EMAIL_APPLICATION_URL ?? "");
+  if (resetEnabled !== "true" && resetEnabled !== "false") throw new Error("EMAIL_PASSWORD_RESET_ENABLED invalid");
+  if (recruitmentEnabled !== "true" && recruitmentEnabled !== "false") {
+    throw new Error("EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED invalid");
+  }
   const apiKey = String(raw.EMAIL_RESEND_API_KEY ?? "");
   const sender = String(raw.EMAIL_FROM ?? "");
   if (mode === "resend") {
@@ -196,6 +208,26 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
   if (invitationEnabled === "true" && mode !== "resend") {
     throw new Error("EMAIL_INVITATION_DELIVERY_ENABLED requires resend mode");
   }
+  if (resetEnabled === "true") {
+    if (mode !== "resend") throw new Error("EMAIL_PASSWORD_RESET_ENABLED requires resend mode");
+    let url: URL;
+    try { url = new URL(resetUrl); } catch { throw new Error("EMAIL_RESET_URL invalid"); }
+    if ((url.protocol !== "https:" && !(env !== "production" && url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) ||
+      url.username || url.password || url.search || url.hash) {
+      throw new Error("EMAIL_RESET_URL must be an HTTPS token-free URL");
+    }
+  }
+  if (recruitmentEnabled === "true") {
+    if (mode !== "resend") throw new Error("EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED requires resend mode");
+    let url: URL;
+    try { url = new URL(applicationUrl); } catch { throw new Error("EMAIL_APPLICATION_URL invalid"); }
+    if ((url.protocol !== "https:" && !(env !== "production" && url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) ||
+      url.username || url.password || url.search || url.hash) {
+      throw new Error("EMAIL_APPLICATION_URL must be an HTTPS token-free URL");
+    }
+  }
   // A disabled feature must not make verification or API startup depend on its unused URL.
   if (invitationEnabled === "true") {
     let url: URL;
@@ -214,9 +246,45 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
     EMAIL_VERIFY_URL: verifyUrl,
     EMAIL_INVITATION_DELIVERY_ENABLED: invitationEnabled,
     EMAIL_INVITATION_URL: invitationUrl,
+    EMAIL_PASSWORD_RESET_ENABLED: resetEnabled,
+    EMAIL_RESET_URL: resetUrl,
+    EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED: recruitmentEnabled,
+    EMAIL_APPLICATION_URL: applicationUrl,
     EMAIL_RESEND_API_KEY: apiKey,
     EMAIL_FROM: sender,
   };
+}
+
+function aiProviderConfig(raw: Record<string, unknown>) {
+  const provider = String(raw.FINDWORK_AI_PROVIDER ?? "").trim();
+  const key = String(raw.FINDWORK_AI_API_KEY ?? "").trim();
+  const model = String(raw.FINDWORK_AI_MODEL ?? "").trim();
+  const inputPrice = String(raw.FINDWORK_AI_INPUT_USD_PER_MILLION ?? "").trim();
+  const outputPrice = String(raw.FINDWORK_AI_OUTPUT_USD_PER_MILLION ?? "").trim();
+  const transcriptionModel = String(raw.FINDWORK_AI_TRANSCRIPTION_MODEL ?? "").trim();
+  const transcriptionBudget = String(raw.FINDWORK_AI_TRANSCRIPTION_MAX_COST_MICROS ?? "").trim();
+  if ([provider, key, model, inputPrice, outputPrice, transcriptionModel, transcriptionBudget].some(Boolean)) {
+    if (provider && provider !== "openai") throw new Error("FINDWORK_AI_PROVIDER must be openai");
+    if (key.length < 16 || /\s/.test(key)) throw new Error("FINDWORK_AI_API_KEY invalid");
+    if (!/^[A-Za-z0-9_.:-]{1,120}$/.test(model)) throw new Error("FINDWORK_AI_MODEL invalid");
+    for (const [name, value] of [["FINDWORK_AI_INPUT_USD_PER_MILLION", inputPrice],
+      ["FINDWORK_AI_OUTPUT_USD_PER_MILLION", outputPrice]]) {
+      const amount = Number(value);
+      if (!value || !Number.isFinite(amount) || amount <= 0 || amount > 100) throw new Error(`${name} invalid`);
+    }
+    if (transcriptionModel && !/^[A-Za-z0-9_.:-]{1,120}$/.test(transcriptionModel)) {
+      throw new Error("FINDWORK_AI_TRANSCRIPTION_MODEL invalid");
+    }
+    if (transcriptionBudget && (!Number.isInteger(Number(transcriptionBudget)) ||
+        Number(transcriptionBudget) < 1 || Number(transcriptionBudget) > 3000)) {
+      throw new Error("FINDWORK_AI_TRANSCRIPTION_MAX_COST_MICROS invalid");
+    }
+  }
+  return { FINDWORK_AI_PROVIDER: provider || "openai", FINDWORK_AI_API_KEY: key,
+    FINDWORK_AI_MODEL: model, FINDWORK_AI_INPUT_USD_PER_MILLION: inputPrice,
+    FINDWORK_AI_OUTPUT_USD_PER_MILLION: outputPrice,
+    FINDWORK_AI_TRANSCRIPTION_MODEL: transcriptionModel,
+    FINDWORK_AI_TRANSCRIPTION_MAX_COST_MICROS: transcriptionBudget };
 }
 
 export function validateEnvironment(
@@ -287,5 +355,6 @@ export function validateEnvironment(
     ),
     REFRESH_TOKEN_PEPPER: refreshTokenPepper,
     ...emailDeliveryConfig(raw, nodeEnv),
+    ...aiProviderConfig(raw),
   };
 }

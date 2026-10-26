@@ -7,6 +7,8 @@ import { EmailVerificationService } from "./email-verification/email-verificatio
 import { EmailVerificationRepository } from "./email-verification/email-verification.repository";
 import { EmailVerificationTokenService } from "./email-verification/email-verification-token.service";
 import { EmailVerificationEnqueueService } from "./email-verification/email-verification-enqueue.service";
+import { PasswordResetController } from "./password-reset/password-reset.controller";
+import { PasswordResetService } from "./password-reset/password-reset.service";
 import { AuthRepository } from "./auth.repository";
 import { AuthService } from "./auth.service";
 import { AccessTokenGuard } from "./guards/access-token.guard";
@@ -18,7 +20,7 @@ import { TokenService } from "./services/token.service";
 
 @Module({
   imports: [JwtModule.register({}), EmailDeliveryModule],
-  controllers: [AuthController, EmailVerificationController],
+  controllers: [AuthController, EmailVerificationController, PasswordResetController],
   providers: [
     AuthRepository,
     AuthService,
@@ -32,6 +34,7 @@ import { TokenService } from "./services/token.service";
     EmailVerificationRepository,
     EmailVerificationTokenService,
     EmailVerificationEnqueueService,
+    PasswordResetService,
   ],
   exports: [
     AuthService,

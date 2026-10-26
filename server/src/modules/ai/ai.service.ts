@@ -133,8 +133,10 @@ export class AiService {
     try { result = await this.provider.generate(history, prompt, attachment); }
     catch (error) { await this.settle(reservation, 0, 0); throw error; }
     const actualCost = Math.ceil(result.inputTokens * prices.inputPrice + result.outputTokens * prices.outputPrice);
-    await this.settle(reservation, result.totalTokens, actualCost);
     const saved = await this.db.$transaction(async (tx) => {
+      await tx.aiUsageBucket.update({ where: { ownerKey_day: { ownerKey: reservation.key, day: reservation.today } },
+        data: { reservedTokens: { increment: result.totalTokens - reservation.tokens },
+          reservedCostMicros: { increment: actualCost - reservation.costMicros } } });
       const user = await tx.aiMessage.create({ data: { conversationId, role: "USER",
         content: attachment ? `${prompt}\n[Image attached; bytes not retained]` : prompt,
         tokenCount: result.inputTokens }, select: { id: true, role: true, content: true, createdAt: true } });

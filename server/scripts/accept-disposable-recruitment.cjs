@@ -1,7 +1,7 @@
 // Real HTTP acceptance on a new, disposable local PostgreSQL database only.
 // Never prints credentials, tokens, private resumes, or candidate contact data.
 const assert = require("node:assert/strict");
-const { randomBytes, randomUUID } = require("node:crypto");
+const { createDecipheriv, randomBytes, randomUUID } = require("node:crypto");
 const { spawn, spawnSync } = require("node:child_process");
 const { readFileSync } = require("node:fs");
 const net = require("node:net");
@@ -50,7 +50,7 @@ async function freePort() {
 }
 
 async function waitForApi(base) {
-  for (let attempt = 0; attempt < 80; attempt++) {
+  for (let attempt = 0; attempt < 160; attempt++) {
     if (apiProcess.exitCode !== null) throw new Error(`Isolated API exited with code ${apiProcess.exitCode}`);
     try {
       const response = await fetch(`${base}/reference/job-categories?pageSize=1`, { signal: AbortSignal.timeout(1000) });
@@ -125,7 +125,7 @@ async function main() {
       (SELECT count(*)::int FROM "User") AS users,
       (SELECT count(*)::int FROM "Company") AS companies,
       (SELECT count(*)::int FROM "Ward") AS wards`)).rows[0];
-    assert.deepEqual(fresh, { migrations: 10, users: 1, companies: 0, wards: 0 });
+    assert.deepEqual(fresh, { migrations: 12, users: 1, companies: 0, wards: 0 });
     const provinces = require("../prisma/seed-data/vietnam-administrative-2026-10-16.json");
     assert.equal(provinces.version, "vn-admin-2026-10-16");
     assert.equal(provinces.provinces.length, 34);
@@ -153,8 +153,12 @@ async function main() {
     apiProcess.stdout.on("data", capture);
     apiProcess.stderr.on("data", capture);
     await waitForApi(base);
-    const registration = async (type, label) => call(base, "POST", "/auth/register/v2", null,
-      { email: `release-${marker}-${label}@example.invalid`, password: `Test-${randomUUID()}!`, accountType: type }, 201);
+    const registration = async (type, label) => {
+      const fixturePassword = `Test-${randomUUID()}!`;
+      const result = await call(base, "POST", "/auth/register/v2", null,
+        { email: `release-${marker}-${label}@example.invalid`, password: fixturePassword, accountType: type }, 201);
+      return { ...result, fixturePassword };
+    };
     const owner = await registration("EMPLOYER", "owner");
     const outsider = await registration("EMPLOYER", "outsider");
     const candidate = await registration("CANDIDATE", "candidate");
@@ -165,6 +169,13 @@ async function main() {
     const outsiderToken = outsider.accessToken;
     const candidateToken = candidate.accessToken;
     const otherCandidateToken = otherCandidate.accessToken;
+    await call(base, "POST", "/auth/password-reset/request", null,
+      { email: candidate.user.email }, 503, "AUTH_PASSWORD_RESET_DELIVERY_UNAVAILABLE");
+    await call(base, "POST", "/auth/password-reset/request", null,
+      { email: `unknown-${marker}@example.invalid` }, 503, "AUTH_PASSWORD_RESET_DELIVERY_UNAVAILABLE");
+    await call(base, "POST", "/auth/password-reset/confirm", null,
+      { token: "A".repeat(43), password: "Disposable-Reset-123!" }, 401, "AUTH_PASSWORD_RESET_TOKEN_INVALID");
+    assert.equal((await database.query('SELECT count(*)::int AS count FROM "PasswordResetToken"')).rows[0].count, 0);
     const admin = await call(base, "POST", "/auth/login", null,
       { email: adminEmail, password: adminPassword }, 200);
     const adminToken = admin.accessToken;
@@ -378,6 +389,153 @@ async function main() {
     await call(base, "POST", "/auth/register/v2", null,
       { email: `release-${marker}-rate-sixth@example.invalid`, password: `Test-${randomUUID()}!`,
         accountType: "EMPLOYER" }, 429, "RATE_LIMITED");
+    // Restart the same disposable API with fake, local-only provider configuration.
+    // No email worker is launched and no Resend request is made.
+    apiProcess.kill();
+    await new Promise((resolve) => apiProcess.once("exit", resolve));
+    const resetKey = randomBytes(32);
+    const resetEnv = { ...childEnv, PORT: String(port), EMAIL_DELIVERY_MODE: "resend",
+      EMAIL_WORKER_ENABLED: "false", EMAIL_PASSWORD_RESET_ENABLED: "true",
+      EMAIL_ACTIVE_KEY_ID: "acceptance", EMAIL_KEYRING_JSON: JSON.stringify({ acceptance: resetKey.toString("base64") }),
+      EMAIL_RESEND_API_KEY: "test-only-no-provider-send-123456", EMAIL_FROM: "no-reply@example.invalid",
+      EMAIL_VERIFY_URL: "http://localhost:5177/verify-email",
+      EMAIL_RESET_URL: "http://localhost:5177/reset-password",
+      EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED: "true",
+      EMAIL_APPLICATION_URL: "http://localhost:5177/candidate/applications" };
+    apiProcess = spawn(process.execPath, ["dist/main.js"], { cwd: root, env: resetEnv,
+      stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    apiDiagnostic = "";
+    apiProcess.stdout.on("data", capture); apiProcess.stderr.on("data", capture);
+    await waitForApi(base);
+    await call(base, "POST", "/auth/password-reset/request", null,
+      { email: `absent-${marker}@example.invalid` }, 204);
+    assert.equal((await database.query('SELECT count(*)::int AS count FROM "PasswordResetToken"')).rows[0].count, 0);
+    await call(base, "POST", "/auth/password-reset/request", null, { email: candidate.user.email }, 204);
+    await call(base, "POST", "/auth/password-reset/request", null, { email: candidate.user.email }, 204);
+    const issued = (await database.query(`SELECT t.id, t."tokenHash", o.id AS "outboxId", o."payloadCiphertext",
+      o."payloadNonce", o."payloadTag", o.status FROM "PasswordResetToken" t
+      JOIN "PasswordResetOutbox" o ON o."tokenId"=t.id WHERE t."userId"=$1`, [candidate.user.id])).rows;
+    assert.equal(issued.length, 1, "Reset cooldown must avoid duplicate issuance");
+    assert.equal(issued[0].status, "QUEUED");
+    const decipher = createDecipheriv("aes-256-gcm", resetKey, issued[0].payloadNonce);
+    decipher.setAAD(Buffer.from(JSON.stringify(["findwork-outbox-v1", issued[0].outboxId, "RESET_PASSWORD", issued[0].id])));
+    decipher.setAuthTag(issued[0].payloadTag);
+    const payload = JSON.parse(Buffer.concat([decipher.update(issued[0].payloadCiphertext), decipher.final()]).toString("utf8"));
+    assert.equal(payload.recipient, candidate.user.email.toLowerCase());
+    assert.match(payload.rawToken, /^[A-Za-z0-9_-]{43}$/);
+    assert.ok(!issued[0].payloadCiphertext.includes(Buffer.from(payload.rawToken)));
+    await call(base, "POST", "/auth/password-reset/confirm", null,
+      { token: "B".repeat(43), password: "Disposable-Reset-123!" }, 401, "AUTH_PASSWORD_RESET_TOKEN_INVALID");
+    const newPassword = `Reset-${randomUUID()}!`;
+    await call(base, "POST", "/auth/password-reset/confirm", null,
+      { token: payload.rawToken, password: newPassword }, 204);
+    await call(base, "POST", "/auth/password-reset/confirm", null,
+      { token: payload.rawToken, password: newPassword }, 401, "AUTH_PASSWORD_RESET_TOKEN_INVALID");
+    await call(base, "GET", `/candidate/applications/${application.id}`, candidateToken, null, 401);
+    await call(base, "POST", "/auth/login", null,
+      { email: candidate.user.email, password: candidate.fixturePassword }, 401, "AUTH_INVALID_CREDENTIALS");
+    const renewed = await call(base, "POST", "/auth/login", null,
+      { email: candidate.user.email, password: newPassword }, 200);
+    assert.ok(renewed.accessToken);
+    const resetState = (await database.query(`SELECT t."consumedAt", o.status, o."payloadCiphertext"
+      FROM "PasswordResetToken" t JOIN "PasswordResetOutbox" o ON o."tokenId"=t.id WHERE t.id=$1`, [issued[0].id])).rows[0];
+    assert.ok(resetState.consumedAt && resetState.status === "CANCELLED" && resetState.payloadCiphertext === null);
+    assert.equal((await database.query(`SELECT count(*)::int AS count FROM "AuditLog" WHERE action='auth.password_reset'
+      AND "actorUserId"=$1`, [candidate.user.id])).rows[0].count, 1);
+    await call(base, "POST", "/auth/password-reset/request", null, { email: owner.user.email }, 204);
+    const { PrismaService } = require("../dist/infrastructure/prisma/prisma.service.js");
+    const { EmailDeliverySettings } = require("../dist/infrastructure/email/email-delivery-settings.service.js");
+    const { EmailCryptoService } = require("../dist/infrastructure/email/email-crypto.service.js");
+    const { PasswordResetWorker } = require("../dist/infrastructure/email/password-reset.worker.js");
+    const workerDb = new PrismaService({ getOrThrow: (name) => resetEnv[name] });
+    await workerDb.$connect();
+    let delivered;
+    try {
+      const settings = new EmailDeliverySettings({ get: (name, fallback) => resetEnv[name] ?? fallback });
+      const worker = new PasswordResetWorker(workerDb, settings, new EmailCryptoService(settings), {
+        sendPasswordReset: async (input) => { delivered = input; return { providerMessageId: "mock-accepted" }; },
+      });
+      assert.equal(await worker.processOne(), true);
+    } finally { await workerDb.$disconnect(); }
+    assert.equal(delivered.to, owner.user.email.toLowerCase());
+    assert.equal(new URL(delivered.resetUrl).search, "");
+    const ownerResetToken = new URLSearchParams(new URL(delivered.resetUrl).hash.slice(1)).get("token");
+    assert.match(ownerResetToken, /^[A-Za-z0-9_-]{43}$/);
+    const deliveredState = (await database.query(`SELECT o.status, o."payloadCiphertext", o."providerMessageId"
+      FROM "PasswordResetOutbox" o JOIN "PasswordResetToken" t ON t.id=o."tokenId"
+      WHERE t."userId"=$1`, [owner.user.id])).rows[0];
+    assert.equal(deliveredState.status, "SENT");
+    assert.equal(deliveredState.payloadCiphertext, null);
+    assert.equal(deliveredState.providerMessageId, "mock-accepted");
+    const employerNewPassword = `Reset-${randomUUID()}!`;
+    await call(base, "POST", "/auth/password-reset/confirm", null,
+      { token: ownerResetToken, password: employerNewPassword }, 204);
+    await call(base, "GET", `/companies/${company.id}/jobs`, owner.accessToken, null, 401);
+    const renewedOwner = await call(base, "POST", "/auth/login", null,
+      { email: owner.user.email, password: employerNewPassword }, 200);
+    assert.ok(renewedOwner.accessToken);
+    await call(base, "POST", "/auth/email-verification/request", renewed.accessToken, null, 204);
+    const { EmailOutboxRepository } = require("../dist/infrastructure/email/email-outbox.repository.js");
+    const { EmailDeliveryWorker } = require("../dist/infrastructure/email/email-delivery.worker.js");
+    const verifyDb = new PrismaService({ getOrThrow: (name) => resetEnv[name] });
+    await verifyDb.$connect();
+    let verificationDelivery;
+    try {
+      const workerEnv = { ...resetEnv, EMAIL_WORKER_ENABLED: "true" };
+      const settings = new EmailDeliverySettings({ get: (name, fallback) => workerEnv[name] ?? fallback });
+      const worker = new EmailDeliveryWorker(new EmailOutboxRepository(verifyDb),
+        new EmailCryptoService(settings), {
+          sendVerification: async (input) => { verificationDelivery = input; return { providerMessageId: "mock-verify" }; },
+        }, settings);
+      assert.equal(await worker.processOne(), true);
+    } finally { await verifyDb.$disconnect(); }
+    assert.equal(verificationDelivery.to, candidate.user.email.toLowerCase());
+    assert.equal(new URL(verificationDelivery.verifyUrl).search, "");
+    const verifyToken = new URLSearchParams(new URL(verificationDelivery.verifyUrl).hash.slice(1)).get("token");
+    assert.match(verifyToken, /^[A-Za-z0-9_-]{43}$/);
+    await call(base, "POST", "/auth/email-verification/confirm", null, { token: verifyToken }, 204);
+    await call(base, "POST", "/auth/email-verification/confirm", null, { token: verifyToken }, 401,
+      "AUTH_EMAIL_VERIFICATION_TOKEN_INVALID");
+    const verifiedEmail = (await database.query('SELECT "emailVerifiedAt" FROM "User" WHERE id=$1',
+      [candidate.user.id])).rows[0].emailVerifiedAt;
+    assert.ok(verifiedEmail);
+    const shortlisted = await call(base, "PATCH",
+      `/companies/${company.id}/jobs/${mainJob.id}/applications/${application.id}/status`,
+      renewedOwner.accessToken, { version: reviewed.version, status: "SHORTLISTED" }, 200);
+    assert.equal(shortlisted.status, "SHORTLISTED");
+    const scheduled = await call(base, "POST", `/companies/${company.id}/applications/${application.id}/interviews`,
+      renewedOwner.accessToken, { scheduledAt: new Date(Date.now() + 86_400_000).toISOString(),
+        durationMinutes: 30, type: "PHONE", provider: "MANUAL" }, 201);
+    const queuedNotice = (await database.query(`SELECT id, status, "payloadCiphertext" FROM "RecruitmentEmailOutbox"
+      WHERE "interviewId"=$1`, [scheduled.id])).rows[0];
+    assert.equal(queuedNotice.status, "QUEUED");
+    assert.ok(queuedNotice.payloadCiphertext.length > 0);
+    const queuedStatus = (await database.query(`SELECT id, status, "payloadCiphertext" FROM "RecruitmentEmailOutbox"
+      WHERE kind='APPLICATION_STATUS' AND "applicationId"=$1`, [application.id])).rows[0];
+    assert.equal(queuedStatus.status, "QUEUED");
+    assert.ok(queuedStatus.payloadCiphertext.length > 0);
+    const { RecruitmentNotificationWorker } = require("../dist/infrastructure/email/recruitment-notification.worker.js");
+    const noticeDb = new PrismaService({ getOrThrow: (name) => resetEnv[name] });
+    await noticeDb.$connect();
+    const noticeDeliveries = [];
+    try {
+      const settings = new EmailDeliverySettings({ get: (name, fallback) => resetEnv[name] ?? fallback });
+      const worker = new RecruitmentNotificationWorker(noticeDb, settings, new EmailCryptoService(settings), {
+        sendRecruitmentNotice: async (input) => { noticeDeliveries.push(input); return { providerMessageId: "mock-notice" }; },
+      });
+      assert.equal(await worker.processOne(), true);
+      assert.equal(await worker.processOne(), true);
+    } finally { await noticeDb.$disconnect(); }
+    assert.deepEqual(noticeDeliveries.map((item) => item.kind).sort(),
+      ["APPLICATION_STATUS", "INTERVIEW_INVITATION"]);
+    for (const delivery of noticeDeliveries) {
+      assert.equal(delivery.to, candidate.user.email.toLowerCase());
+      assert.equal(new URL(delivery.url).pathname, `/candidate/applications/${application.id}`);
+    }
+    const sentNotices = (await database.query(`SELECT status, "payloadCiphertext" FROM "RecruitmentEmailOutbox"
+      WHERE id=ANY($1::uuid[])`, [[queuedNotice.id, queuedStatus.id]])).rows;
+    assert.equal(sentNotices.length, 2);
+    assert.ok(sentNotices.every((row) => row.status === "SENT" && row.payloadCiphertext === null));
     console.log(JSON.stringify({ environment: "DISPOSABLE", database: dbName, port, status: "PASS",
       recruitment: { draftEditPublish: "PASS", guestSearch: "PASS", savedJob: "PASS", resumeVersion: "PASS",
         application: "PASS", duplicateApplication: 409, employerReview: "REVIEWING",
@@ -389,6 +547,13 @@ async function main() {
         jobs: "PASS", audit: "PASS", roleIsolation: "PASS", moderation: "PASS" },
       messaging: { candidateEmployer: "PASS", persistedMessages: 2, unread: "PASS", crossCompany: 403,
         otherCandidate: 404, adminImpersonation: 403 },
+      passwordReset: { unknownAccount: 204, queuedEncrypted: true, cooldown: "PASS",
+        confirm: 204, replay: 401, oldSession: 401, oldPassword: 401, newLogin: 200,
+        audit: "PASS", mockWorker: "SENT", providerDelivery: "NOT_ATTEMPTED" },
+      emailVerification: { mockWorker: "SENT", confirm: 204, replay: 401,
+        persistedVerifiedAt: true, providerDelivery: "NOT_ATTEMPTED" },
+      recruitmentEmail: { statusQueued: true, interviewQueued: true, mockWorker: "SENT",
+        providerDelivery: "NOT_ATTEMPTED" },
       search: { positiveProvince: province.pagination.total, salaryAscending: asc.data.map((row) => Number(row.salaryMin)),
         salaryDescending: desc.data.map((row) => Number(row.salaryMin)), combinedTotal: combinedFirst.pagination.total,
         pageTotal: first.pagination.total, invalidQueries: 5,

@@ -28,6 +28,18 @@ export class EmailDeliverySettings {
   get invitationUrl(): string {
     return this.config.get<string>("EMAIL_INVITATION_URL", "");
   }
+  get passwordResetEnabled(): boolean {
+    return this.config.get<string>("EMAIL_PASSWORD_RESET_ENABLED", "false") === "true";
+  }
+  get resetUrl(): string {
+    return this.config.get<string>("EMAIL_RESET_URL", "");
+  }
+  get recruitmentEnabled(): boolean {
+    return this.config.get<string>("EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED", "false") === "true";
+  }
+  get applicationUrl(): string {
+    return this.config.get<string>("EMAIL_APPLICATION_URL", "");
+  }
   get resendApiKey(): string {
     return this.config.get<string>("EMAIL_RESEND_API_KEY", "");
   }
@@ -58,6 +70,28 @@ export class EmailDeliverySettings {
         url.username || url.password || url.search || url.hash) {
       throw new Error("EMAIL_INVITATION_URL_INVALID");
     }
+  }
+  assertCanQueuePasswordReset(): void {
+    if (!this.passwordResetEnabled) throw new Error("EMAIL_PASSWORD_RESET_DISABLED");
+    if (this.mode !== "resend" || !this.activeKeyId || !this.keyringJson ||
+        !this.resetUrl || !this.resendApiKey || !this.sender) {
+      throw new Error("EMAIL_PASSWORD_RESET_NOT_CONFIGURED");
+    }
+    const url = new URL(this.resetUrl);
+    if ((url.protocol !== "https:" && !(this.nodeEnv !== "production" && url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) ||
+      url.username || url.password || url.search || url.hash) throw new Error("EMAIL_RESET_URL_INVALID");
+  }
+  assertCanQueueRecruitment(): void {
+    if (!this.recruitmentEnabled) throw new Error("EMAIL_RECRUITMENT_DISABLED");
+    if (this.mode !== "resend" || !this.activeKeyId || !this.keyringJson ||
+        !this.applicationUrl || !this.resendApiKey || !this.sender) {
+      throw new Error("EMAIL_RECRUITMENT_NOT_CONFIGURED");
+    }
+    const url = new URL(this.applicationUrl);
+    if ((url.protocol !== "https:" && !(this.nodeEnv !== "production" && url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) ||
+      url.username || url.password || url.search || url.hash) throw new Error("EMAIL_APPLICATION_URL_INVALID");
   }
   assertWorkerReady(): void {
     this.assertCanQueue();

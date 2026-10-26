@@ -92,6 +92,21 @@ describe("Email delivery fail-closed crypto/config", () => {
   it("rejects enabling worker without real delivery", () => {
     expect(() => validateEnvironment({ ...base, EMAIL_WORKER_ENABLED: "true" })).toThrow();
   });
+  it("keeps reset delivery disabled and validates reachable token-free URLs when enabled", () => {
+    expect(validateEnvironment(base).EMAIL_PASSWORD_RESET_ENABLED).toBe("false");
+    const configured = { ...base, EMAIL_DELIVERY_MODE: "resend", EMAIL_ACTIVE_KEY_ID: "k1",
+      EMAIL_KEYRING_JSON: JSON.stringify({ k1: key }), EMAIL_VERIFY_URL: "https://example.invalid/verify",
+      EMAIL_RESEND_API_KEY: "fake-only-1234567890", EMAIL_FROM: "no-reply@example.invalid",
+      EMAIL_PASSWORD_RESET_ENABLED: "true" };
+    expect(() => validateEnvironment({ ...base, EMAIL_PASSWORD_RESET_ENABLED: "true" })).toThrow();
+    expect(() => validateEnvironment(configured)).toThrow("EMAIL_RESET_URL");
+    expect(() => validateEnvironment({ ...configured, EMAIL_RESET_URL: "https://example.invalid/reset?token=x" })).toThrow();
+    expect(() => validateEnvironment({ ...configured, NODE_ENV: "production", CORS_ORIGINS: "https://example.invalid",
+      EMAIL_RESET_URL: "http://localhost:5177/reset" })).toThrow("EMAIL_RESET_URL");
+    const valid = validateEnvironment({ ...configured, EMAIL_RESET_URL: "http://localhost:5177/reset" });
+    const settings = new EmailDeliverySettings({ get: (name: string, fallback?: unknown) => valid[name] ?? fallback } as ConfigService);
+    expect(() => settings.assertCanQueuePasswordReset()).not.toThrow();
+  });
   it("rejects missing encryption key when explicitly enabled", () => {
     expect(() => validateEnvironment({ ...base, EMAIL_DELIVERY_MODE: "resend" })).toThrow();
   });
@@ -159,6 +174,42 @@ describe("Email delivery fail-closed crypto/config", () => {
       const body = JSON.parse(String(args?.[1]?.body)) as Record<string, unknown>;
       expect(body.to).toEqual(["recipient@example.invalid"]);
       expect(body.from).toBe("sender@example.invalid");
+    } finally { fetchMock.mockRestore(); }
+  });
+  it("builds a password reset email without exposing the URL outside the provider request", async () => {
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, status: 200,
+      json: async () => ({ id: "mock-reset-id" }) } as Response);
+    try {
+      const settings = { mode: "resend", resendApiKey: "fake-only-key", assertCanQueuePasswordReset: () => {} } as unknown as EmailDeliverySettings;
+      const service = new EmailProviderService(settings);
+      const result = await service.sendPasswordReset({ to: "recipient@example.invalid", from: "sender@example.invalid",
+        resetUrl: "https://example.invalid/reset#token=fake", idempotencyKey: "reset:test" });
+      expect(result.providerMessageId).toBe("mock-reset-id");
+      const options = fetchMock.mock.calls[0]?.[1];
+      expect(options?.headers).toEqual(expect.objectContaining({ "Idempotency-Key": "reset:test" }));
+      const body = JSON.parse(String(options?.body));
+      expect(body.subject).toContain("Reset");
+      expect(body.to).toEqual(["recipient@example.invalid"]);
+      expect(body.text).toContain("#token=fake");
+    } finally { fetchMock.mockRestore(); }
+  });
+
+  it("escapes candidate-visible job titles in recruitment email HTML", async () => {
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, status: 200,
+      json: async () => ({ id: "mock-notice-id" }) } as Response);
+    try {
+      const settings = { mode: "resend", resendApiKey: "fake-only-key",
+        assertCanQueueRecruitment: () => {} } as unknown as EmailDeliverySettings;
+      const service = new EmailProviderService(settings);
+      await service.sendRecruitmentNotice({ to: "candidate@example.invalid", from: "sender@example.invalid",
+        url: "https://example.invalid/applications/one", jobTitle: "<script>alert(1)</script>",
+        kind: "APPLICATION_STATUS", status: "REVIEWING", idempotencyKey: "application:status:one:2" });
+      const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+      expect(body.html).not.toContain("<script>");
+      expect(body.html).toContain("&lt;script&gt;");
+      expect(body.text).toContain("REVIEWING");
+      expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({
+        "Idempotency-Key": "application:status:one:2" }));
     } finally { fetchMock.mockRestore(); }
   });
 

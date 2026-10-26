@@ -146,6 +146,12 @@ enum EmailOutboxKind {
   COMPANY_INVITATION
 }
 
+enum RecruitmentEmailKind {
+  APPLICATION_CONFIRMED
+  APPLICATION_STATUS
+  INTERVIEW_INVITATION
+}
+
 enum EmailOutboxStatus {
   QUEUED
   PROCESSING
@@ -273,6 +279,8 @@ model User {
   companiesCreated        Company[]                  @relation("CompanyCreator")
   authSessions            AuthSession[]
   emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens      PasswordResetToken[]
+  recruitmentEmailJobs    RecruitmentEmailOutbox[]
   systemRoleAssignments   SystemUserRole[]           @relation("SystemRoleAssignee")
   systemRolesAssigned     SystemUserRole[]           @relation("SystemRoleAssigner")
   systemPermissionGrants  SystemUserPermission[]     @relation("SystemPermissionAssignee")
@@ -763,6 +771,83 @@ model EmailVerificationToken {
   @@index([expiresAt])
 }
 
+model PasswordResetToken {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @db.Uuid
+  emailNormalized String    @db.VarChar(320)
+  tokenHash       String    @unique @db.VarChar(64)
+  expiresAt       DateTime  @db.Timestamptz(6)
+  consumedAt      DateTime? @db.Timestamptz(6)
+  revokedAt       DateTime? @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outboxJob PasswordResetOutbox?
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model PasswordResetOutbox {
+  id                String            @id @default(uuid()) @db.Uuid
+  tokenId           String            @unique @db.Uuid
+  idempotencyKey    String            @unique @db.VarChar(200)
+  payloadCiphertext Bytes?            @db.ByteA
+  payloadNonce      Bytes?            @db.ByteA
+  payloadTag        Bytes?            @db.ByteA
+  encryptionKeyId   String?           @db.VarChar(80)
+  status            EmailOutboxStatus @default(QUEUED)
+  attemptCount      Int               @default(0)
+  maxAttempts       Int               @default(8)
+  nextAttemptAt     DateTime          @default(now()) @db.Timestamptz(6)
+  claimedBy         String?           @db.VarChar(128)
+  leaseUntil        DateTime?         @db.Timestamptz(6)
+  providerMessageId String?           @db.VarChar(255)
+  lastErrorCode     String?           @db.VarChar(120)
+  sentAt            DateTime?         @db.Timestamptz(6)
+  cancelledAt       DateTime?         @db.Timestamptz(6)
+  createdAt         DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+
+  token PasswordResetToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseUntil])
+}
+
+model RecruitmentEmailOutbox {
+  id                String               @id @default(uuid()) @db.Uuid
+  kind              RecruitmentEmailKind
+  applicationId     String               @db.Uuid
+  interviewId       String?              @db.Uuid
+  recipientUserId   String               @db.Uuid
+  idempotencyKey    String               @unique @db.VarChar(200)
+  payloadCiphertext Bytes?               @db.ByteA
+  payloadNonce      Bytes?               @db.ByteA
+  payloadTag        Bytes?               @db.ByteA
+  encryptionKeyId   String?              @db.VarChar(80)
+  status            EmailOutboxStatus    @default(QUEUED)
+  attemptCount      Int                  @default(0)
+  maxAttempts       Int                  @default(8)
+  nextAttemptAt     DateTime             @default(now()) @db.Timestamptz(6)
+  claimedBy         String?              @db.VarChar(128)
+  leaseUntil        DateTime?            @db.Timestamptz(6)
+  providerMessageId String?              @db.VarChar(255)
+  lastErrorCode     String?              @db.VarChar(120)
+  sentAt            DateTime?            @db.Timestamptz(6)
+  cancelledAt       DateTime?            @db.Timestamptz(6)
+  createdAt         DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime             @default(now()) @updatedAt @db.Timestamptz(6)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  interview   Interview?  @relation(fields: [interviewId], references: [id], onDelete: Restrict)
+  recipient   User        @relation(fields: [recipientUserId], references: [id], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseUntil])
+  @@index([applicationId, createdAt])
+}
+
 // Phase 4.3C.2A — no plaintext recipient or one-time token in this table.
 // Encrypt both before enqueue with independently managed AES-256-GCM keys.
 // A SQL CHECK enforces ciphertext presence only in active job states and
@@ -939,6 +1024,7 @@ model Application {
   statusHistory    ApplicationStatusHistory[]
   assignments      ApplicationAssignment[]
   interviews       Interview[]
+  recruitmentEmailJobs RecruitmentEmailOutbox[]
   messages         ApplicationMessage[]
 
   @@unique([candidateProfileId, jobId])
@@ -1041,6 +1127,7 @@ model Interview {
   createdByMember CompanyMember          @relation("InterviewCreator", fields: [companyId, createdByMemberId], references: [companyId, id], onDelete: Restrict, onUpdate: Cascade, map: "Interview_creator_same_company_fkey")
   participants    InterviewParticipant[]
   session         InterviewSession?
+  recruitmentEmailJobs RecruitmentEmailOutbox[]
 
   @@unique([companyId, id])
   @@index([companyId, status, scheduledAt])

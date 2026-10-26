@@ -42,7 +42,7 @@ export class AiProviderService {
           instructions: "You are FINDWORK's career and recruitment assistant. Give practical, honest guidance. Do not claim access to private company, candidate, or job data. Do not request passwords, tax documents, or sensitive identity data. Reply in the user's language.",
           input: [...history.map((m) => ({ role: m.role, content: m.content })), { role: "user", content }] }),
       });
-    } catch (error) { throw new ServiceUnavailableException({ code: error !== null && typeof error === "object" && "name" in error && error.name === "TimeoutError"
+    } catch (error) { throw new ServiceUnavailableException({ code: error !== null && typeof error === "object" && "name" in error && (error.name === "TimeoutError" || error.name === "AbortError")
       ? "AI_PROVIDER_TIMEOUT" : "AI_PROVIDER_UNAVAILABLE" }); }
     if (!response.ok) this.unavailable(response);
     let body: { output?: Array<{ type: string; content?: Array<{ type: string; text?: string }> }>;
@@ -68,7 +68,7 @@ export class AiProviderService {
     let response: Response;
     try { response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(30_000),
-    }); } catch (error) { throw new ServiceUnavailableException({ code: error !== null && typeof error === "object" && "name" in error && error.name === "TimeoutError"
+    }); } catch (error) { throw new ServiceUnavailableException({ code: error !== null && typeof error === "object" && "name" in error && (error.name === "TimeoutError" || error.name === "AbortError")
       ? "AI_PROVIDER_TIMEOUT" : "AI_PROVIDER_UNAVAILABLE" }); }
     if (!response.ok) this.unavailable(response);
     let result: { text?: string };

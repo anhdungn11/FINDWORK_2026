@@ -2,6 +2,8 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { EmailDeliverySettings } from "../infrastructure/email/email-delivery-settings.service";
 import { EmailDeliveryWorker } from "../infrastructure/email/email-delivery.worker";
+import { PasswordResetWorker } from "../infrastructure/email/password-reset.worker";
+import { RecruitmentNotificationWorker } from "../infrastructure/email/recruitment-notification.worker";
 import { EmailWorkerModule } from "./email-worker.module";
 
 async function start(): Promise<void> {
@@ -14,9 +16,13 @@ async function start(): Promise<void> {
     const settings = app.get(EmailDeliverySettings);
     settings.assertWorkerReady();
     const worker = app.get(EmailDeliveryWorker);
+    const resetWorker = app.get(PasswordResetWorker);
+    const recruitmentWorker = app.get(RecruitmentNotificationWorker);
     while (!stopping) {
-      const claimed = await worker.processOne();
-      if (!claimed) await new Promise<void>((resolve) => setTimeout(resolve, 1500));
+      const verified = await worker.processOne();
+      const reset = await resetWorker.processOne();
+      const recruitment = await recruitmentWorker.processOne();
+      if (!verified && !reset && !recruitment) await new Promise<void>((resolve) => setTimeout(resolve, 1500));
     }
   } finally {
     await app.close();

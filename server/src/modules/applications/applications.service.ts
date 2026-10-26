@@ -1,6 +1,7 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { Prisma, type ApplicationAvailability, type ApplicationContactMethod } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
+import { RecruitmentNotificationService } from "../../infrastructure/email/recruitment-notification.service";
 import type { ApplicationPageQueryDto, AssignApplicationDto, ReviewApplicationDto, SubmitApplicationDto } from "./dto/application.dto";
 import { validateScreeningAnswers } from "./screening-answers";
 
@@ -37,7 +38,7 @@ function unavailable(): ConflictException {
 
 @Injectable()
 export class ApplicationsService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(private readonly db: PrismaService, @Optional() private readonly notifications?: RecruitmentNotificationService) {}
 
   private async requireMember(tx: Prisma.TransactionClient, companyId: string, userId: string): Promise<string> {
     const member = await tx.companyMember.findFirst({
@@ -107,6 +108,7 @@ export class ApplicationsService {
             answerValue: answer.answerValue as Prisma.InputJsonValue,
           })) });
         }
+        await this.notifications?.enqueue(tx, { kind: "APPLICATION_CONFIRMED", applicationId: application.id });
         return tx.application.findUniqueOrThrow({ where: { id: application.id }, select: applicationSelect });
       });
     } catch (error) {
@@ -210,6 +212,8 @@ export class ApplicationsService {
         actorUserId: userId, companyId, action: "application.review", targetType: "Application", targetId: applicationId,
         beforeData: { status: current.status, version: dto.version }, afterData: { status: dto.status, version: dto.version + 1 },
       } });
+      await this.notifications?.enqueue(tx, { kind: "APPLICATION_STATUS", applicationId,
+        status: dto.status, version: dto.version + 1 });
       return tx.application.findUniqueOrThrow({ where: { id: applicationId }, select: applicationSelect });
     });
   }

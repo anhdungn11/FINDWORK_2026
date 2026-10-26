@@ -146,7 +146,7 @@ async function main() {
       (SELECT count(*)::int FROM "Province") AS provinces,
       (SELECT count(*)::int FROM "Ward") AS wards,
       (SELECT count(*)::int FROM "User") AS users`)).rows[0];
-    assert.deepEqual(counts, { migrations: 10, provinces: 34, wards: 3321, users: 3 });
+    assert.deepEqual(counts, { migrations: 12, provinces: 34, wards: 3321, users: 3 });
     console.log(JSON.stringify({ status: "FRONTEND_ACCEPTANCE_READY", database: name,
       backendEnv: backendFile, accountsFile, baseUrl: `http://127.0.0.1:${port}/api/v1`,
       companyId: company.id, counts }));
