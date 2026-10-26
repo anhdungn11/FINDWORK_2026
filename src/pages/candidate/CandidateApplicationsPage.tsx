@@ -1,6 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Briefcase, Calendar, ArrowRight, FileText, CheckCircle2, RefreshCw } from "lucide-react";
+import {
+  Briefcase,
+  Calendar,
+  ArrowRight,
+  FileText,
+  CheckCircle2,
+  RefreshCw,
+  MessageSquare,
+  Clock,
+  MapPin,
+  Video,
+} from "lucide-react";
 import { candidateApplicationApi } from "@/services/api/candidateApplicationApi";
 import {
   APPLICATION_STATUS_LABEL,
@@ -8,11 +19,13 @@ import {
   formatContactMethod,
   type ApplicationStatus,
   type CompanyApplicationDto,
+  type CompanyInterviewDto,
   type Paged,
 } from "@/services/api/apiTypes";
 import type { ApiFailure } from "@/services/api/apiFailure";
 import { PageHeader, Badge, LoadingBlock } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
+import ApplicationChatModal from "@/components/messaging/ApplicationChatModal";
 import styles from "./CandidateApplicationsPage.module.css";
 
 const STATUS_TONES: Record<ApplicationStatus, "neutral" | "info" | "warning" | "success" | "danger"> = {
@@ -30,6 +43,11 @@ const CandidateApplicationsPage = () => {
   const [error, setError] = useState<ApiFailure | null>(null);
   const [paged, setPaged] = useState<Paged<CompanyApplicationDto> | null>(null);
   const [selectedApp, setSelectedApp] = useState<CompanyApplicationDto | null>(null);
+  const [chatApp, setChatApp] = useState<CompanyApplicationDto | null>(null);
+
+  // Interviews state for currently selected application
+  const [interviews, setInterviews] = useState<CompanyInterviewDto[]>([]);
+  const [interviewsLoading, setInterviewsLoading] = useState(false);
 
   const fetchApplications = useCallback(() => {
     const ctrl = new AbortController();
@@ -54,6 +72,33 @@ const CandidateApplicationsPage = () => {
   useEffect(() => {
     return fetchApplications();
   }, [fetchApplications]);
+
+  // Load interviews when an application is selected
+  useEffect(() => {
+    if (!selectedApp) {
+      setInterviews([]);
+      return;
+    }
+    let active = true;
+    setInterviewsLoading(true);
+    candidateApplicationApi
+      .listInterviews(selectedApp.id)
+      .then((data) => {
+        if (!active) return;
+        setInterviews(data);
+      })
+      .catch(() => {
+        if (!active) return;
+        setInterviews([]);
+      })
+      .finally(() => {
+        if (active) setInterviewsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedApp]);
 
   const applications = paged?.data ?? [];
 
@@ -98,23 +143,21 @@ const CandidateApplicationsPage = () => {
         </div>
       ) : applications.length === 0 ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIconCircle}>
-            <Briefcase size={32} aria-hidden="true" />
+          <div className={styles.emptyIcon}>
+            <Briefcase size={36} aria-hidden="true" />
           </div>
-          <h2 className={styles.emptyTitle}>Chưa có đơn ứng tuyển nào</h2>
-          <p className={styles.emptyText}>
-            Bạn chưa gửi hồ sơ ứng tuyển nào trên FINDWORK. Hãy khám phá các tin tuyển dụng đang mở và ứng tuyển ngay hôm nay.
-          </p>
-          <Link to="/jobs" className={styles.emptyButton}>
-            Khám phá việc làm <ArrowRight size={16} aria-hidden="true" />
+          <h3>Chưa có đơn ứng tuyển nào</h3>
+          <p>Bạn chưa nộp hồ sơ vào vị trí công việc nào trên FINDWORK.</p>
+          <Link to="/jobs" className={styles.emptyAction}>
+            Khám phá việc làm phù hợp
           </Link>
         </div>
       ) : (
-        <div className={styles.appList}>
+        <div className={styles.list}>
           {applications.map((app) => (
-            <article key={app.id} className={styles.appCard}>
-              <div className={styles.appHeader}>
-                <div className={styles.jobInfo}>
+            <article key={app.id} className={styles.card}>
+              <div className={styles.cardHeader}>
+                <div>
                   <h2 className={styles.jobTitle}>
                     <Link to={`/jobs/${app.jobId}`}>
                       {app.job?.title || "Vị trí tuyển dụng"}
@@ -151,6 +194,16 @@ const CandidateApplicationsPage = () => {
               <div className={styles.cardFooter}>
                 <span className={styles.appId}>Mã đơn: {app.id.slice(0, 8)}...</span>
                 <div className={styles.cardActions}>
+                  <button
+                    type="button"
+                    className={styles.detailBtn}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                    onClick={() => setChatApp(app)}
+                    title="Trao đổi tin nhắn với nhà tuyển dụng"
+                  >
+                    <MessageSquare size={14} />
+                    <span>Nhắn tin</span>
+                  </button>
                   <Link to={`/jobs/${app.jobId}`} className={styles.viewJobBtn}>
                     Xem tin tuyển dụng
                   </Link>
@@ -193,15 +246,86 @@ const CandidateApplicationsPage = () => {
             <div className={styles.modalBody}>
               <div className={styles.detailSection}>
                 <h4>Trạng thái đơn</h4>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
                   <Badge tone={STATUS_TONES[selectedApp.status] ?? "neutral"}>
                     {APPLICATION_STATUS_LABEL[selectedApp.status] ?? selectedApp.status}
                   </Badge>
                   <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
                     Cập nhật lần cuối: {new Date(selectedApp.updatedAt).toLocaleDateString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
                   </span>
+                  <button
+                    type="button"
+                    className={styles.detailBtn}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      marginLeft: "auto",
+                      backgroundColor: "#0284c7",
+                      color: "#fff",
+                      border: "none",
+                    }}
+                    onClick={() => {
+                      setChatApp(selectedApp);
+                    }}
+                  >
+                    <MessageSquare size={14} />
+                    <span>Nhắn tin với nhà tuyển dụng</span>
+                  </button>
                 </div>
               </div>
+
+              {/* Lịch phỏng vấn mời từ nhà tuyển dụng */}
+              {interviewsLoading ? (
+                <div className={styles.detailSection}>
+                  <LoadingBlock rows={2} label="Đang kiểm tra lịch phỏng vấn..." />
+                </div>
+              ) : interviews.length > 0 ? (
+                <div className={styles.detailSection} style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 14 }}>
+                  <h4 style={{ color: "#166534", margin: "0 0 10px", display: "flex", alignItems: "center", gap: 6 }}>
+                    <Calendar size={16} /> Lịch hẹn phỏng vấn từ nhà tuyển dụng
+                  </h4>
+                  {interviews.map((iv) => (
+                    <div key={iv.id} style={{ display: "grid", gap: 6, fontSize: "0.875rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Clock size={15} style={{ color: "#16a34a" }} />
+                        <strong>
+                          {new Date(iv.scheduledAt).toLocaleString("vi-VN", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </strong>
+                        <Badge tone={iv.status === "SCHEDULED" ? "success" : iv.status === "CANCELLED" ? "danger" : "info"}>
+                          {iv.status === "SCHEDULED" ? "Đã xếp lịch" : iv.status === "CANCELLED" ? "Đã hủy" : "Đã hoàn thành"}
+                        </Badge>
+                      </div>
+                      {iv.location && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#374151" }}>
+                          <MapPin size={15} />
+                          <span>Địa điểm: {iv.location}</span>
+                        </div>
+                      )}
+                      {iv.meetingUrl && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Video size={15} style={{ color: "#0284c7" }} />
+                          <a href={iv.meetingUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#0284c7", textDecoration: "underline" }}>
+                            Liên kết phòng họp trực tuyến
+                          </a>
+                        </div>
+                      )}
+                      {iv.notes && (
+                        <p style={{ margin: "4px 0 0", color: "#4b5563", fontStyle: "italic" }}>
+                          Ghi chú: {iv.notes}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               <div className={styles.detailSection}>
                 <h4>Thông tin người ứng tuyển</h4>
@@ -292,6 +416,18 @@ const CandidateApplicationsPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Interpersonal Candidate <-> Employer Chat Modal */}
+      {chatApp && (
+        <ApplicationChatModal
+          isOpen={Boolean(chatApp)}
+          onClose={() => setChatApp(null)}
+          applicationId={chatApp.id}
+          side="CANDIDATE"
+          title={`Trao đổi với ${chatApp.job?.company?.name || "Nhà tuyển dụng"}`}
+          subtitle={`Vị trí: ${chatApp.job?.title || "Tin tuyển dụng"}`}
+        />
       )}
     </div>
   );

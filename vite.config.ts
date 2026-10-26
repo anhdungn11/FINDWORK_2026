@@ -12,6 +12,12 @@ export default defineConfig(({ mode }) => {
     process.env.VITE_PORT === "5173" ||
     env.VITE_PORT === "5173";
 
+  const isPort5177 =
+    process.argv.includes("5177") ||
+    process.env.PORT === "5177" ||
+    process.env.VITE_PORT === "5177" ||
+    env.VITE_PORT === "5177";
+
   const isTestBackendPort =
     process.env.VITE_BACKEND_PORT === "3001" ||
     env.VITE_BACKEND_PORT === "3001" ||
@@ -34,9 +40,26 @@ export default defineConfig(({ mode }) => {
     );
   }
 
+  // Fail-closed safety: Port 5177 integration instance MUST NEVER target dev (3000) or test (3001) backend
+  if (
+    isPort5177 &&
+    requestedTarget &&
+    (requestedTarget.includes(":3000") ||
+      requestedTarget.endsWith("3000") ||
+      requestedTarget.includes(":3001") ||
+      requestedTarget.endsWith("3001"))
+  ) {
+    throw new Error(
+      "[Vite Safety Gate] Port 5177 is dedicated to integrated frontend delivery targeting backend port 3002. " +
+      "Targeting port 3000 (findwork_dev) or port 3001 (findwork_test) is strictly prohibited to prevent environment pollution."
+    );
+  }
+
   // 3. Fixed backend target selected at startup (no ambiguous Host header inspection or silent fallback)
   const backendTarget = isTestInstance
     ? "http://127.0.0.1:3001"
+    : isPort5177
+    ? (requestedTarget || "http://127.0.0.1:3002")
     : (requestedTarget || "http://127.0.0.1:3000");
 
   return {

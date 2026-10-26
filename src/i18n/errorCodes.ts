@@ -21,6 +21,18 @@ export const LOCALIZED_API_ERRORS: Record<string, { vi: string; en: string }> = 
     vi: "Địa chỉ email này đã được đăng ký tài khoản.",
     en: "An account with this email address already exists.",
   },
+  AUTH_EMAIL_VERIFICATION_DELIVERY_UNAVAILABLE: {
+    vi: "Dịch vụ gửi email xác minh hiện chưa được cấu hình nhà cung cấp dịch vụ trên máy chủ (HTTP 503).",
+    en: "Email verification delivery service is not configured on the server (HTTP 503).",
+  },
+  COMPANY_INVITATION_DELIVERY_UNAVAILABLE: {
+    vi: "Dịch vụ gửi email lời mời hiện chưa được cấu hình nhà cung cấp dịch vụ trên máy chủ (HTTP 503).",
+    en: "Company invitation delivery service is not configured on the server (HTTP 503).",
+  },
+  CONVERSATION_NOT_FOUND: {
+    vi: "Không tìm thấy hội thoại trao đổi cho đơn ứng tuyển này.",
+    en: "Conversation not found for this application.",
+  },
   AUTH_SESSION_INVALID: {
     vi: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
     en: "Session is invalid or expired. Please sign in again.",

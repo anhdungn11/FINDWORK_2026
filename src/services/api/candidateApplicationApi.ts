@@ -5,6 +5,7 @@ import {
   normalizePaged,
   unwrapData,
   type CompanyApplicationDto,
+  type CompanyInterviewDto,
   type Paged,
 } from "./apiTypes";
 
@@ -119,6 +120,30 @@ export const candidateApplicationApi = {
         { signal },
       );
       return normalizeCompanyApplication(unwrapData(res.data));
+    } catch (e) {
+      throw toApiFailure(e);
+    }
+  },
+
+  /**
+   * GET /api/v1/candidate/applications/:applicationId/interviews
+   * Danh sách lịch phỏng vấn của đơn ứng tuyển do nhà tuyển dụng mời.
+   */
+  async listInterviews(
+    applicationId: string,
+    signal?: AbortSignal,
+  ): Promise<CompanyInterviewDto[]> {
+    try {
+      const res = await apiClient.get(
+        `/candidate/applications/${encodeURIComponent(applicationId)}/interviews`,
+        { signal },
+      );
+      const raw = res.data;
+      if (Array.isArray(raw)) return raw as CompanyInterviewDto[];
+      if (raw && typeof raw === "object" && Array.isArray((raw as any).data)) {
+        return (raw as any).data as CompanyInterviewDto[];
+      }
+      return [];
     } catch (e) {
       throw toApiFailure(e);
     }

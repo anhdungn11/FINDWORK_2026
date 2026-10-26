@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FileText, X } from "lucide-react";
+import { FileText, MessageSquare, X } from "lucide-react";
+import ApplicationChatModal from "@/components/messaging/ApplicationChatModal";
 import {
   Badge,
   Card,
@@ -71,6 +72,7 @@ const EmployerApplicantsPage = () => {
   const page = Math.max(1, Number(params.get("page")) || 1);
 
   const [activeApplication, setActiveApplication] = useState<CompanyApplicationDto | null>(null);
+  const [chatTargetApp, setChatTargetApp] = useState<CompanyApplicationDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [interviewTargetApp, setInterviewTargetApp] = useState<CompanyApplicationDto | null>(null);
@@ -452,6 +454,16 @@ const EmployerApplicantsPage = () => {
                           style={{ fontSize: "0.85rem", padding: "5px 12px" }}
                         >
                           Xem hồ sơ
+                        </button>
+                        <button
+                          type="button"
+                          className={ui.btn}
+                          onClick={() => setChatTargetApp(app)}
+                          style={{ fontSize: "0.85rem", padding: "5px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}
+                          title="Nhắn tin với ứng viên"
+                        >
+                          <MessageSquare size={13} />
+                          <span>Nhắn tin</span>
                         </button>
                         {availableReviewTransitions(app.status).map((nextSt) => (
                           <button
@@ -992,6 +1004,17 @@ const EmployerApplicantsPage = () => {
                 <button
                   type="button"
                   className={ui.btn}
+                  onClick={() => setChatTargetApp(activeApplication)}
+                  style={{ fontSize: "0.875rem", padding: "6px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}
+                  title="Nhắn tin trao đổi với ứng viên"
+                >
+                  <MessageSquare size={15} />
+                  <span>Nhắn tin với ứng viên</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={ui.btn}
                   onClick={() => setActiveApplication(null)}
                 >
                   Đóng
@@ -1089,6 +1112,18 @@ const EmployerApplicantsPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {chatTargetApp && (
+        <ApplicationChatModal
+          isOpen={Boolean(chatTargetApp)}
+          onClose={() => setChatTargetApp(null)}
+          applicationId={chatTargetApp.id}
+          side="COMPANY"
+          companyId={active.id}
+          title={`Trao đổi với ${chatTargetApp.fullNameSnapshot || chatTargetApp.emailSnapshot || "Ứng viên"}`}
+          subtitle={`Hồ sơ vị trí: ${currentJobObj?.title || "Tuyển dụng"}`}
+        />
       )}
     </>
   );

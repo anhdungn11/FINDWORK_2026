@@ -94,8 +94,34 @@ export function isLiveWritesEnabled(): boolean {
     return false;
   }
 
-  // Đối với port 5176 (dev demo) hoặc 5177 (isolated integration): cho phép khi env opt-in được thiết lập tường minh
-  if (isDevDemoPort || isIntegrationPort) {
+  // Khóa cứng đối với port 5177 (isolated integration): cấm tuyệt đối thao tác ghi nếu hướng tới dev (3000) hoặc test (3001)
+  if (isIntegrationPort) {
+    const isTargetingUnintended =
+      backendTarget.includes(":3000") ||
+      backendPort === "3000" ||
+      apiBaseUrl.includes(":3000") ||
+      backendTarget.includes(":3001") ||
+      backendPort === "3001" ||
+      apiBaseUrl.includes(":3001");
+
+    if (isTargetingUnintended) {
+      return false;
+    }
+
+    const isTargeting3002 =
+      backendTarget.includes(":3002") ||
+      backendPort === "3002" ||
+      apiBaseUrl.includes(":3002") ||
+      (!backendTarget && !backendPort && !apiBaseUrl); // Vite proxy trên port 5177 mặc định định tuyến tới 3002
+
+    if (!isTargeting3002) {
+      return false;
+    }
+    return true;
+  }
+
+  // Đối với port 5176 (dev demo): cho phép khi env opt-in được thiết lập tường minh
+  if (isDevDemoPort) {
     return true;
   }
 
