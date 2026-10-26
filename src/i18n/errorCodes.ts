@@ -25,6 +25,14 @@ export const LOCALIZED_API_ERRORS: Record<string, { vi: string; en: string }> = 
     vi: "Dịch vụ gửi email xác minh hiện chưa được cấu hình nhà cung cấp dịch vụ trên máy chủ (HTTP 503).",
     en: "Email verification delivery service is not configured on the server (HTTP 503).",
   },
+  AUTH_PASSWORD_RESET_DELIVERY_UNAVAILABLE: {
+    vi: "Dịch vụ gửi email đặt lại mật khẩu hiện chưa được cấu hình nhà cung cấp dịch vụ trên máy chủ (HTTP 503).",
+    en: "Password reset delivery service is not configured on the server (HTTP 503).",
+  },
+  AUTH_PASSWORD_RESET_TOKEN_INVALID: {
+    vi: "Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.",
+    en: "Password reset token is invalid or expired.",
+  },
   COMPANY_INVITATION_DELIVERY_UNAVAILABLE: {
     vi: "Dịch vụ gửi email lời mời hiện chưa được cấu hình nhà cung cấp dịch vụ trên máy chủ (HTTP 503).",
     en: "Company invitation delivery service is not configured on the server (HTTP 503).",

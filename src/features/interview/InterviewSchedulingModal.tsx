@@ -358,6 +358,9 @@ export const InterviewSchedulingModal = ({
           {/* Notification recipient */}
           <div style={{ padding: "8px 12px", background: "#f8fafc", borderRadius: 6, fontSize: "0.8rem", color: "#64748b" }}>
             📧 Ứng viên nhận thông báo: <strong>{candidateEmail}</strong>
+            <div style={{ marginTop: 4, fontSize: "0.75rem", color: "#94a3b8" }}>
+              Lưu ý: Email thông báo lịch phỏng vấn sẽ được xếp vào hàng đợi gửi khi dịch vụ gửi thư được cấu hình trên máy chủ. Lịch phỏng vấn luôn được lưu và hiển thị trực tiếp trên hệ thống.
+            </div>
           </div>
 
           {/* Footer buttons */}
