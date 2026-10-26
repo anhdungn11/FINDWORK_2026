@@ -34,8 +34,16 @@ const ResumeUploadModal = ({
       setError("");
       setIsSubmitting(false);
       setIsDragging(false);
+      return;
     }
-  }, [isOpen]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isSubmitting, onClose]);
 
   if (!isOpen) {
     return null;

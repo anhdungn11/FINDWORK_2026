@@ -9,6 +9,7 @@ import AuthPasswordField from "@/features/auth/components/AuthPasswordField/Auth
 import AuthShell from "@/features/auth/components/AuthShell/AuthShell";
 import AuthSubmitButton from "@/features/auth/components/AuthSubmitButton/AuthSubmitButton";
 import { useLoginForm } from "@/features/auth/hooks/useLoginForm";
+import styles from "./LoginPageLinks.module.css";
 
 const LoginPage = () => {
   const location = useLocation();
@@ -60,6 +61,11 @@ const LoginPage = () => {
           id="password" label="Mật khẩu" value={password}
           placeholder="Nhập mật khẩu" autoComplete="current-password" required onChange={setPassword}
         />
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "-6px", marginBottom: "4px" }}>
+          <Link to="/forgot-password" className={styles.forgotLink}>
+            Quên mật khẩu?
+          </Link>
+        </div>
         <AuthErrorMessage message={error} />
         <AuthSubmitButton disabled={isSubmitting}>
           {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}

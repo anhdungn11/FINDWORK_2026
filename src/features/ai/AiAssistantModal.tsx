@@ -44,6 +44,8 @@ import {
 } from "./aiChatApi";
 import { encodeWav, resampleTo16kMono } from "./audioUtils";
 import { useI18n } from "../../i18n/i18nStore";
+import { AiMarkdownMessage } from "./components/AiMarkdownMessage";
+import styles from "./AiAssistantModal.module.css";
 import {
   VI_CATEGORIES,
   EN_CATEGORIES,
@@ -354,6 +356,13 @@ export const AiAssistantModal = ({
     }
   };
 
+  const handleRetryMessage = (msg: ChatMessage) => {
+    const remaining = messages.filter((m) => m.id !== msg.id);
+    setMessages(remaining);
+    saveChatHistory(remaining);
+    void handleSend(msg.content);
+  };
+
   /* =========================================================================
    * Actions: Image Handling
    * ========================================================================= */
@@ -528,33 +537,10 @@ export const AiAssistantModal = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1050,
-        backgroundColor: isExpanded ? "rgba(15, 23, 42, 0.6)" : "rgba(15, 23, 42, 0.25)",
-        backdropFilter: isExpanded ? "blur(4px)" : "none",
-        pointerEvents: "auto",
-        display: "flex",
-        alignItems: isExpanded ? "center" : "flex-end",
-        justifyContent: isExpanded ? "center" : "flex-end",
-        padding: isExpanded ? 16 : 0,
-      }}
+      className={`${styles.overlay} ${isExpanded ? styles.overlayExpanded : styles.overlayFloating}`}
     >
       <div
-        style={{
-          pointerEvents: "auto",
-          width: isExpanded ? "min(920px, 95vw)" : "min(460px, 100vw)",
-          height: isExpanded ? "min(840px, 92vh)" : "min(640px, 90vh)",
-          margin: isExpanded ? 0 : "0 16px 16px 0",
-          backgroundColor: "#ffffff",
-          borderRadius: isExpanded ? 16 : "16px 16px 12px 12px",
-          boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
-        }}
+        className={`${styles.container} ${isExpanded ? styles.containerExpanded : styles.containerFloating}`}
       >
         {/* ================= HEADER ================= */}
         <header
@@ -1053,33 +1039,19 @@ export const AiAssistantModal = ({
             }}
           >
             {/* Category Pills */}
-            <div
-              style={{
-                display: "flex",
-                gap: 6,
-                padding: "8px 12px",
-                borderBottom: "1px solid #f1f5f9",
-                overflowX: "auto",
-                backgroundColor: "#fcfdfe",
-              }}
-            >
+            <div className={styles.categoryPillsScroll}>
               {categories.map((cat) => (
                 <button
                   key={cat.key}
                   type="button"
                   onClick={() => setActiveCategory(cat.key)}
+                  className={styles.categoryPill}
                   style={{
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    fontSize: 11,
                     fontWeight: activeCategory === cat.key ? 600 : 500,
                     border: "1px solid",
                     borderColor: activeCategory === cat.key ? "#0ea5e9" : "#e2e8f0",
                     backgroundColor: activeCategory === cat.key ? "#f0f9ff" : "#ffffff",
                     color: activeCategory === cat.key ? "#0369a1" : "#64748b",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    transition: "all 0.15s ease",
                   }}
                 >
                   {cat.label}
@@ -1204,11 +1176,8 @@ export const AiAssistantModal = ({
                       }}
                     >
                       <div
+                        className={styles.messageBubbleContainer}
                         style={{
-                          display: "flex",
-                          alignItems: "flex-end",
-                          gap: 8,
-                          maxWidth: "85%",
                           flexDirection: isUser ? "row-reverse" : "row",
                         }}
                       >
@@ -1230,19 +1199,7 @@ export const AiAssistantModal = ({
                         </div>
 
                         {/* Bubble */}
-                        <div
-                          style={{
-                            padding: "10px 14px",
-                            borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                            backgroundColor: isUser ? "#0284c7" : "#f1f5f9",
-                            color: isUser ? "#ffffff" : "#0f172a",
-                            fontSize: 13.5,
-                            lineHeight: 1.5,
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                          }}
-                        >
+                        <div className={isUser ? styles.userBubble : styles.assistantBubble}>
                           {/* Attached image preview */}
                           {m.imageUrl && (
                             <div style={{ marginBottom: 8, borderRadius: 8, overflow: "hidden" }}>
@@ -1254,7 +1211,13 @@ export const AiAssistantModal = ({
                             </div>
                           )}
 
-                          {m.content}
+                          {isUser ? (
+                            <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                              {m.content}
+                            </div>
+                          ) : (
+                            <AiMarkdownMessage content={m.content} isUser={false} />
+                          )}
                         </div>
                       </div>
 
@@ -1273,7 +1236,18 @@ export const AiAssistantModal = ({
                         <span>{m.timestamp}</span>
                         {m.status === "sending" && <span>• Đang gửi...</span>}
                         {m.status === "error" && (
-                          <span style={{ color: "#ef4444" }}>• Chưa gửi được</span>
+                          <>
+                            <span style={{ color: "#ef4444" }}>• Chưa gửi được</span>
+                            <button
+                              type="button"
+                              className={styles.retryBtn}
+                              onClick={() => handleRetryMessage(m)}
+                              title="Thử gửi lại tin nhắn này"
+                            >
+                              <RefreshCw size={10} />
+                              Thử lại
+                            </button>
+                          </>
                         )}
 
                         {!isUser && (
