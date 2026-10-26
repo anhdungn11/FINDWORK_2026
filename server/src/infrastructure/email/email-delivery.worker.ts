@@ -70,7 +70,8 @@ export class EmailDeliveryWorker {
         return true;
       }
       const url = new URL(value.verificationBaseUrl);
-      url.searchParams.set("token", value.rawToken);
+      // Fragments stay in the browser and are not sent in HTTP requests or access logs.
+      url.hash = `token=${value.rawToken}`;
       const result = await this.provider.sendVerification({
         to: value.recipient,
         from: value.sender,

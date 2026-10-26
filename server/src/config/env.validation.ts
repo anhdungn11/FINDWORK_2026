@@ -6,6 +6,7 @@ export interface ValidatedEnvironment {
   API_PREFIX: string;
   CORS_ORIGINS: string[];
   DATABASE_URL: string;
+  FINDWORK_EXPECTED_DATABASE?: string;
 
   JWT_ACCESS_SECRET: string;
   JWT_ACCESS_TTL_SECONDS: number;
@@ -183,7 +184,7 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
       let url: URL;
       try { url = new URL(verifyUrl); } catch { throw new Error("EMAIL_VERIFY_URL invalid"); }
       if ((url.protocol !== "https:" && !(env !== "production" && url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) ||
-        url.username || url.password || url.hash || url.searchParams.has("token")) {
+        url.username || url.password || url.hash || url.search) {
         throw new Error("EMAIL_VERIFY_URL must use HTTPS and contain no token");
       }
     }
@@ -247,13 +248,27 @@ export function validateEnvironment(
     );
   }
 
+  const port = parsePort(raw.PORT);
+  const databaseUrl = parseDatabaseUrl(raw.DATABASE_URL);
+  const expectedDatabase = String(raw.FINDWORK_EXPECTED_DATABASE ??
+    (nodeEnv === "test" && port === 3002 ? "findwork_employer_media_3002" : "")).trim();
+  if (expectedDatabase) {
+    const parsed = new URL(databaseUrl);
+    if (!/^[a-z][a-z0-9_]{2,62}$/.test(expectedDatabase) ||
+        decodeURIComponent(parsed.pathname.slice(1)) !== expectedDatabase ||
+        parsed.searchParams.get("schema") !== "public") {
+      throw new Error("DATABASE_URL does not match FINDWORK_EXPECTED_DATABASE/public schema.");
+    }
+  }
+
   return {
     ...raw,
     NODE_ENV: nodeEnv,
-    PORT: parsePort(raw.PORT),
+    PORT: port,
     API_PREFIX: parseApiPrefix(raw.API_PREFIX),
     CORS_ORIGINS: parseCorsOrigins(raw.CORS_ORIGINS, nodeEnv),
-    DATABASE_URL: parseDatabaseUrl(raw.DATABASE_URL),
+    DATABASE_URL: databaseUrl,
+    FINDWORK_EXPECTED_DATABASE: expectedDatabase || undefined,
 
     JWT_ACCESS_SECRET: jwtAccessSecret,
     JWT_ACCESS_TTL_SECONDS: parsePositiveInteger(

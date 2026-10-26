@@ -18,7 +18,7 @@ export class EmailVerificationController {
   @Post("request")
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth("access-token")
-  @ApiOperation({ summary: "Request verification; disabled until encrypted delivery is wired" })
+  @ApiOperation({ summary: "Queue encrypted verification email when delivery is configured" })
   @Throttle({ default: { limit: 10, ttl: 600_000 } })
   @UseGuards(AccessTokenGuard, AuthOriginGuard, ThrottlerGuard)
   request(@CurrentAuth() auth: AuthenticatedPrincipal): Promise<void> {

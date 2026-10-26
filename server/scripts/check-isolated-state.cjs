@@ -27,6 +27,8 @@ async function main() {
       (SELECT count(*)::int FROM "Skill") AS skills,
       (SELECT count(*)::int FROM "LanguageCertificateType") AS certificates,
       (SELECT count(*)::int FROM "Role") AS roles,
+      (SELECT count(*)::int FROM "SystemUserRole" sr JOIN "Role" r ON r.id=sr."roleId"
+        WHERE r."systemCode"='SUPER_ADMIN') AS super_admin_assignments,
       (SELECT count(*)::int FROM "Permission") AS permissions`);
     const row = result.rows[0];
     if (row.database !== "findwork_employer_media_3002" || row.schema !== "public" ||

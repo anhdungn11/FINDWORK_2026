@@ -233,6 +233,11 @@ enum AccountType {
   LEGACY_UNCLASSIFIED
 }
 
+enum ApplicationMessageSender {
+  CANDIDATE
+  COMPANY
+}
+
 enum PermissionEffect {
   ALLOW
   DENY
@@ -277,6 +282,7 @@ model User {
   applicationStatusEdits  ApplicationStatusHistory[] @relation("ApplicationStatusActor")
   auditLogs               AuditLog[]                 @relation("AuditActor")
   aiConversations         AiConversation[]
+  applicationMessages     ApplicationMessage[]
 
   @@index([status])
 }
@@ -933,6 +939,7 @@ model Application {
   statusHistory    ApplicationStatusHistory[]
   assignments      ApplicationAssignment[]
   interviews       Interview[]
+  messages         ApplicationMessage[]
 
   @@unique([candidateProfileId, jobId])
   @@unique([companyId, id])
@@ -941,6 +948,24 @@ model Application {
   @@index([candidateProfileId, status, updatedAt])
   @@index([jobId, status, createdAt])
   @@index([resumeVersionId])
+}
+
+model ApplicationMessage {
+  id              String                   @id @default(uuid()) @db.Uuid
+  applicationId   String                   @db.Uuid
+  senderUserId    String                   @db.Uuid
+  senderRole      ApplicationMessageSender
+  body            String                   @db.VarChar(4000)
+  candidateReadAt DateTime?                @db.Timestamptz(6)
+  companyReadAt   DateTime?                @db.Timestamptz(6)
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(6)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  sender      User        @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, createdAt, id])
+  @@index([applicationId, senderRole, candidateReadAt])
+  @@index([applicationId, senderRole, companyReadAt])
 }
 
 model ApplicationAnswer {

@@ -119,7 +119,7 @@ describe("Phase 4.3C.2C Email Delivery (findwork_test ONLY)", () => {
     expect(final.providerMessageId).toBe("sandbox-message-id");
     expect(calls).toHaveLength(1);
     expect(calls[0]?.to).toBe(user.email);
-    expect(new URL(calls[0]!.verifyUrl).searchParams.get("token")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(new URLSearchParams(new URL(calls[0]!.verifyUrl).hash.slice(1)).get("token")).toMatch(/^[A-Za-z0-9_-]{43}$/);
   });
 
   it("retries transient provider failure without scrubbing payload", async () => {

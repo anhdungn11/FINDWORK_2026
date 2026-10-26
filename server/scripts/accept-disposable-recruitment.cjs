@@ -29,6 +29,7 @@ const maintenance = new Client({ connectionString: maintenanceUrl.toString(), co
 const database = new Client({ connectionString: dbUrl.toString(), connectionTimeoutMillis: 5000 });
 const marker = randomUUID().slice(0, 8);
 let apiProcess;
+let apiDiagnostic = "";
 let created = false;
 let port;
 
@@ -57,7 +58,7 @@ async function waitForApi(base) {
     } catch { /* Startup is still in progress. */ }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("Isolated API did not become healthy");
+  throw new Error(`Isolated API did not become healthy: ${apiDiagnostic.slice(-600)}`);
 }
 
 async function call(base, method, route, token, body, expected, code) {
@@ -102,6 +103,16 @@ async function main() {
       EMAIL_INVITATION_DELIVERY_ENABLED: "false" };
     command("Prisma migrate deploy", ["./node_modules/prisma/build/index.js", "migrate", "deploy"], childEnv);
     command("Foundational reference/RBAC seed", ["./node_modules/tsx/dist/cli.mjs", "prisma/seed.ts"], childEnv);
+    const adminEmail = `release-${marker}-platform-admin@example.invalid`;
+    const adminPassword = `Bootstrap-${randomUUID()}!`;
+    const bootstrapEnv = { ...childEnv, ADMIN_BOOTSTRAP_EXPECTED_DATABASE: dbName,
+      ADMIN_BOOTSTRAP_EMAIL: adminEmail, ADMIN_BOOTSTRAP_PASSWORD: adminPassword };
+    command("First admin dry run", ["scripts/bootstrap-first-super-admin.cjs"], bootstrapEnv);
+    command("First admin bootstrap", ["scripts/bootstrap-first-super-admin.cjs", "--apply"],
+      { ...bootstrapEnv, ADMIN_BOOTSTRAP_ALLOW_WRITE: "YES" });
+    const repeatBootstrap = spawnSync(process.execPath, ["scripts/bootstrap-first-super-admin.cjs", "--apply"],
+      { cwd: root, env: { ...bootstrapEnv, ADMIN_BOOTSTRAP_ALLOW_WRITE: "YES" }, encoding: "utf8", timeout: 15_000 });
+    assert.notEqual(repeatBootstrap.status, 0, "First admin bootstrap must be single use");
     await database.connect();
     const identity = (await database.query(`SELECT current_database() AS database, current_schema() AS schema,
       inet_server_addr()::text AS address, inet_server_port() AS port`)).rows[0];
@@ -114,7 +125,7 @@ async function main() {
       (SELECT count(*)::int FROM "User") AS users,
       (SELECT count(*)::int FROM "Company") AS companies,
       (SELECT count(*)::int FROM "Ward") AS wards`)).rows[0];
-    assert.deepEqual(fresh, { migrations: 9, users: 0, companies: 0, wards: 0 });
+    assert.deepEqual(fresh, { migrations: 10, users: 1, companies: 0, wards: 0 });
     const provinces = require("../prisma/seed-data/vietnam-administrative-2026-10-16.json");
     assert.equal(provinces.version, "vn-admin-2026-10-16");
     assert.equal(provinces.provinces.length, 34);
@@ -134,8 +145,13 @@ async function main() {
       cwd: root, env: { ...childEnv, PORT: String(port) }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
     });
     // Drain startup logs; they may contain configuration details and are never printed.
-    apiProcess.stdout.on("data", () => {});
-    apiProcess.stderr.on("data", () => {});
+    const capture = (chunk) => {
+      apiDiagnostic = (apiDiagnostic + String(chunk)).slice(-1600)
+        .replace(/(?:postgresql|postgres):\/\/[^\s]+/gi, "[REDACTED_DATABASE_URL]")
+        .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]");
+    };
+    apiProcess.stdout.on("data", capture);
+    apiProcess.stderr.on("data", capture);
     await waitForApi(base);
     const registration = async (type, label) => call(base, "POST", "/auth/register/v2", null,
       { email: `release-${marker}-${label}@example.invalid`, password: `Test-${randomUUID()}!`, accountType: type }, 201);
@@ -149,6 +165,16 @@ async function main() {
     const outsiderToken = outsider.accessToken;
     const candidateToken = candidate.accessToken;
     const otherCandidateToken = otherCandidate.accessToken;
+    const admin = await call(base, "POST", "/auth/login", null,
+      { email: adminEmail, password: adminPassword }, 200);
+    const adminToken = admin.accessToken;
+    assert.equal(admin.user.accountType, "LEGACY_UNCLASSIFIED");
+    assert.equal((await database.query('SELECT "accountType" FROM "User" WHERE id=$1', [admin.user.id])).rows[0].accountType, null);
+    await call(base, "GET", "/admin/dashboard", null, null, 401);
+    await call(base, "GET", "/admin/dashboard", ownerToken, null, 403);
+    await call(base, "GET", "/admin/dashboard", candidateToken, null, 403);
+    const initialAdmin = await call(base, "GET", "/admin/dashboard", adminToken, null, 200);
+    assert.equal(initialAdmin.users, 5);
     const company = await call(base, "POST", "/companies", ownerToken,
       { name: `FINDWORK Release E2E ${marker}`, slug: `release-e2e-${marker}` }, 201);
     const otherCompany = await call(base, "POST", "/companies", outsiderToken,
@@ -270,6 +296,29 @@ async function main() {
     const freshCandidate = await call(base, "GET", `/candidate/applications/${application.id}`, candidateToken, null, 200);
     assert.equal(freshCandidate.status, "REVIEWING");
     assert.ok(!JSON.stringify(freshCandidate).includes("Disposable internal review"));
+    const companyConversation = `/companies/${company.id}/conversations/${application.id}`;
+    const candidateConversation = `/candidate/conversations/${application.id}`;
+    await call(base, "GET", `${companyConversation}/messages`, outsiderToken, null, 403);
+    await call(base, "GET", `${candidateConversation}/messages`, otherCandidateToken, null, 404);
+    await call(base, "POST", `${candidateConversation}/messages`, adminToken, { body: "Admin impersonation" }, 403);
+    const employerMessage = await call(base, "POST", `${companyConversation}/messages`, ownerToken,
+      { body: "Can we discuss your application?" }, 201);
+    assert.equal(employerMessage.senderRole, "COMPANY");
+    const candidateInbox = await call(base, "GET", "/candidate/conversations", candidateToken, null, 200);
+    assert.equal(candidateInbox.data.find((row) => row.applicationId === application.id)?.unreadCount, 1);
+    const candidateMessages = await call(base, "GET", `${candidateConversation}/messages`, candidateToken, null, 200);
+    assert.equal(candidateMessages.data[0].body, employerMessage.body);
+    assert.equal(candidateMessages.unreadCount, 1);
+    assert.equal((await call(base, "POST", `${candidateConversation}/read`, candidateToken, null, 201)).readCount, 1);
+    const candidateMessage = await call(base, "POST", `${candidateConversation}/messages`, candidateToken,
+      { body: "Yes, thank you." }, 201);
+    assert.equal(candidateMessage.senderRole, "CANDIDATE");
+    const employerInbox = await call(base, "GET", `/companies/${company.id}/conversations`, ownerToken, null, 200);
+    assert.equal(employerInbox.data.find((row) => row.applicationId === application.id)?.unreadCount, 1);
+    const employerMessages = await call(base, "GET", `${companyConversation}/messages`, ownerToken, null, 200);
+    assert.deepEqual(employerMessages.data.map((row) => row.body), [employerMessage.body, candidateMessage.body]);
+    assert.equal((await database.query('SELECT count(*)::int AS count FROM "ApplicationMessage" WHERE "applicationId"=$1',
+      [application.id])).rows[0].count, 2);
     const history = (await database.query(`SELECT "fromStatus","toStatus" FROM "ApplicationStatusHistory"
       WHERE "applicationId"=$1 ORDER BY "createdAt",id`, [application.id])).rows;
     assert.deepEqual(history.map((row) => row.toStatus), ["SUBMITTED", "REVIEWING"]);
@@ -294,6 +343,37 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 4200));
     await call(base, "GET", `/jobs/${expiring.id}`, null, null, 404);
     assert.equal((await list({ pageSize: "100" })).pagination.total, 2);
+    const adminUsers = await call(base, "GET", "/admin/users?pageSize=100", adminToken, null, 200);
+    const adminCompanies = await call(base, "GET", "/admin/companies?pageSize=100", adminToken, null, 200);
+    const adminJobs = await call(base, "GET", "/admin/jobs?pageSize=100", adminToken, null, 200);
+    const adminAudit = await call(base, "GET", "/admin/audit?pageSize=100", adminToken, null, 200);
+    const adminKpi = await call(base, "GET", "/admin/dashboard", adminToken, null, 200);
+    assert.equal(adminUsers.pagination.total, adminKpi.users);
+    assert.equal(adminCompanies.pagination.total, adminKpi.companies);
+    assert.equal(adminJobs.pagination.total, adminKpi.jobs);
+    assert.ok(adminAudit.data.some((row) => row.action === "admin.bootstrap.first_super_admin"));
+    assert.equal(adminKpi.users, Number((await database.query('SELECT count(*) FROM "User"')).rows[0].count));
+    assert.equal(adminKpi.publishedJobs, Number((await database.query('SELECT count(*) FROM "Job" WHERE status=\'PUBLISHED\'')).rows[0].count));
+    await call(base, "POST", `/admin/jobs/${mainJob.id}/close`, ownerToken, null, 403);
+    const moderatedJob = await call(base, "POST", `/admin/jobs/${mainJob.id}/close`, adminToken, null, 200);
+    assert.equal(moderatedJob.status, "CLOSED");
+    // Fixture state is isolated; exercise the real authorization, transition and audit path.
+    await database.query(`UPDATE "Company" SET "verificationStatus"='PENDING' WHERE id=$1`, [otherCompany.id]);
+    await call(base, "PATCH", `/admin/companies/${otherCompany.id}/verification`, ownerToken,
+      { status: "REJECTED", reason: "Disposable evidence is insufficient" }, 403);
+    const verification = await call(base, "PATCH", `/admin/companies/${otherCompany.id}/verification`, adminToken,
+      { status: "REJECTED", reason: "Disposable evidence is insufficient" }, 200);
+    assert.equal(verification.verificationStatus, "REJECTED");
+    const suspendedCompany = await call(base, "PATCH", `/admin/companies/${otherCompany.id}/status`, adminToken,
+      { status: "SUSPENDED" }, 200);
+    assert.equal(suspendedCompany.status, "SUSPENDED");
+    const disabledUser = await call(base, "POST", `/admin/users/${otherCandidate.user.id}/disable`, adminToken, null, 200);
+    assert.equal(disabledUser.status, "DISABLED");
+    await call(base, "GET", `/candidate/applications/${application.id}`, otherCandidateToken, null, 401);
+    const finalAdminAudit = await call(base, "GET", "/admin/audit?pageSize=100", adminToken, null, 200);
+    for (const action of ["admin.bootstrap.first_super_admin", "admin.job.close", "admin.company.verify", "admin.company.status", "admin.user.status"]) {
+      assert.ok(finalAdminAudit.data.some((row) => row.action === action), `Missing audit: ${action}`);
+    }
     await registration("EMPLOYER", "rate-fifth");
     await call(base, "POST", "/auth/register/v2", null,
       { email: `release-${marker}-rate-sixth@example.invalid`, password: `Test-${randomUUID()}!`,
@@ -305,6 +385,10 @@ async function main() {
         guestPrivate: 401, candidateEmployer: 403, employerResume: 403,
         otherCandidateResume: 404, crossCompany: 403, invalidTransition: 409,
         registrationRateLimit: 429 },
+      admin: { bootstrap: "PASS", login: "PASS", dashboard: "PASS", users: "PASS", companies: "PASS",
+        jobs: "PASS", audit: "PASS", roleIsolation: "PASS", moderation: "PASS" },
+      messaging: { candidateEmployer: "PASS", persistedMessages: 2, unread: "PASS", crossCompany: 403,
+        otherCandidate: 404, adminImpersonation: 403 },
       search: { positiveProvince: province.pagination.total, salaryAscending: asc.data.map((row) => Number(row.salaryMin)),
         salaryDescending: desc.data.map((row) => Number(row.salaryMin)), combinedTotal: combinedFirst.pagination.total,
         pageTotal: first.pagination.total, invalidQueries: 5,

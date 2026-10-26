@@ -5,6 +5,7 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
+import { PrismaService } from "./infrastructure/prisma/prisma.service";
 import { ApiExceptionFilter } from "./common/exceptions/api-exception.filter";
 
 async function bootstrap(): Promise<void> {
@@ -20,6 +21,14 @@ async function bootstrap(): Promise<void> {
   const corsOrigins = config.getOrThrow<string[]>("CORS_ORIGINS");
   const port = config.getOrThrow<number>("PORT");
   const nodeEnv = config.getOrThrow<string>("NODE_ENV");
+  const expectedDatabase = config.get<string>("FINDWORK_EXPECTED_DATABASE");
+  if (expectedDatabase) {
+    const rows = await app.get(PrismaService).$queryRaw<Array<{ name: string; schema: string }>>
+      `SELECT current_database() AS name, current_schema() AS schema`;
+    if (rows[0]?.name !== expectedDatabase || rows[0]?.schema !== "public") {
+      throw new Error("Connected database identity does not match FINDWORK_EXPECTED_DATABASE/public schema.");
+    }
+  }
 
   app.enableShutdownHooks();
   app.setGlobalPrefix(apiPrefix);

@@ -2,8 +2,14 @@
 const { readFileSync } = require("node:fs");
 const { resolve } = require("node:path");
 const dotenv = require("dotenv");
-const base = "http://127.0.0.1:3002/api/v1";
-const env = dotenv.parse(readFileSync(resolve(__dirname, "..", ".env.employer-media.local")));
+const env = dotenv.parse(readFileSync(resolve(__dirname, "..", ".env.frontend-acceptance.local")));
+const target = new URL(env.DATABASE_URL);
+if (env.NODE_ENV !== "test" || env.PORT !== "3003" || target.hostname !== "127.0.0.1" ||
+    !/^\/findwork_frontend_acceptance_[a-f0-9]{12}$/.test(target.pathname) ||
+    env.FINDWORK_EXPECTED_DATABASE !== target.pathname.slice(1)) {
+  throw new Error("LIVE_AI_BLOCKED: isolated acceptance database identity required");
+}
+const base = "http://127.0.0.1:3003/api/v1";
 if (process.argv.slice(2).join(" ") !== "--live" || process.env.FINDWORK_AI_SMOKE_ALLOW_LIVE !== "YES") {
   throw new Error("Run with --live and FINDWORK_AI_SMOKE_ALLOW_LIVE=YES after provider configuration");
 }

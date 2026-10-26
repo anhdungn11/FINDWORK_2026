@@ -1,5 +1,10 @@
 // Real HTTP check: missing provider credentials must never produce a fake AI reply.
-const base = "http://127.0.0.1:3002/api/v1";
+const base = process.env.FINDWORK_ACCEPTANCE_API_BASE || "http://127.0.0.1:3002/api/v1";
+const parsed = new URL(base);
+if (parsed.protocol !== "http:" || parsed.hostname !== "127.0.0.1" ||
+    !["3002", "3003"].includes(parsed.port) || parsed.pathname !== "/api/v1") {
+  throw new Error("Only an expected loopback acceptance API may be tested");
+}
 async function call(method, route, token, content) {
   const response = await fetch(base + route, { method,
     headers: { Origin: "http://127.0.0.1:5177", ...(token && { "X-Findwork-Guest-Token": token }),

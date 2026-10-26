@@ -19,6 +19,13 @@ describe("Email delivery fail-closed crypto/config", () => {
     expect(validateEnvironment(base).EMAIL_WORKER_ENABLED).toBe("false");
     expect(validateEnvironment(base).EMAIL_INVITATION_DELIVERY_ENABLED).toBe("false");
   });
+  it("binds integration port 3002 to its dedicated database", () => {
+    expect(() => validateEnvironment({ ...base, PORT: 3002 })).toThrow("FINDWORK_EXPECTED_DATABASE");
+    const integration = validateEnvironment({ ...base, PORT: 3002,
+      DATABASE_URL: "postgresql://user:password@localhost:5432/findwork_employer_media_3002?schema=public" });
+    expect(integration.FINDWORK_EXPECTED_DATABASE).toBe("findwork_employer_media_3002");
+    expect(() => validateEnvironment({ ...base, FINDWORK_EXPECTED_DATABASE: "findwork_test" })).toThrow();
+  });
   it("validates invitation URL and flag independently of verification URL", () => {
     const shared = {
       ...base, EMAIL_DELIVERY_MODE: "resend", EMAIL_ACTIVE_KEY_ID: "k1",

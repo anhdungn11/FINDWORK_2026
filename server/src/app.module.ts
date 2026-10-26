@@ -21,6 +21,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { CareerDiscoveryModule } from "./modules/career-discovery/career-discovery.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { InterviewModule } from "./modules/interviews/interview.module";
+import { MessagingModule } from "./modules/messaging/messaging.module";
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { InterviewModule } from "./modules/interviews/interview.module";
     CareerDiscoveryModule,
     AiModule,
     InterviewModule,
+    MessagingModule,
     AuthModule,
     AuthorizationModule,
     CandidateModule,

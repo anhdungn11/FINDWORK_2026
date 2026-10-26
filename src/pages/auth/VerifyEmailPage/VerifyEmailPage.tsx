@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
-import {
-  Link,
-  useSearchParams,
-} from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { apiClient } from "@/services/http/apiClient";
 
 import AuthShell from "@/features/auth/components/AuthShell/AuthShell";
 
@@ -14,40 +12,27 @@ type VerifyStatus =
   | "invalid";
 
 const VerifyEmailPage = () => {
-  const [searchParams] = useSearchParams();
-
   const [status, setStatus] =
     useState<VerifyStatus>("checking");
-
-  const token =
-    searchParams.get("token");
+  const [token] = useState(() => {
+    const value = new URLSearchParams(window.location.hash.slice(1)).get("token");
+    return value && /^[A-Za-z0-9_-]{43}$/.test(value) ? value : null;
+  });
+  const confirmation = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
+    window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     if (!token) {
       setStatus("invalid");
       return;
     }
 
-    // Frontend mock.
-    // Sau này sẽ gọi backend:
-    // POST /auth/verify-email
-    //
-    // Backend sẽ kiểm tra:
-    // - token tồn tại
-    // - token còn hạn
-    // - token chưa được sử dụng
-    // - token thuộc đúng account
-
-    const timer = window.setTimeout(
-      () => {
-        setStatus("success");
-      },
-      800,
-    );
-
-    return () => {
-      window.clearTimeout(timer);
-    };
+    // Reuse the promise across React StrictMode effect replays.
+    confirmation.current ??= apiClient.post("/auth/email-verification/confirm", { token }).then(() => undefined);
+    let active = true;
+    void confirmation.current.then(() => { if (active) setStatus("success"); })
+      .catch(() => { if (active) setStatus("invalid"); });
+    return () => { active = false; };
   }, [token]);
 
   if (status === "checking") {
@@ -126,12 +111,9 @@ const VerifyEmailPage = () => {
             xác minh từ tài khoản của mình.
           </p>
 
-          <button
-            type="button"
-            className={styles.resendButton}
-          >
-            Gửi lại email xác minh
-          </button>
+          <Link to="/login" className={styles.resendButton}>
+            Đăng nhập để yêu cầu gửi lại
+          </Link>
         </div>
       </AuthShell>
     );
@@ -206,4 +188,4 @@ const VerifyEmailPage = () => {
   );
 };
 
-export default VerifyEmailPage; 
+export default VerifyEmailPage;
