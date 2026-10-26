@@ -145,10 +145,10 @@ export class AuthController {
   @ApiBearerAuth("access-token")
   @UseGuards(AccessTokenGuard)
   @Get("me")
-  me(
+  async me(
     @CurrentAuth() auth: AuthenticatedPrincipal,
-  ) {
-    return auth.user;
+  ): Promise<AuthenticatedPrincipal["user"]> {
+    return this.authService.getPublicMe(auth.user);
   }
 
   private setRefreshCookie(

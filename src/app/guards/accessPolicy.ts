@@ -14,7 +14,6 @@ export type WorkspaceAccess = "loading" | "allowed" | "unauthenticated" | "forbi
  * - SUPPORT_ADMIN: user.view, company.view, job.view (Dashboard, User list, Company list, Job list)
  * - VERIFICATION_ADMIN: company.view, company.verify, company.suspend
  * - MODERATION_ADMIN: company.view, job.view, job.moderate
- * Cùng các bí danh chuẩn: ADMIN, SYSTEM_ADMIN, PLATFORM_ADMIN.
  * LƯU Ý BẢO MẬT: Quyền quản trị công ty (Company ADMIN) KHÔNG BAO GIỜ là System Admin.
  * Backend AccessTokenGuard + PermissionGuard (scope: "SYSTEM") là nguồn quyết định cuối cùng.
  */
@@ -23,9 +22,6 @@ const SYSTEM_ADMIN_ROLE_CODES = new Set([
   "SUPPORT_ADMIN",
   "VERIFICATION_ADMIN",
   "MODERATION_ADMIN",
-  "ADMIN",
-  "SYSTEM_ADMIN",
-  "PLATFORM_ADMIN",
 ]);
 
 export const isAdminRole = (role: string | null | undefined): boolean =>

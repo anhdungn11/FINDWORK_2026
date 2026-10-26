@@ -81,7 +81,7 @@ export class AuthService {
           this.tokenService.getAccessTtlSeconds(),
         refreshToken: refresh.token,
         refreshExpiresAt: expiresAt,
-        user: this.toPublicUser(user),
+        user: await this.getPublicUser(user),
       };
     } catch (error: unknown) {
       if (this.isUniqueConstraintError(error)) {
@@ -159,7 +159,7 @@ export class AuthService {
         this.tokenService.getAccessTtlSeconds(),
       refreshToken: refresh.token,
       refreshExpiresAt: expiresAt,
-      user: this.toPublicUser(user),
+      user: await this.getPublicUser(user),
     };
   }
 
@@ -231,7 +231,7 @@ export class AuthService {
         this.tokenService.getAccessTtlSeconds(),
       refreshToken: nextRefresh.token,
       refreshExpiresAt: session.expiresAt,
-      user: this.toPublicUser(session.user),
+      user: await this.getPublicUser(session.user),
     };
   }
 
@@ -285,20 +285,27 @@ export class AuthService {
     return value ? value.slice(0, 64) : undefined;
   }
 
-  private toPublicUser(user: {
+  async getPublicUser(user: {
     id: string;
     email: string;
     status: string;
     emailVerifiedAt: Date | null;
     accountType: "CANDIDATE" | "EMPLOYER" | "LEGACY_UNCLASSIFIED" | null;
-  }): PublicAuthUser {
+  }): Promise<PublicAuthUser> {
+    const role = await this.authRepository.findActivePlatformRole(user.id);
     return {
       id: user.id,
       email: user.email,
       status: "ACTIVE",
       emailVerified: user.emailVerifiedAt !== null,
       accountType: user.accountType ?? "LEGACY_UNCLASSIFIED",
+      ...(role && { role }),
     };
+  }
+
+  async getPublicMe(user: PublicAuthUser): Promise<PublicAuthUser> {
+    const role = await this.authRepository.findActivePlatformRole(user.id);
+    return { ...user, ...(role && { role }) };
   }
 
   private invalidCredentials(): UnauthorizedException {

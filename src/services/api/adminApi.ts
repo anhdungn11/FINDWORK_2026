@@ -191,11 +191,11 @@ export const adminApi = {
       );
     }),
 
-  verifyCompany: (companyId: string, status: "VERIFIED" | "REJECTED"): Promise<AdminCompanyDto> => {
+  verifyCompany: (companyId: string, status: "VERIFIED" | "REJECTED", reason?: string): Promise<AdminCompanyDto> => {
     guardWrite("xét duyệt doanh nghiệp");
     return run(async () =>
       normalizeAdminCompany(
-        (await apiClient.patch(`/admin/companies/${companyId}/verification`, { status })).data,
+        (await apiClient.patch(`/admin/companies/${companyId}/verification`, { status, ...(reason && { reason }) })).data,
       ),
     );
   },

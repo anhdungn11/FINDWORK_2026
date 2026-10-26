@@ -48,6 +48,20 @@ async function main() {
     const employerCompanies = await call("GET", "/companies/me", null, employer);
     assert.equal(employerCompanies.status, 200);
     assert.ok(employerCompanies.body.data.some((item) => item.id === accounts.COMPANY_ID));
+    const publicJobs = await call("GET", "/jobs?pageSize=1");
+    const candidateApplications = await call("GET", "/candidate/applications", null, candidate);
+    const candidateConversations = await call("GET", "/candidate/conversations", null, candidate);
+    const employerConversations = await call("GET", `/companies/${accounts.COMPANY_ID}/conversations`, null, employer);
+    assert.equal(publicJobs.status, 200);
+    assert.equal(candidateApplications.status, 200);
+    assert.equal(candidateConversations.status, 200);
+    assert.equal(employerConversations.status, 200);
+    assert.ok(Array.isArray(publicJobs.body.data));
+    assert.ok(Array.isArray(candidateApplications.body.data));
+    assert.ok(Array.isArray(candidateConversations.body.data));
+    assert.ok(Array.isArray(employerConversations.body.data));
+    assert.equal((await call("GET", `/companies/${accounts.COMPANY_ID}/conversations`, null, candidate)).status, 403);
+    assert.equal((await call("GET", "/candidate/conversations", null, employer)).status, 403);
     const verification = await call("POST", "/auth/email-verification/request", {}, candidate);
     assert.equal(verification.status, 503, "email verification request status");
     assert.equal(verification.body.code, "AUTH_EMAIL_VERIFICATION_DELIVERY_UNAVAILABLE");
@@ -67,7 +81,9 @@ async function main() {
       candidateLogin: 200, employerLogin: 200, adminLogin: 200, adminDashboard: 200,
       nonAdminDashboard: 403, companyOwner: true, migrations,
       emailDisabled: 503, passwordResetDisabled: 503, emailTokensCreated: 0,
-      aiProviderCall: "NOT_ATTEMPTED", aiCrossAccount: 404, users: userCount }));
+      aiProviderCall: "NOT_ATTEMPTED", aiCrossAccount: 404, users: userCount,
+      recruitmentRead: 200, candidateApplicationsRead: 200,
+      candidateMessagingRead: 200, employerMessagingRead: 200, messagingCrossScope: 403 }));
   } finally { await db.end(); }
 }
 main().catch((error) => { console.error(`FRONTEND_ACCEPTANCE_FAILED ${error.message}`); process.exitCode = 1; });

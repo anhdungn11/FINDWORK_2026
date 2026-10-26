@@ -20,10 +20,10 @@ import { normalizeBackendResume } from "../../../features/resume/services/resume
 
 describe("accessPolicy", () => {
   it("recognizes system admin roles accurately", () => {
-    assert.equal(isAdminRole("ADMIN"), true);
-    assert.equal(isAdminRole("SYSTEM_ADMIN"), true);
+    assert.equal(isAdminRole("ADMIN"), false);
+    assert.equal(isAdminRole("SYSTEM_ADMIN"), false);
     assert.equal(isAdminRole("SUPER_ADMIN"), true);
-    assert.equal(isAdminRole("PLATFORM_ADMIN"), true);
+    assert.equal(isAdminRole("PLATFORM_ADMIN"), false);
     assert.equal(isAdminRole("SUPPORT_ADMIN"), true);
     assert.equal(isAdminRole("VERIFICATION_ADMIN"), true);
     assert.equal(isAdminRole("MODERATION_ADMIN"), true);
@@ -44,8 +44,9 @@ describe("accessPolicy", () => {
   it("enforces admin role separation from candidate/employer", () => {
     assert.equal(resolveWorkspaceAccess("admin", "authenticated", { role: "CANDIDATE" }, "token"), "forbidden");
     assert.equal(resolveWorkspaceAccess("admin", "authenticated", { role: "EMPLOYER" }, "token"), "forbidden");
-    assert.equal(resolveWorkspaceAccess("admin", "authenticated", { role: "ADMIN" }, "token"), "allowed");
-    assert.equal(resolveWorkspaceAccess("admin", "authenticated", { role: "SYSTEM_ADMIN" }, "token"), "allowed");
+    assert.equal(resolveWorkspaceAccess("admin", "authenticated", { role: "ADMIN" }, "token"), "forbidden");
+    assert.equal(resolveWorkspaceAccess("admin", "authenticated", { role: "SYSTEM_ADMIN" }, "token"), "forbidden");
+    assert.equal(resolveWorkspaceAccess("admin", "authenticated", { role: "SUPER_ADMIN" }, "token"), "allowed");
   });
 
   it("allows authenticated user to enter employer workspace for membership verification", () => {

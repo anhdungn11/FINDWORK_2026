@@ -11,6 +11,7 @@ export interface PublicAuthUser {
   status: "ACTIVE";
   emailVerified: boolean;
   accountType: "CANDIDATE" | "EMPLOYER" | "LEGACY_UNCLASSIFIED";
+  role?: string;
 }
 
 export interface AuthenticatedPrincipal {

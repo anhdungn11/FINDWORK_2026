@@ -32,6 +32,10 @@ export const getReturnDestination = (requested: unknown, defaultFallback = DEFAU
       path === "/candidate/applications" || path === "/cv" ||
       path === "/cv/create") return requested;
 
+  if (path === "/admin" || path === "/admin/users" ||
+      path === "/admin/companies" || path === "/admin/jobs" ||
+      path === "/admin/system") return requested;
+
   if (path === "/employer" || path === "/employer/onboarding" ||
       path === "/employer/jobs" || path === "/employer/jobs/new" ||
       path === "/employer/jobs/create" || path === "/employer/profile" ||

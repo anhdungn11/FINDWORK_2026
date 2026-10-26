@@ -26,6 +26,16 @@ interface CreateSessionInput {
 export class AuthRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findActivePlatformRole(userId: string): Promise<string | undefined> {
+    const assignments = await this.prisma.systemUserRole.findMany({
+      where: { userId, role: { kind: "SYSTEM", isActive: true,
+        systemCode: { in: ["SUPER_ADMIN", "SUPPORT_ADMIN", "VERIFICATION_ADMIN", "MODERATION_ADMIN"] } } },
+      select: { role: { select: { systemCode: true } } },
+    });
+    const priority = ["SUPER_ADMIN", "SUPPORT_ADMIN", "VERIFICATION_ADMIN", "MODERATION_ADMIN"];
+    return priority.find((code) => assignments.some(({ role }) => role.systemCode === code));
+  }
+
   findUserByNormalizedEmail(emailNormalized: string) {
     return this.prisma.user.findUnique({
       where: {

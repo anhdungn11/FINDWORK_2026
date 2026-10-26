@@ -36,6 +36,8 @@ describe("P0-01 Backend API Contract & HTTP Method Regression", () => {
         assert.equal(recordedUrl, `/admin/companies/${companyId}/verification`);
         assert.deepEqual(recordedBody, { status: "VERIFIED" });
         assert.equal(res.verificationStatus, "VERIFIED");
+        await adminApi.verifyCompany(companyId, "REJECTED", "Synthetic evidence is unclear");
+        assert.deepEqual(recordedBody, { status: "REJECTED", reason: "Synthetic evidence is unclear" });
       } finally {
         apiClient.patch = originalPatch;
         setWorkspaceWritesForTesting(null);

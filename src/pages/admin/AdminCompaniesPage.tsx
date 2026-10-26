@@ -37,10 +37,20 @@ const AdminCompaniesPage = () => {
   };
 
   const handleVerification = async (company: AdminCompanyDto, vStatus: "VERIFIED" | "REJECTED") => {
+    let reason: string | undefined;
+    if (vStatus === "REJECTED") {
+      const answer = window.prompt("Nhập lý do từ chối xác minh (ít nhất 10 ký tự):");
+      if (answer === null) return;
+      reason = answer.trim();
+      if (reason.length < 10) {
+        setNotice({ tone: "error", text: "Lý do từ chối cần ít nhất 10 ký tự." });
+        return;
+      }
+    }
     setBusyId(company.id);
     setNotice(null);
     try {
-      await adminApi.verifyCompany(company.id, vStatus);
+      await adminApi.verifyCompany(company.id, vStatus, reason);
       setNotice({
         tone: "ok",
         text: `Đã ${vStatus === "VERIFIED" ? "xác minh" : "từ chối xác minh"} doanh nghiệp “${company.name}”.`,
@@ -175,7 +185,7 @@ const AdminCompaniesPage = () => {
                     <td>{c.createdAt ? new Date(c.createdAt).toLocaleDateString("vi-VN") : "—"}</td>
                     <td>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {c.status === "ACTIVE" && c.verificationStatus !== "VERIFIED" && (
+                        {c.status === "ACTIVE" && c.verificationStatus === "PENDING" && (
                           <button
                             type="button"
                             className={`${ui.btn} ${ui.btnPrimary}`}
@@ -186,7 +196,7 @@ const AdminCompaniesPage = () => {
                             Xác minh
                           </button>
                         )}
-                        {c.status === "ACTIVE" && c.verificationStatus !== "REJECTED" && (
+                        {c.status === "ACTIVE" && c.verificationStatus === "PENDING" && (
                           <button
                             type="button"
                             className={ui.btn}

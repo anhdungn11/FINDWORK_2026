@@ -28,6 +28,16 @@ const registration = {
 };
 
 describe("persisted account type contract", () => {
+  it("derives platform role only from active SYSTEM assignments", async () => {
+    const findMany = jest.fn().mockResolvedValue([{ role: { systemCode: "SUPER_ADMIN" } }]);
+    const repository = new AuthRepository({ systemUserRole: { findMany } } as never);
+    await expect(repository.findActivePlatformRole("user-id")).resolves.toBe("SUPER_ADMIN");
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      userId: "user-id", role: expect.objectContaining({ kind: "SYSTEM", isActive: true }),
+    }) }));
+    findMany.mockResolvedValue([]);
+    await expect(repository.findActivePlatformRole("ordinary-id")).resolves.toBeUndefined();
+  });
   it("requires an explicit supported type on both registration routes", async () => {
     for (const type of ["CANDIDATE", "EMPLOYER"]) {
       const dto = plainToInstance(RegisterDto, { email: "person@example.test", password: "StrongPassword123!", accountType: type });
@@ -89,6 +99,7 @@ describe("persisted account type contract", () => {
     const existing = { id: "user", email: "person@example.test", status: "ACTIVE", emailVerifiedAt: null,
       passwordHash: "hash", accountType: "EMPLOYER" as "EMPLOYER" | null };
     const repository = {
+      findActivePlatformRole: jest.fn().mockResolvedValue(undefined),
       createRegisteredUserWithSession: jest.fn().mockResolvedValue(existing),
       findUserByNormalizedEmail: jest.fn().mockResolvedValue(existing),
       createSession: jest.fn(),

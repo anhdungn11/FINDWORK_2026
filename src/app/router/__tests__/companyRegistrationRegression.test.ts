@@ -42,6 +42,10 @@ test("Task 1 Regression: login return destination allows employer private routes
   // Employer login default fallback
   assert.equal(getReturnDestination(undefined, "/employer"), "/employer");
   assert.equal(getReturnDestination(null, "/employer"), "/employer");
+  for (const path of ["/admin", "/admin/users", "/admin/companies", "/admin/jobs", "/admin/system"]) {
+    assert.equal(getReturnDestination(path, "/admin"), path);
+  }
+  assert.equal(getReturnDestination("/admin/../candidate", "/admin"), "/admin");
 
   // Malicious or invalid paths should fall back safely without executing
   assert.equal(getReturnDestination("https://evil.com"), "/candidate");

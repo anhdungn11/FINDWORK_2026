@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../store/authStore";
 import { getReturnDestination } from "../../../app/router/returnDestination";
+import { isAdminRole } from "../../../app/guards/accessPolicy";
 
 export const useLoginForm = () => {
   const navigate = useNavigate();
@@ -31,10 +32,14 @@ export const useLoginForm = () => {
     submittingRef.current = true;
     setIsSubmitting(true);
     try {
-      await login({ email: normalizedEmail, password });
+      const user = await login({ email: normalizedEmail, password });
       const requestedPath = (location.state as { from?: unknown } | null)?.from;
       const isEmployer = location.pathname.startsWith("/employer");
-      const destination = getReturnDestination(requestedPath, isEmployer ? "/employer" : undefined);
+      const admin = isAdminRole(user.role);
+      const fallback = admin ? "/admin" : isEmployer ? "/employer" : "/candidate";
+      const rolePath = admin && (typeof requestedPath !== "string" || !requestedPath.startsWith("/admin"))
+        ? undefined : requestedPath;
+      const destination = getReturnDestination(rolePath, fallback);
       navigate(destination, { replace: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Đăng nhập thất bại. Vui lòng thử lại.");
