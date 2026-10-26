@@ -37,22 +37,20 @@ const RoleRoute = ({ kind }: { kind: WorkspaceKind }) => {
       adminApi
         .getDashboard()
         .then(() => {
-          if (!active) return;
           // Backend verified SYSTEM scope permissions
           setAuth({ ...user, role: "SUPER_ADMIN" }, accessToken);
         })
         .catch(() => {
-          if (!active) return;
-          setProbeFailed(true);
+          if (active) setProbeFailed(true);
         })
         .finally(() => {
-          if (active) setProbingAdmin(false);
+          setProbingAdmin(false);
         });
     }
     return () => {
       active = false;
     };
-  }, [kind, status, user, accessToken, probeFailed, probingAdmin, setAuth]);
+  }, [kind, status, user?.id, user?.role, accessToken, probeFailed, probingAdmin, setAuth]);
 
   const access = resolveWorkspaceAccess(kind, status, user, accessToken);
   if (access === "loading" || probingAdmin) {
@@ -70,13 +68,16 @@ const RoleRoute = ({ kind }: { kind: WorkspaceKind }) => {
     return (
       <main style={{ padding: 24, maxWidth: 560, margin: "10vh auto" }} data-testid="forbidden-page">
         <div className={`${ui.state} ${ui.stateError}`} role="alert">
-          <h1 className={ui.stateTitle}>Bạn không có quyền truy cập khu vực này</h1>
-          <p className={ui.stateText}>Tài khoản hiện tại không có quyền quản trị nền tảng. Không có dữ liệu quản trị nào được tải.</p>
-          <Link className={`${ui.btn} ${ui.btnPrimary}`} to="/">Về trang chủ</Link>
+          <h2>Từ chối truy cập</h2>
+          <p>Tài khoản của bạn không có quyền truy cập vào khu vực làm việc này.</p>
+          <div style={{ marginTop: 16 }}>
+            <Link to="/" className={ui.btn}>Về trang chủ</Link>
+          </div>
         </div>
       </main>
     );
   }
+
   return <Outlet />;
 };
 

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import AuthShell from "@/features/auth/components/AuthShell/AuthShell";
 import { emailVerificationApi } from "@/services/api/emailVerificationApi";
 import { useAuthStore } from "@/store/authStore";
@@ -8,28 +8,45 @@ import styles from "./VerifyEmailPage.module.css";
 type VerifyStatus = "checking" | "success" | "invalid";
 
 export const VerifyEmailPage = () => {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
-
   const [status, setStatus] = useState<VerifyStatus>("checking");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
 
+  const [token] = useState<string | null>(() => {
+    // 1. Check URL fragment (#token=<secret>) first as per Backend security specification
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const hashToken = hashParams.get("token");
+    if (hashToken && /^[A-Za-z0-9_-]{43}$/.test(hashToken)) {
+      return hashToken;
+    }
+    // 2. Fallback to query parameter (?token=<secret>)
+    const searchToken = new URLSearchParams(window.location.search).get("token");
+    if (searchToken && /^[A-Za-z0-9_-]{43}$/.test(searchToken)) {
+      return searchToken;
+    }
+    return null;
+  });
+
+  const confirmation = useRef<Promise<void> | null>(null);
   const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
-    let active = true;
+    // Sanitize token from URL fragment to protect secret in browser history/referer
+    if (window.location.hash) {
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
 
     if (!token) {
       setStatus("invalid");
-      setErrorMessage("Liên kết xác minh không có mã token hợp lệ.");
+      setErrorMessage("Liên kết xác minh không có mã token hợp lệ hoặc sai định dạng.");
       return;
     }
 
-    // Call real Backend API to confirm email token
-    emailVerificationApi
-      .confirm(token)
+    let active = true;
+    confirmation.current ??= emailVerificationApi.confirm(token).then(() => undefined);
+
+    confirmation.current
       .then(() => {
         if (!active) return;
         setStatus("success");
@@ -138,15 +155,21 @@ export const VerifyEmailPage = () => {
             </p>
           )}
 
-          <button
-            type="button"
-            className={styles.resendButton}
-            onClick={handleResend}
-            disabled={isResending}
-            style={{ marginTop: 16 }}
-          >
-            {isResending ? "Đang gửi yêu cầu..." : "Gửi lại email xác minh"}
-          </button>
+          {user ? (
+            <button
+              type="button"
+              className={styles.resendButton}
+              onClick={handleResend}
+              disabled={isResending}
+              style={{ marginTop: 16 }}
+            >
+              {isResending ? "Đang gửi yêu cầu..." : "Gửi lại email xác minh"}
+            </button>
+          ) : (
+            <Link to="/login" className={styles.resendButton} style={{ marginTop: 16, display: "inline-block", textAlign: "center" }}>
+              Đăng nhập để yêu cầu gửi lại
+            </Link>
+          )}
         </div>
       </AuthShell>
     );
@@ -154,8 +177,8 @@ export const VerifyEmailPage = () => {
 
   return (
     <AuthShell
-      eyebrow="XÁC MINH TÀI KHOẢN"
-      title="Email đã được xác minh"
+      eyebrow="HOÀN TẤT"
+      title="Xác minh thành công"
       description="Tài khoản FINDWORK của bạn đã sẵn sàng để tiếp tục."
     >
       <div className={styles.statusState}>
@@ -166,7 +189,7 @@ export const VerifyEmailPage = () => {
               d="m8 12 2.6 2.6L16 9"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.7"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />

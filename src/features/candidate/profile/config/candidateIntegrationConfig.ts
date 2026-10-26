@@ -74,9 +74,10 @@ export function isLiveWritesEnabled(): boolean {
   const isTestPort = port === "5173";
   const isDevDemoPort = port === "5176";
   const isIntegrationPort = port === "5177";
+  const isAcceptancePort = port === "5178";
 
-  // Khóa cứng: chỉ chấp nhận cổng Frontend Test cô lập (5173), DEV Demo session (5176) hoặc Integration (5177)
-  if (!isTestPort && !isDevDemoPort && !isIntegrationPort) {
+  // Khóa cứng: chỉ chấp nhận cổng Frontend Test cô lập (5173), DEV Demo session (5176), Integration (5177) hoặc Acceptance (5178)
+  if (!isTestPort && !isDevDemoPort && !isIntegrationPort && !isAcceptancePort) {
     return false;
   }
 
@@ -115,6 +116,35 @@ export function isLiveWritesEnabled(): boolean {
       (!backendTarget && !backendPort && !apiBaseUrl); // Vite proxy trên port 5177 mặc định định tuyến tới 3002
 
     if (!isTargeting3002) {
+      return false;
+    }
+    return true;
+  }
+
+  // Khóa cứng đối với port 5178 (isolated acceptance): cấm tuyệt đối thao tác ghi nếu hướng tới dev (3000), test (3001) hoặc 3002
+  if (isAcceptancePort) {
+    const isTargetingUnintended =
+      backendTarget.includes(":3000") ||
+      backendPort === "3000" ||
+      apiBaseUrl.includes(":3000") ||
+      backendTarget.includes(":3001") ||
+      backendPort === "3001" ||
+      apiBaseUrl.includes(":3001") ||
+      backendTarget.includes(":3002") ||
+      backendPort === "3002" ||
+      apiBaseUrl.includes(":3002");
+
+    if (isTargetingUnintended) {
+      return false;
+    }
+
+    const isTargeting3003 =
+      backendTarget.includes(":3003") ||
+      backendPort === "3003" ||
+      apiBaseUrl.includes(":3003") ||
+      (!backendTarget && !backendPort && !apiBaseUrl); // Vite proxy trên port 5178 mặc định định tuyến tới 3003
+
+    if (!isTargeting3003) {
       return false;
     }
     return true;
