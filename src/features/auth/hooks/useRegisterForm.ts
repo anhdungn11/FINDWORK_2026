@@ -1,13 +1,10 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import axios from "axios";
-import { apiClient, extractApiErrorMessage } from "../../../services/http/apiClient";
-import { API_ENDPOINTS } from "../../../services/http/endpoints";
+import { extractApiErrorMessage } from "../../../services/http/apiClient";
+import { registerAccount } from "../../../services/api/registrationApi";
 import { useAuthStore } from "../../../store/authStore";
-import { parseAuthResponse } from "../../../services/http/authResponse";
 import { getPasswordRules, isPasswordRuleSetValid } from "../utils/password-validation.utils";
 import type { RegistrationIntent } from "../types/accountType";
-import { isAccountTypeContractEnabled } from "../utils/accountTypeFeature";
 
 export interface UseRegisterFormOptions {
   defaultIntent?: RegistrationIntent;
@@ -69,31 +66,11 @@ export const useRegisterForm = (options?: UseRegisterFormOptions) => {
     submittingRef.current = true;
     setIsSubmitting(true);
     try {
-      // Wire contract gating:
-      // Live backend strictly validates RegisterDto (email, password).
-      // Only include accountType and use /auth/register/v2 if backend cutover contract is active.
-      const payload: { email: string; password: string; accountType?: RegistrationIntent } = {
+      const session = await registerAccount({
         email: normalizedEmail,
         password,
-      };
-
-      let endpoint: string = API_ENDPOINTS.AUTH.REGISTER;
-      if (isAccountTypeContractEnabled()) {
-        payload.accountType = intent;
-        endpoint = API_ENDPOINTS.AUTH.REGISTER_V2;
-      }
-
-      let response;
-      try {
-        response = await apiClient.post<unknown>(endpoint, payload);
-      } catch (err: unknown) {
-        if (endpoint === API_ENDPOINTS.AUTH.REGISTER_V2 && axios.isAxiosError(err) && err.response?.status === 404) {
-          response = await apiClient.post<unknown>(API_ENDPOINTS.AUTH.REGISTER, payload);
-        } else {
-          throw err;
-        }
-      }
-      const session = parseAuthResponse(response.data);
+        accountType: intent,
+      });
       setAuth(session.user, session.accessToken);
       setRegisteredIntent(intent);
 

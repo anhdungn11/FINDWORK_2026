@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { isAccountTypeContractEnabled } from "../../../features/auth/utils/accountTypeFeature";
 import type { AccountType } from "../../../store/authStore";
 
 describe("Candidate & Employer Registration UX Regression", () => {
@@ -123,29 +122,6 @@ describe("Candidate & Employer Registration UX Regression", () => {
       hookSrc.includes("sessionStorage.setItem"),
       "useRegisterForm must persist registration intent locally for routing continuity"
     );
-  });
-
-  it("Wire payload gating: does NOT send unsupported accountType to live backend unless contract flag is active", () => {
-    const hookSrc = readFileSync(
-      new URL("../../../features/auth/hooks/useRegisterForm.ts", import.meta.url),
-      "utf8"
-    );
-
-    assert.ok(
-      hookSrc.includes("isAccountTypeContractEnabled()"),
-      "useRegisterForm must gate accountType transmission with isAccountTypeContractEnabled()"
-    );
-
-    const globalScope = globalThis as unknown as { __FINDWORK_ACCOUNT_TYPE_CONTRACT__?: boolean };
-
-    // Verify default contract state is false (safe for live backend)
-    delete globalScope.__FINDWORK_ACCOUNT_TYPE_CONTRACT__;
-    assert.equal(isAccountTypeContractEnabled(), false, "Default contract flag must be false");
-
-    // Verify contract flag when enabled for testing or future backend cutover
-    globalScope.__FINDWORK_ACCOUNT_TYPE_CONTRACT__ = true;
-    assert.equal(isAccountTypeContractEnabled(), true, "Contract flag must be true when set");
-    delete globalScope.__FINDWORK_ACCOUNT_TYPE_CONTRACT__;
   });
 
   it("Type definitions: AuthUser supports optional accountType matching backend contract proposal", () => {
