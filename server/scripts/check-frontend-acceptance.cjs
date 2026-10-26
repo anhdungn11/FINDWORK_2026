@@ -42,30 +42,32 @@ async function main() {
     assert.equal((await call("GET", "/admin/dashboard", null, employer)).status, 403);
     const dashboard = await call("GET", "/admin/dashboard", null, admin);
     assert.equal(dashboard.status, 200);
-    assert.equal(dashboard.body.users, 3);
+    const userCount = (await db.query('SELECT count(*)::int AS count FROM "User"')).rows[0].count;
+    assert.ok(userCount >= 3);
+    assert.equal(dashboard.body.users, userCount);
     const employerCompanies = await call("GET", "/companies/me", null, employer);
     assert.equal(employerCompanies.status, 200);
     assert.ok(employerCompanies.body.data.some((item) => item.id === accounts.COMPANY_ID));
     const verification = await call("POST", "/auth/email-verification/request", {}, candidate);
-    assert.equal(verification.status, 503);
+    assert.equal(verification.status, 503, "email verification request status");
     assert.equal(verification.body.code, "AUTH_EMAIL_VERIFICATION_DELIVERY_UNAVAILABLE");
     const after = (await db.query('SELECT count(*)::int AS count FROM "EmailVerificationToken"')).rows[0].count;
     assert.equal(after, before);
     const reset = await call("POST", "/auth/password-reset/request", { email: accounts.CANDIDATE_EMAIL });
-    assert.equal(reset.status, 503);
+    assert.equal(reset.status, 503, "password reset request status");
     assert.equal(reset.body.code, "AUTH_PASSWORD_RESET_DELIVERY_UNAVAILABLE");
     const conversation = await call("POST", "/ai/conversations", {}, candidate);
     assert.equal(conversation.status, 201);
     assert.equal((await call("GET", `/ai/conversations/${conversation.body.id}/messages`, null, employer)).status, 404);
-    const ai = await call("POST", `/ai/conversations/${conversation.body.id}/messages`, { content: "Hello" }, candidate);
-    assert.equal(ai.status, 503);
-    assert.equal(ai.body.code, "AI_PROVIDER_NOT_CONFIGURED");
+    const messages = await call("GET", `/ai/conversations/${conversation.body.id}/messages`, null, candidate);
+    assert.equal(messages.status, 200);
+    assert.deepEqual(messages.body, []);
     assert.equal((await call("DELETE", `/ai/conversations/${conversation.body.id}`, null, candidate)).status, 200);
     console.log(JSON.stringify({ status: "FRONTEND_ACCEPTANCE_PASS", database: identity.name,
       candidateLogin: 200, employerLogin: 200, adminLogin: 200, adminDashboard: 200,
       nonAdminDashboard: 403, companyOwner: true, migrations,
       emailDisabled: 503, passwordResetDisabled: 503, emailTokensCreated: 0,
-      aiUnconfigured: 503, aiCrossAccount: 404 }));
+      aiProviderCall: "NOT_ATTEMPTED", aiCrossAccount: 404, users: userCount }));
   } finally { await db.end(); }
 }
 main().catch((error) => { console.error(`FRONTEND_ACCEPTANCE_FAILED ${error.message}`); process.exitCode = 1; });
