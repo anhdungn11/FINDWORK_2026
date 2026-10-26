@@ -131,9 +131,6 @@ export default defineConfig(({ mode }) => {
         "/api/v1": {
           target: backendTarget,
           changeOrigin: true,
-          headers: {
-            origin: isPort5178 ? "http://127.0.0.1:5177" : undefined,
-          },
           // Fixed router: guarantees 100% of requests go to backendTarget without relying on Host headers
           router() {
             return backendTarget;

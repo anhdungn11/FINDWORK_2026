@@ -1,13 +1,37 @@
-import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import AuthShell from "@/features/auth/components/AuthShell/AuthShell";
+import { passwordResetApi } from "@/services/api/passwordResetApi";
+import { ApiFailure } from "@/services/api/apiFailure";
 
 import styles from "./ResetPasswordPage.module.css";
 
+const TOKEN_REGEX = /^[A-Za-z0-9_-]{43}$/;
+
 const ResetPasswordPage = () => {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  // 1. Secure token capture: fragment first (#token=<secret>), then fallback to search param (?token=<secret>)
+  const [token] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const hashStr = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+    const hashParams = new URLSearchParams(hashStr);
+    const hashToken = hashParams.get("token");
+    if (hashToken && TOKEN_REGEX.test(hashToken)) {
+      return hashToken;
+    }
+    const searchToken = new URLSearchParams(window.location.search).get("token");
+    if (searchToken && TOKEN_REGEX.test(searchToken)) {
+      return searchToken;
+    }
+    return null;
+  });
+
+  // 2. Remove token fragment immediately after capture to prevent leakage in history/referer
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash) {
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
+  }, []);
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -16,11 +40,15 @@ const ResetPasswordPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  const isSubmittingRef = useRef(false);
+
+  // Backend requires length between 12 and 128 characters
   const passwordRules = useMemo(
     () => ({
-      length: password.length >= 8,
+      length: password.length >= 12 && password.length <= 128,
       uppercase: /[A-Z]/.test(password),
       number: /\d/.test(password),
       special: /[^A-Za-z0-9]/.test(password),
@@ -30,8 +58,10 @@ const ResetPasswordPage = () => {
 
   const isPasswordValid = Object.values(passwordRules).every(Boolean);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting || isSubmittingRef.current) return;
+
     setError("");
 
     if (!token) {
@@ -40,7 +70,7 @@ const ResetPasswordPage = () => {
     }
 
     if (!isPasswordValid) {
-      setError("Mật khẩu chưa đáp ứng đầy đủ yêu cầu.");
+      setError("Mật khẩu chưa đáp ứng đầy đủ yêu cầu (từ 12–128 ký tự, gồm chữ hoa, chữ số và ký tự đặc biệt).");
       return;
     }
 
@@ -49,11 +79,26 @@ const ResetPasswordPage = () => {
       return;
     }
 
-    // Backend Auth Service does not provide self-service /auth/reset-password endpoint yet.
-    // Display honest status rather than fabricating success.
-    setError(
-      "Dịch vụ đặt lại mật khẩu trực tuyến hiện chưa được cấu hình máy chủ. Vui lòng liên hệ quản trị viên nền tảng để được hỗ trợ cấp lại mật khẩu."
-    );
+    setIsSubmitting(true);
+    isSubmittingRef.current = true;
+
+    try {
+      await passwordResetApi.confirm(token, password);
+      setIsSuccess(true);
+    } catch (err: any) {
+      if (err?.status === 401 || err?.code === "AUTH_PASSWORD_RESET_TOKEN_INVALID") {
+        setError("Mã đặt lại mật khẩu không hợp lệ, đã hết hạn hoặc đã được sử dụng. Vui lòng yêu cầu liên kết mới.");
+      } else if (err?.status === 429) {
+        setError("Bạn đã thử quá nhiều lần trong thời gian ngắn. Vui lòng đợi 10 phút trước khi thử lại.");
+      } else if (err?.status === 503) {
+        setError("Dịch vụ đặt lại mật khẩu tạm thời không khả dụng. Vui lòng thử lại sau.");
+      } else {
+        setError(err?.message || "Không thể cập nhật mật khẩu lúc này.");
+      }
+    } finally {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+    }
   };
 
   if (isSuccess) {
@@ -71,8 +116,8 @@ const ResetPasswordPage = () => {
             </svg>
           </div>
           <h2>Đặt lại mật khẩu thành công</h2>
-          <p>Mật khẩu mới đã được ghi nhận. Hãy đăng nhập lại để tiếp tục sử dụng FINDWORK.</p>
-          <Link to="/login" className={styles.loginButton}>Đăng nhập</Link>
+          <p>Mật khẩu mới đã được ghi nhận và mọi phiên đăng nhập cũ đã được vô hiệu hóa để bảo vệ tài khoản.</p>
+          <Link to="/login" className={styles.loginButton}>Đăng nhập ngay</Link>
         </div>
       </AuthShell>
     );
@@ -82,7 +127,7 @@ const ResetPasswordPage = () => {
     <AuthShell
       eyebrow="BẢO MẬT TÀI KHOẢN"
       title="Tạo mật khẩu mới"
-      description="Chọn mật khẩu mạnh và không sử dụng lại mật khẩu cũ."
+      description="Chọn mật khẩu mạnh từ 12 ký tự trở lên và không sử dụng lại mật khẩu cũ."
       footer={
         <p className={styles.footerText}>
           Không yêu cầu đặt lại mật khẩu? <Link to="/login">Quay lại đăng nhập</Link>
@@ -92,7 +137,10 @@ const ResetPasswordPage = () => {
       <form className={styles.form} onSubmit={handleSubmit}>
         {!token && (
           <div className={styles.error} style={{ marginBottom: 16 }} role="alert">
-            Liên kết đặt lại mật khẩu thiếu mã token xác thực hợp lệ. Vui lòng kiểm tra lại liên kết trong email hoặc liên hệ quản trị viên.
+            Liên kết đặt lại mật khẩu thiếu mã token xác thực hợp lệ hoặc mã sai định dạng. Vui lòng kiểm tra lại liên kết trong email hoặc{" "}
+            <Link to="/forgot-password" style={{ color: "var(--color-primary)", textDecoration: "underline" }}>
+              gửi yêu cầu mới
+            </Link>.
           </div>
         )}
 
@@ -103,9 +151,10 @@ const ResetPasswordPage = () => {
               id="password"
               type={showPassword ? "text" : "password"}
               value={password}
-              placeholder="Nhập mật khẩu mới"
+              placeholder="Nhập mật khẩu mới (tối thiểu 12 ký tự)"
               autoComplete="new-password"
               required
+              disabled={!token || isSubmitting}
               onChange={(event) => setPassword(event.target.value)}
             />
             <button
@@ -118,7 +167,7 @@ const ResetPasswordPage = () => {
           </div>
 
           <div className={styles.passwordRules}>
-            <PasswordRule valid={passwordRules.length} label="8 ký tự trở lên" />
+            <PasswordRule valid={passwordRules.length} label="12 ký tự trở lên (tối đa 128)" />
             <PasswordRule valid={passwordRules.uppercase} label="Có chữ hoa" />
             <PasswordRule valid={passwordRules.number} label="Có chữ số" />
             <PasswordRule valid={passwordRules.special} label="Có ký tự đặc biệt" />
@@ -135,6 +184,7 @@ const ResetPasswordPage = () => {
               placeholder="Nhập lại mật khẩu mới"
               autoComplete="new-password"
               required
+              disabled={!token || isSubmitting}
               onChange={(event) => setConfirmPassword(event.target.value)}
             />
             <button
@@ -153,8 +203,12 @@ const ResetPasswordPage = () => {
           </div>
         )}
 
-        <button type="submit" className={styles.submitButton}>
-          Cập nhật mật khẩu
+        <button
+          type="submit"
+          className={styles.submitButton}
+          disabled={!token || !isPasswordValid || password !== confirmPassword || isSubmitting}
+        >
+          {isSubmitting ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M5 12h14M13 6l6 6-6 6"

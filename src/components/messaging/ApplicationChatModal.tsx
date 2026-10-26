@@ -67,6 +67,29 @@ export const ApplicationChatModal = ({
   useEffect(() => {
     if (isOpen) {
       void fetchMessages();
+      // Auto-poll messages every 4 seconds while modal is open to keep conversation synchronized
+      const interval = setInterval(() => {
+        void (async () => {
+          if (!applicationId) return;
+          try {
+            const res =
+              side === "COMPANY" && companyId
+                ? await messagingApi.getCompanyMessages(companyId, applicationId, { pageSize: 100 })
+                : await messagingApi.getCandidateMessages(applicationId, { pageSize: 100 });
+            setMessages(res.data);
+            if (res.unreadCount > 0) {
+              if (side === "COMPANY" && companyId) {
+                void messagingApi.markCompanyRead(companyId, applicationId);
+              } else {
+                void messagingApi.markCandidateRead(applicationId);
+              }
+            }
+          } catch {
+            // Keep existing messages on background poll glitch
+          }
+        })();
+      }, 4000);
+      return () => clearInterval(interval);
     } else {
       setMessages([]);
       setInputText("");
