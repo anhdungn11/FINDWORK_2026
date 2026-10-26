@@ -9,6 +9,7 @@ interface ResumeSelectionStepProps {
   selectedResumeId: string;
   onSelectResume: (resumeId: string) => void;
   onContinue: () => void;
+  jobId?: number | string;
 }
 
 const ResumeSelectionStep = ({
@@ -16,7 +17,12 @@ const ResumeSelectionStep = ({
   selectedResumeId,
   onSelectResume,
   onContinue,
+  jobId,
 }: ResumeSelectionStepProps) => {
+  const createCvUrl = jobId
+    ? `/cv/create?returnTo=${encodeURIComponent(`/jobs/${jobId}/apply`)}`
+    : "/cv/create";
+
   if (resumes.length === 0) {
     return (
       <section className={styles.card}>
@@ -40,7 +46,7 @@ const ResumeSelectionStep = ({
 
           <div className={styles.emptyActions}>
             <Link
-              to="/cv/create"
+              to={createCvUrl}
               className={styles.primaryAction}
             >
               Tạo CV mới
@@ -69,12 +75,21 @@ const ResumeSelectionStep = ({
           </p>
         </div>
 
-        <Link
-          to="/cv"
-          className={styles.manageLink}
-        >
-          Quản lý CV
-        </Link>
+        <div className={styles.headingActions}>
+          <Link
+            to={createCvUrl}
+            className={styles.createLink}
+          >
+            + Tạo CV mới
+          </Link>
+
+          <Link
+            to="/cv"
+            className={styles.manageLink}
+          >
+            Quản lý CV
+          </Link>
+        </div>
       </div>
 
       <div className={styles.resumeList}>

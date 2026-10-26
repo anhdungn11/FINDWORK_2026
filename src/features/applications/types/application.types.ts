@@ -79,9 +79,11 @@ export interface ApplicationDetailsErrors {
   availability?: string;
 }
 
+export type ScreeningAnswerValue = string | boolean | string[];
+
 export interface ApplicationScreeningAnswer {
   questionId: string;
-  answer: string;
+  answer: ScreeningAnswerValue;
 }
 
 /**

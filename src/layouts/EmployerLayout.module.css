@@ -1,0 +1,433 @@
+.layout {
+  min-height: 100vh;
+  background: var(--color-background, #f8fafc);
+  display: flex;
+  flex-direction: column;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  background: #fff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.skip:focus {
+  left: 12px;
+  outline: 2px solid var(--color-primary, #4f6ef7);
+}
+
+/* TOPBAR */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 64px;
+  padding: 0 24px;
+  background: var(--color-surface, #ffffff);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.menuBtn {
+  display: none;
+  min-width: 40px;
+  min-height: 40px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--color-text-primary, #1e293b);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+.brandGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  color: var(--color-primary, #4f6ef7);
+  text-decoration: none;
+}
+
+.brandTag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--color-primary-soft, #eef2ff);
+  color: var(--color-primary, #4f6ef7);
+}
+
+/* COMPANY SELECTOR IN TOPBAR */
+.companySelector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--color-surface-soft, #f1f5f9);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  margin-left: 12px;
+}
+
+.companySelectorSelect {
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text-primary, #1e293b);
+  cursor: pointer;
+  outline: none;
+  max-width: 220px;
+}
+
+.companyNameStatic {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text-primary, #1e293b);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewPublicLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #64748b);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.viewPublicLink:hover {
+  color: var(--color-primary, #4f6ef7);
+  background: var(--color-primary-soft, #eef2ff);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* RIGHT TOPBAR ACTIONS */
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.aiAssistantBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
+  border: 1px solid #c7d2fe;
+  color: var(--color-primary, #4f6ef7);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.aiAssistantBtn:hover {
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  color: #3730a3;
+  box-shadow: 0 1px 3px rgba(79, 110, 247, 0.2);
+}
+
+.postJobBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--color-primary, #4f6ef7);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(79, 110, 247, 0.25);
+  transition: background 150ms ease;
+}
+
+.postJobBtn:hover {
+  background: var(--color-primary-hover, #3f5de0);
+}
+
+.accountInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 200px;
+}
+
+.accountEmail {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.accountRole {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.logoutBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text-secondary, #64748b);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.logoutBtn:hover {
+  background: var(--color-surface-soft, #f1f5f9);
+  color: var(--color-danger, #ef4444);
+  border-color: var(--color-danger-soft, #fee2e2);
+}
+
+/* BODY & SIDEBAR */
+.body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar {
+  width: 270px;
+  flex-shrink: 0;
+  padding: 20px 14px;
+  background: var(--color-surface, #ffffff);
+  border-right: 1px solid var(--color-border, #e2e8f0);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* SIDEBAR COMPANY CARD */
+.sidebarCompanyCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-surface-soft, #f8fafc);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+}
+
+.sidebarCompanySelector {
+  margin-top: -10px;
+  margin-bottom: 4px;
+}
+
+.sidebarSelect {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-surface-soft, #f1f5f9);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1e293b);
+  cursor: pointer;
+  outline: none;
+}
+
+.companyAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--color-primary-soft, #eef2ff);
+  color: var(--color-primary, #4f6ef7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.companyDetails {
+  min-width: 0;
+  flex: 1;
+}
+
+.companyTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.companyRoleTag {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary, #64748b);
+  margin-top: 2px;
+}
+
+/* SIDEBAR NAVIGATION GROUPS */
+.navSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sectionTitle {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted, #94a3b8);
+  padding: 0 12px;
+  margin-bottom: 6px;
+}
+
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--color-text-secondary, #475569);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 140ms ease;
+}
+
+.navLink:hover {
+  background: var(--color-surface-soft, #f1f5f9);
+  color: var(--color-text-primary, #1e293b);
+}
+
+.navLinkActive {
+  background: var(--color-primary-soft, #eef2ff);
+  color: var(--color-primary, #4f6ef7);
+  font-weight: 600;
+}
+
+.navIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* MAIN CONTENT CONTAINER */
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 28px 32px;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* MOBILE BACKDROP */
+.backdrop {
+  display: none;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 1023px) {
+  .menuBtn {
+    display: inline-flex;
+  }
+
+  .topbar {
+    padding: 0 16px;
+    height: 56px;
+  }
+
+  .companySelector,
+  .viewPublicLink,
+  .accountInfo {
+    display: none;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 56px;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2);
+    overflow-y: auto;
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.4);
+    z-index: 45;
+  }
+
+  .main {
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}

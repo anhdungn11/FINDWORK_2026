@@ -10,4 +10,8 @@ import type {
  *
  * Domain contract thật nằm tại features/jobs/types/job.types.ts.
  */
-export type JobDetailRecord = JobRecord;
+export type JobDetailRecord = JobRecord & {
+  companyLogoUrl?: string | null;
+  companyId?: string | null;
+  companySlug?: string | null;
+};

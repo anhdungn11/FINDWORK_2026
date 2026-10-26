@@ -22,6 +22,12 @@ interface CompaniesResultsProps<
   renderCompany: (
     company: TCompany,
   ) => ReactNode;
+
+  pagination?: {
+    page: number;
+    totalPages: number;
+    onPageChange: (newPage: number) => void;
+  };
 }
 
 const CompaniesResults = <
@@ -33,6 +39,7 @@ const CompaniesResults = <
   hasFilters,
   onClearFilters,
   renderCompany,
+  pagination,
 }: CompaniesResultsProps<TCompany>) => {
   return (
     <section
@@ -77,18 +84,44 @@ const CompaniesResults = <
         </div>
 
         {companies.length > 0 ? (
-          <div
-            className={
-              styles.companyGrid
-            }
-          >
-            {companies.map(
-              (company) =>
-                renderCompany(
-                  company,
-                ),
+          <>
+            <div
+              className={
+                styles.companyGrid
+              }
+            >
+              {companies.map(
+                (company) =>
+                  renderCompany(
+                    company,
+                  ),
+              )}
+            </div>
+
+            {pagination && pagination.totalPages > 1 && (
+              <div className={styles.pagination}>
+                <button
+                  type="button"
+                  className={styles.pageBtn}
+                  disabled={pagination.page <= 1}
+                  onClick={() => pagination.onPageChange(pagination.page - 1)}
+                >
+                  ← Trang trước
+                </button>
+                <span className={styles.pageIndicator}>
+                  Trang {pagination.page} / {pagination.totalPages}
+                </span>
+                <button
+                  type="button"
+                  className={styles.pageBtn}
+                  disabled={pagination.page >= pagination.totalPages}
+                  onClick={() => pagination.onPageChange(pagination.page + 1)}
+                >
+                  Trang sau →
+                </button>
+              </div>
             )}
-          </div>
+          </>
         ) : (
           <CompaniesEmptyState
             onClearFilters={

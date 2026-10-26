@@ -1,67 +1,46 @@
-import {
-  NavLink,
-} from "react-router-dom";
-
+import { NavLink } from "react-router-dom";
+import { useI18n } from "../../../../i18n/i18nStore";
 import styles from "../styles/HeaderNavigation.module.css";
 
 const DesktopNavigation = () => {
+  const t = useI18n((s) => s.t);
+
   return (
-    <nav
-      className={styles.nav}
-      aria-label="Điều hướng chính"
-    >
+    <nav className={styles.nav} aria-label={t.nav.home}>
       <NavLink
         to="/jobs"
         className={({ isActive }) =>
-          `${styles.navLink} ${
-            isActive
-              ? styles.navLinkActive
-              : ""
-          }`
+          `${styles.navLink} ${isActive ? styles.navLinkActive : ""}`
         }
       >
-        Việc làm
+        {t.nav.jobs}
       </NavLink>
 
       <NavLink
         to="/companies"
         className={({ isActive }) =>
-          `${styles.navLink} ${
-            isActive
-              ? styles.navLinkActive
-              : ""
-          }`
+          `${styles.navLink} ${isActive ? styles.navLinkActive : ""}`
         }
       >
-        Công ty
+        {t.nav.companies}
       </NavLink>
 
       <NavLink
         to="/cv"
         className={({ isActive }) =>
-          `${styles.navLink} ${
-            styles.cvLink
-          } ${
-            isActive
-              ? styles.navLinkActive
-              : ""
-          }`
+          `${styles.navLink} ${styles.cvLink} ${isActive ? styles.navLinkActive : ""}`
         }
       >
-        Tạo CV
+        {t.nav.createCv}
       </NavLink>
 
       <NavLink
         to="/career"
         className={({ isActive }) =>
-          `${styles.navLink} ${
-            isActive
-              ? styles.navLinkActive
-              : ""
-          }`
+          `${styles.navLink} ${isActive ? styles.navLinkActive : ""}`
         }
       >
-        Khám phá nghề nghiệp
+        {t.nav.career}
       </NavLink>
     </nav>
   );

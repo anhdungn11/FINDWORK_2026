@@ -111,7 +111,7 @@ const CvCenterPage = () => {
         {isLoading ? (
           <section className={styles.loadingCard}>Đang tải danh sách CV...</section>
         ) : resumes.length === 0 ? (
-          <ResumeEmptyState onAddResume={() => setIsUploadOpen(true)} />
+          <ResumeEmptyState onAddResume={() => setIsUploadOpen(true)} onCreateResume={() => navigate("/cv/create")} />
         ) : (
           <ResumeList
             resumes={resumes}

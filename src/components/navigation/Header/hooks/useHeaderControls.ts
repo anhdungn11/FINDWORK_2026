@@ -1,31 +1,16 @@
 import { useCallback, useState } from "react";
-
-import type {
-  HeaderLanguage,
-} from "../types/header.types";
+import { useI18n } from "../../../../i18n/i18nStore";
+import type { HeaderLanguage } from "../types/header.types";
 
 const useHeaderControls = () => {
-  const [
-    isLanguageOpen,
-    setIsLanguageOpen,
-  ] = useState(false);
-
-  const [
-    isEmployerOpen,
-    setIsEmployerOpen,
-  ] = useState(false);
-
-  const [
-    isMobileOpen,
-    setIsMobileOpen,
-  ] = useState(false);
+  const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+  const [isEmployerOpen, setIsEmployerOpen] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
 
-  const [
-    language,
-    setLanguage,
-  ] =
-    useState<HeaderLanguage>("VI");
+  const locale = useI18n((s) => s.locale);
+  const setLocale = useI18n((s) => s.setLocale);
+  const language: HeaderLanguage = locale === "en" ? "EN" : "VI";
 
   const closeMenus = useCallback(() => {
     setIsLanguageOpen(false);
@@ -42,36 +27,25 @@ const useHeaderControls = () => {
     setIsEmployerOpen(false);
   };
 
-  const changeLanguage = (
-    value: HeaderLanguage,
-  ) => {
-    setLanguage(value);
+  const changeLanguage = (value: HeaderLanguage) => {
+    setLocale(value.toLowerCase() as "vi" | "en");
     setIsLanguageOpen(false);
   };
 
   const toggleLanguage = () => {
-    setIsLanguageOpen(
-      (current) => !current,
-    );
-
+    setIsLanguageOpen((current) => !current);
     setIsEmployerOpen(false);
     setIsAccountOpen(false);
   };
 
   const toggleEmployer = () => {
-    setIsEmployerOpen(
-      (current) => !current,
-    );
-
+    setIsEmployerOpen((current) => !current);
     setIsLanguageOpen(false);
     setIsAccountOpen(false);
   };
 
   const toggleMobile = () => {
-    setIsMobileOpen(
-      (current) => !current,
-    );
-
+    setIsMobileOpen((current) => !current);
     setIsLanguageOpen(false);
     setIsEmployerOpen(false);
     setIsAccountOpen(false);
@@ -86,10 +60,10 @@ const useHeaderControls = () => {
     closeMenus,
     closeAccount,
     changeLanguage,
+    toggleAccount,
     toggleLanguage,
     toggleEmployer,
     toggleMobile,
-    toggleAccount,
   };
 };
 

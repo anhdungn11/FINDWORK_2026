@@ -1,0 +1,211 @@
+.filterSection {
+  background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  padding: 28px 0 20px;
+}
+
+.searchCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.primarySearchRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inputWrapper {
+  position: relative;
+  flex: 2;
+  min-width: 260px;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 12px 38px 12px 42px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background-color: var(--color-background, #f8fafc);
+  color: var(--color-text-primary, #0f172a);
+  outline: none;
+  transition: all 160ms ease;
+}
+
+.searchInput:focus {
+  border-color: #6366f1;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.clearInputBtn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.clearInputBtn:hover {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+.selectWrapper {
+  position: relative;
+  flex: 1;
+  min-width: 170px;
+}
+
+.filterSelect {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background-color: var(--color-background, #f8fafc);
+  color: var(--color-text-primary, #0f172a);
+  outline: none;
+  cursor: pointer;
+  transition: all 160ms ease;
+  appearance: auto;
+}
+
+.filterSelect:focus {
+  border-color: #6366f1;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.searchSubmitBtn {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 160ms ease;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  white-space: nowrap;
+}
+
+.searchSubmitBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+}
+
+.secondaryFiltersRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.filterChipLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quickChipsRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.quickChip {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 20px;
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #cbd5e1);
+  color: var(--color-text-secondary, #475569);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.quickChip:hover {
+  border-color: #6366f1;
+  color: #4f46e5;
+  background-color: #f5f3ff;
+}
+
+.quickChipActive {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+  border-color: #4f46e5 !important;
+  font-weight: 600;
+}
+
+.clearFiltersBtn {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ef4444;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background-color 150ms ease;
+}
+
+.clearFiltersBtn:hover {
+  background-color: #fee2e2;
+}
+
+@media (max-width: 768px) {
+  .primarySearchRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inputWrapper,
+  .selectWrapper,
+  .searchSubmitBtn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .searchSubmitBtn {
+    justify-content: center;
+  }
+}

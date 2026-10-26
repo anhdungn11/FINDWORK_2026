@@ -1,0 +1,385 @@
+/* ==========================================================================
+   Candidate Profile Guidance, Checklist & Feedback Stylesheet - UI/UX Pro Max
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Guidance Checklist Card (Right Rail - No %)
+   -------------------------------------------------------------------------- */
+.checklistCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-4, 1rem);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(15, 23, 42, 0.06));
+}
+
+.checklistHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3, 0.75rem);
+}
+
+.checklistTitle {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1e293b);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+.countBadge {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold, 600);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--color-primary-soft, #eef2ff);
+  color: var(--color-primary, #4f6ef7);
+}
+
+.checklistNotice {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary, #64748b);
+  margin-bottom: var(--space-3, 0.75rem);
+  line-height: 1.4;
+}
+
+.checklistsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checklistItemBtn {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2, 0.5rem);
+  padding: 0.5rem;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid transparent;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.checklistItemBtn:hover {
+  background: var(--color-surface-soft, #f1f5f9);
+  border-color: var(--color-border, #e2e8f0);
+}
+
+.checklistItemBtn:focus-visible {
+  outline: 2px solid var(--color-primary, #4f6ef7);
+  outline-offset: 1px;
+}
+
+.checkIconDone {
+  color: var(--color-success, #22c55e);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.checkIconPending {
+  color: var(--color-text-muted, #94a3b8);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.itemMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemTitle {
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-primary, #1e293b);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.itemTitleCompleted {
+  text-decoration: line-through;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.optionalTag {
+  font-size: 0.625rem;
+  color: var(--color-text-muted, #94a3b8);
+  font-weight: normal;
+  text-decoration: none;
+}
+
+.itemDescription {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary, #64748b);
+  margin: 2px 0 0 0;
+  line-height: 1.3;
+}
+
+/* --------------------------------------------------------------------------
+   Quick Navigation Card
+   -------------------------------------------------------------------------- */
+.quickNavCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-4, 1rem);
+}
+
+.quickNavTitle {
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #94a3b8);
+  margin: 0 0 var(--space-2, 0.5rem) 0;
+}
+
+.quickNavList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.quickNavLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-secondary, #64748b);
+  text-decoration: none;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.quickNavLink:hover {
+  background: var(--color-surface-soft, #f1f5f9);
+  color: var(--color-primary, #4f6ef7);
+}
+
+.quickNavLink:focus-visible {
+  outline: 2px solid var(--color-primary, #4f6ef7);
+}
+
+/* --------------------------------------------------------------------------
+   CV Center Reference Card
+   -------------------------------------------------------------------------- */
+.cvReferenceCard {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-4, 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.cvReferenceTitle {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: #15803d;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+}
+
+.cvReferenceText {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-secondary, #64748b);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.cvReferenceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: #15803d;
+  text-decoration: none;
+  margin-top: 4px;
+}
+
+.cvReferenceLink:hover {
+  text-decoration: underline;
+}
+
+.cvReferenceLink:focus-visible {
+  outline: 2px solid #15803d;
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Onboarding Import Banner
+   -------------------------------------------------------------------------- */
+.importBanner {
+  background: linear-gradient(135deg, var(--color-primary-soft, #eef2ff) 0%, #ffffff 100%);
+  border: 1px solid rgba(79, 110, 247, 0.3);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-4, 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+@media (min-width: 640px) {
+  .importBanner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-5, 1.25rem);
+  }
+}
+
+.importBannerLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3, 0.75rem);
+  flex: 1;
+}
+
+.importBannerIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-primary, #4f6ef7);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.importBannerTitle {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary, #1e293b);
+  margin: 0;
+}
+
+.importBannerText {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-secondary, #64748b);
+  margin: 2px 0 0 0;
+  line-height: 1.4;
+}
+
+.importBannerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   Profile State Feedback Cards (Error, Forbidden, etc.)
+   -------------------------------------------------------------------------- */
+.stateCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-8, 2rem) var(--space-5, 1.25rem);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 540px;
+  margin: var(--space-6, 1.5rem) auto;
+}
+
+.stateIconWrap {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full, 9999px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-3, 0.75rem);
+}
+
+.stateIconWarning {
+  background: var(--color-warning-soft, #fef3c7);
+  color: #b45309;
+}
+
+.stateIconDanger {
+  background: var(--color-danger-soft, #fee2e2);
+  color: var(--color-danger, #ef4444);
+}
+
+.stateIconInfo {
+  background: var(--color-info-soft, #e0f2fe);
+  color: var(--color-info, #0ea5e9);
+}
+
+.stateTitle {
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-text-primary, #1e293b);
+  margin: 0 0 var(--space-2, 0.5rem) 0;
+}
+
+.stateDescription {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-secondary, #64748b);
+  line-height: 1.5;
+  margin: 0 0 var(--space-4, 1rem) 0;
+}
+
+.stateActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------------------
+   Skeleton Loader Styles
+   -------------------------------------------------------------------------- */
+.skeletonCard {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-6, 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+.skeletonRow {
+  height: 16px;
+  border-radius: var(--radius-sm, 6px);
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonRow {
+    animation: none !important;
+    background: var(--color-surface-soft, #f1f5f9);
+  }
+}

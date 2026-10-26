@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import type { AuthUser } from "@/store/authStore";
+import { useEmployerMembership } from "@/features/company/hooks/useEmployerMembership";
+import { useI18n } from "../../../../i18n/i18nStore";
 
 import { getAccountInitials, getAccountName } from "../hooks/headerAuth";
 import styles from "../styles/AccountDropdown.module.css";
@@ -28,6 +30,17 @@ const AccountDropdown = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
+  const location = useLocation();
+  const { isEmployer } = useEmployerMembership();
+  const t = useI18n((s) => s.t);
+
+  const isEmployerContext = location.pathname.startsWith("/employer");
+  // Chỉ tài khoản có tư cách doanh nghiệp hợp lệ (GET /companies/me) mới có đích đến /employer.
+  // Tài khoản thuần Ứng viên luôn hướng tới /candidate.
+  const workspaceTarget = isEmployer ? "/employer" : "/candidate";
+  const workspaceTitle = isEmployer
+    ? t.nav.employerWorkspace
+    : t.nav.candidateWorkspace;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -52,7 +65,7 @@ const AccountDropdown = ({
 
   return (
     <div ref={rootRef} className={`${styles.account} ${variant === "mobile" ? styles.mobile : ""}`}>
-      <Link to="/candidate" className={styles.workspaceLink} onClick={onNavigate}>
+      <Link to={workspaceTarget} className={styles.workspaceLink} onClick={onNavigate} title={workspaceTitle}>
         Workspace
       </Link>
       <div className={styles.menuAnchor}>
@@ -73,13 +86,31 @@ const AccountDropdown = ({
         </button>
         {isOpen && (
           <nav id={menuId} className={styles.menu} aria-label="Tài khoản">
-            <Link to="/candidate" onClick={onNavigate}>Bảng điều khiển</Link>
-            <Link to="/candidate/profile" onClick={onNavigate}>
-              Hồ sơ <small>Đang phát triển</small>
-            </Link>
-            <Link to="/cv" onClick={onNavigate}>Trung tâm CV</Link>
+            {isEmployer ? (
+              <>
+                <Link to="/employer" onClick={onNavigate}>{t.nav.employerWorkspace}</Link>
+                <Link to="/employer/jobs" onClick={onNavigate}>{t.nav.employerJobs}</Link>
+                <Link to="/employer/profile" onClick={onNavigate}>{t.nav.employerProfile}</Link>
+                <Link to="/employer/locations" onClick={onNavigate}>{t.nav.employerLocations}</Link>
+                <Link to="/employer/members" onClick={onNavigate}>{t.nav.employerMembers}</Link>
+                <Link to="/employer/applicants" onClick={onNavigate}>{t.nav.employerApplicants}</Link>
+                <Link to="/jobs" onClick={onNavigate}>{t.nav.jobs}</Link>
+              </>
+            ) : (
+              <>
+                <Link to="/candidate" onClick={onNavigate}>{t.nav.dashboard}</Link>
+                <Link to="/candidate/profile" onClick={onNavigate}>{t.nav.profile}</Link>
+                <Link to="/cv" onClick={onNavigate}>{t.nav.cvCenter}</Link>
+                <Link to="/candidate/saved-jobs" onClick={onNavigate}>{t.nav.savedJobs}</Link>
+                <Link to="/candidate/applications" onClick={onNavigate}>{t.nav.applications}</Link>
+                <Link to="/jobs" onClick={onNavigate}>{t.nav.jobs}</Link>
+                {isEmployer && (
+                  <Link to="/employer" onClick={onNavigate}>{t.nav.employerWorkspace}</Link>
+                )}
+              </>
+            )}
             <button type="button" className={styles.logoutButton} onClick={onLogout}>
-              Đăng xuất
+              {t.nav.logout}
             </button>
           </nav>
         )}

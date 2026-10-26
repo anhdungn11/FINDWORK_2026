@@ -9,9 +9,10 @@ import type {
  * Backend sau này có thể trả DTO khác và jobService
  * sẽ map về shape này cho frontend sử dụng.
  */
-export type JobId = number;
+export type JobId = number | string;
 
 export interface JobRecord
   extends JobFilterRecord {
   id: JobId;
+  isMock?: boolean;
 }

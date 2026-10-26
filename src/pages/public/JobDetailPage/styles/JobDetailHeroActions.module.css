@@ -45,6 +45,17 @@
     var(--color-surface-soft);
 }
 
+.saveButton.savedActive {
+  background: var(--color-primary-soft, #eef2ff);
+  color: var(--color-primary, #4f46e5);
+  border-color: var(--color-primary, #4f46e5);
+}
+
+.saveButton.savedActive svg {
+  fill: currentColor;
+}
+
+
 .applyButton {
   padding: 0 18px;
 

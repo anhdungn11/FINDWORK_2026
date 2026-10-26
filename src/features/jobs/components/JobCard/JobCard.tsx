@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import type {
   JobRecord,
 } from "@/features/jobs/types/job.types";
@@ -9,8 +10,26 @@ interface JobCardProps {
 }
 
 const JobCard = ({ job }: JobCardProps) => {
+  const navigate = useNavigate();
+
+  const handleOpen = () => {
+    navigate(`/jobs/${job.id}`);
+  };
+
   return (
-    <article className={styles.card}>
+    <article
+      className={styles.card}
+      onClick={handleOpen}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleOpen();
+        }
+      }}
+      style={{ cursor: "pointer" }}
+    >
       <h3 className={styles.title}>
         {job.title}
       </h3>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import AuthErrorMessage from "@/features/auth/components/AuthErrorMessage/AuthErrorMessage";
 import AuthField from "@/features/auth/components/AuthField/AuthField";
@@ -11,6 +11,8 @@ import AuthSubmitButton from "@/features/auth/components/AuthSubmitButton/AuthSu
 import { useLoginForm } from "@/features/auth/hooks/useLoginForm";
 
 const LoginPage = () => {
+  const location = useLocation();
+  const isEmployer = location.pathname.startsWith("/employer");
   const { email, password, error, isSubmitting, setEmail, setPassword, handleSubmit } = useLoginForm();
   const logoutError = useAuthStore((state) => state.logoutError);
   const logout = useAuthStore((state) => state.logout);
@@ -22,10 +24,26 @@ const LoginPage = () => {
   };
   return (
     <AuthShell
-      eyebrow="TÀI KHOẢN ỨNG VIÊN"
-      title="Đăng nhập FINDWORK"
-      description="Tiếp tục quản lý hồ sơ, CV và những cơ hội nghề nghiệp của bạn."
-      footer={<AuthFooterText>Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link></AuthFooterText>}
+      eyebrow={isEmployer ? "DÀNH CHO NHÀ TUYỂN DỤNG" : "TÀI KHOẢN FINDWORK"}
+      title={isEmployer ? "Đăng nhập nhà tuyển dụng" : "Đăng nhập FINDWORK"}
+      description={
+        isEmployer
+          ? "Truy cập không gian làm việc doanh nghiệp để quản lý tin tuyển dụng và tìm kiếm ứng viên."
+          : "Một tài khoản duy nhất để quản lý hồ sơ ứng viên và không gian tuyển dụng doanh nghiệp."
+      }
+      footer={
+        <AuthFooterText>
+          {isEmployer ? (
+            <>
+              Chưa có tài khoản tuyển dụng? <Link to="/employer/register">Đăng ký doanh nghiệp</Link>
+            </>
+          ) : (
+            <>
+              Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>
+            </>
+          )}
+        </AuthFooterText>
+      }
     >
       {logoutError && <div role="alert">
         <p>{logoutError}</p>

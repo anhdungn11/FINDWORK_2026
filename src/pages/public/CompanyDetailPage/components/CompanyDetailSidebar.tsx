@@ -61,13 +61,17 @@ const CompanyDetailSidebar = ({
             icon={<GlobeIcon />}
             label="Website"
           >
-            <a
-              href={company.website}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Truy cập website
-            </a>
+            {company.website && company.website !== "Chưa cập nhật" ? (
+              <a
+                href={company.website.startsWith("http") ? company.website : `https://${company.website}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Truy cập website
+              </a>
+            ) : (
+              <strong>Chưa cập nhật</strong>
+            )}
           </CompanyInfoItem>
         </div>
       </div>

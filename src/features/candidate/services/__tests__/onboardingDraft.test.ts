@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { draftSnapshot, restoreDraftData, safeStepIndex } from "../onboardingDraft";
+import {
+  draftSnapshot,
+  normalizeOnboardingDraftPayload,
+  restoreDraftData,
+  safeStepIndex,
+} from "../onboardingDraft";
 import { INITIAL_ONBOARDING_DATA } from "../../utils/onboarding.constants";
 
 describe("Private onboarding draft serialization", () => {
@@ -52,5 +57,28 @@ describe("Private onboarding draft serialization", () => {
     assert.equal(safeStepIndex(7), 0);
     assert.equal(safeStepIndex(4), 4);
     assert.equal(safeStepIndex(NaN), 0);
+  });
+
+  it("normalizes empty 200 response body ('') or null from GET /api/v1/candidate/onboarding-draft to null", () => {
+    assert.equal(normalizeOnboardingDraftPayload(""), null);
+    assert.equal(normalizeOnboardingDraftPayload(null), null);
+    assert.equal(normalizeOnboardingDraftPayload(undefined), null);
+    assert.equal(normalizeOnboardingDraftPayload({}), null);
+  });
+
+  it("normalizes valid onboarding draft payload preserving version and stepIndex", () => {
+    const normalized = normalizeOnboardingDraftPayload({
+      data: {
+        personal: { ...INITIAL_ONBOARDING_DATA.personal, fullName: "Lê Minh Châu" },
+      },
+      stepIndex: 3,
+      version: 4,
+      updatedAt: "2026-10-16T01:00:00.000Z",
+    });
+    assert.ok(normalized);
+    assert.equal(normalized.version, 4);
+    assert.equal(normalized.stepIndex, 3);
+    assert.equal(normalized.data.personal.fullName, "Lê Minh Châu");
+    assert.equal(normalized.data.privacy.allowJobMatching, true);
   });
 });

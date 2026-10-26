@@ -5,6 +5,7 @@ import {
   CandidateSidebar,
   CandidateMobileDrawer,
 } from "@/features/candidate/workspace";
+import { FindworkAiFloatingWidget } from "@/features/ai/FindworkAiFloatingWidget";
 import styles from "@/features/candidate/workspace/styles/CandidateWorkspace.module.css";
 
 const CandidateLayout = () => {
@@ -62,6 +63,9 @@ const CandidateLayout = () => {
         triggerRef={hamburgerButtonRef}
         onClose={() => setIsMobileDrawerOpen(false)}
       />
+
+      {/* Floating AI Assistant Widget */}
+      <FindworkAiFloatingWidget />
     </div>
   );
 };

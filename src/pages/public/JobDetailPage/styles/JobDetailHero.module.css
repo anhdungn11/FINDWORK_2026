@@ -177,6 +177,31 @@
   stroke-linejoin: round;
 }
 
+.mockBadge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+  background: var(--color-surface-soft, #f1f5f9);
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.demoNotice {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background-color: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
 @media (max-width: 900px) {
   .heroCard {
     align-items: flex-start;

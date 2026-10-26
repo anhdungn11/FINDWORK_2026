@@ -2,8 +2,10 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   useApplicationData,
@@ -13,8 +15,15 @@ import {
   useApplicationDetails,
 } from "@/features/applications/hooks/useApplicationDetails";
 
+import {
+  applicationDraftService,
+} from "@/features/applications/services/applicationDraftService";
+
+import { useAuthStore } from "@/store/authStore";
+
 import type {
   ApplicationStep,
+  ScreeningAnswerValue,
 } from "@/features/applications/types/application.types";
 
 interface UseApplicationFlowOptions {
@@ -25,17 +34,23 @@ interface UseApplicationFlowOptions {
  * Orchestrator của Candidate Application Flow.
  *
  * Trách nhiệm:
- * - điều phối các step
- * - quản lý CV đang chọn
- * - kết nối application data với application details
- *
- * Không trực tiếp gọi service.
- * Không chứa validation implementation.
- * Không chứa Resume -> Application mapping.
+ * - Điều phối các step (1: resume, 2: details, 3: questions, 4: review)
+ * - Quản lý CV đang chọn
+ * - Kết nối application data với application details
+ * - Lưu giữ trạng thái draft qua F5 refresh (sessionStorage phân vùng theo user + job)
+ * - Tránh ghi đè dữ liệu người dùng khi thông tin CV tải bất đồng bộ
  */
 export const useApplicationFlow = ({
   jobId,
 }: UseApplicationFlowOptions) => {
+  const user = useAuthStore((state) => state.user);
+  const userId = user?.id ?? null;
+
+  // Khởi tạo draft ban đầu cho cặp (userId, jobId)
+  const initialDraft = useMemo(() => {
+    return applicationDraftService.getDraft(userId, jobId);
+  }, [userId, jobId]);
+
   const {
     job,
     resumes,
@@ -52,42 +67,75 @@ export const useApplicationFlow = ({
     updateContact,
     updateDetails,
     prefillFromResume,
+    setAllDetails,
     resetDetails,
-  } = useApplicationDetails();
+  } = useApplicationDetails({
+    initialDetails: initialDraft?.details as any,
+  });
 
   const [
     selectedResumeId,
     setSelectedResumeId,
-  ] = useState("");
+  ] = useState<string>(() => initialDraft?.selectedResumeId ?? "");
 
   const [
     currentStep,
     setCurrentStep,
   ] = useState<ApplicationStep>(
-    "resume",
+    () => initialDraft?.currentStep ?? "resume",
   );
 
+  const [
+    screeningAnswers,
+    setScreeningAnswers,
+  ] = useState<Record<string, ScreeningAnswerValue>>(
+    () => (initialDraft?.screeningAnswers as Record<string, ScreeningAnswerValue>) ?? {},
+  );
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const createdCvId = searchParams.get("createdCvId");
+
   /**
-   * Một Application Flow mới phải bắt đầu lại
-   * khi jobId thay đổi.
-   *
-   * Tránh giữ state của Job A khi chuyển trực tiếp
-   * sang URL ứng tuyển Job B.
+   * Đồng bộ lại state khi chuyển đổi giữa các Job IDs hoặc User IDs khác nhau.
+   * Dùng ref so sánh để không bị re-run vòng lặp vô hạn ở mỗi lần render.
+   */
+  const prevContextRef = useRef({ jobId, userId });
+  useEffect(() => {
+    if (prevContextRef.current.jobId !== jobId || prevContextRef.current.userId !== userId) {
+      prevContextRef.current = { jobId, userId };
+      const existingDraft = applicationDraftService.getDraft(userId, jobId);
+      if (existingDraft) {
+        setCurrentStep(existingDraft.currentStep);
+        setSelectedResumeId(existingDraft.selectedResumeId);
+        setAllDetails(existingDraft.details as any);
+        setScreeningAnswers(existingDraft.screeningAnswers);
+      } else {
+        setCurrentStep("resume");
+        setSelectedResumeId("");
+        resetDetails();
+        setScreeningAnswers({});
+      }
+    }
+  }, [jobId, userId, resetDetails, setAllDetails]);
+
+  /**
+   * Lưu draft tự động vào sessionStorage mỗi khi có thay đổi.
    */
   useEffect(() => {
-    setCurrentStep("resume");
-    setSelectedResumeId("");
-    resetDetails();
-  }, [
-    jobId,
-    resetDetails,
-  ]);
+    applicationDraftService.saveDraft(userId, jobId, {
+      currentStep,
+      selectedResumeId,
+      details,
+      screeningAnswers,
+    });
+  }, [userId, jobId, currentStep, selectedResumeId, details, screeningAnswers]);
 
   /**
    * Khi danh sách CV sẵn sàng:
-   * - giữ CV hiện tại nếu vẫn tồn tại
-   * - nếu chưa có thì chọn CV default
-   * - nếu không có default thì lấy CV đầu tiên
+   * 1. Ưu tiên createdCvId nếu vừa tạo CV mới thành công quay lại
+   * 2. Giữ CV hiện tại nếu hợp lệ trong danh sách
+   * 3. Giữ CV từ draft nếu hợp lệ trong danh sách
+   * 4. Mặc định chọn CV default hoặc CV đầu tiên
    */
   useEffect(() => {
     if (resumes.length === 0) {
@@ -95,96 +143,87 @@ export const useApplicationFlow = ({
       return;
     }
 
-    setSelectedResumeId(
-      (currentId) => {
-        const currentStillExists =
-          Boolean(currentId) &&
-          resumes.some(
-            (resume) =>
-              resume.id === currentId,
-          );
+    if (createdCvId && resumes.some((resume) => resume.id === createdCvId)) {
+      setSelectedResumeId(createdCvId);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("createdCvId");
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
 
-        if (currentStillExists) {
-          return currentId;
-        }
+    setSelectedResumeId((currentId) => {
+      const currentStillExists =
+        Boolean(currentId) &&
+        resumes.some((resume) => resume.id === currentId);
 
-        const defaultResume =
-          resumes.find(
-            (resume) =>
-              resume.isDefault,
-          ) ??
-          resumes[0];
+      if (currentStillExists) {
+        return currentId;
+      }
 
-        return defaultResume.id;
-      },
-    );
-  }, [resumes]);
+      const draft = applicationDraftService.getDraft(userId, jobId);
+      if (draft?.selectedResumeId && resumes.some((resume) => resume.id === draft.selectedResumeId)) {
+        return draft.selectedResumeId;
+      }
 
-  const selectedResume =
-    useMemo(
-      () =>
-        resumes.find(
-          (resume) =>
-            resume.id ===
-            selectedResumeId,
-        ) ?? null,
-      [
-        resumes,
-        selectedResumeId,
-      ],
-    );
+      const defaultResume =
+        resumes.find((resume) => resume.isDefault) ?? resumes[0];
+
+      return defaultResume.id;
+    });
+  }, [resumes, createdCvId, searchParams, setSearchParams, userId, jobId]);
+
+  const selectedResume = useMemo(
+    () =>
+      resumes.find(
+        (resume) => resume.id === selectedResumeId,
+      ) ?? null,
+    [resumes, selectedResumeId],
+  );
 
   /**
-   * CV được chọn có thể prefill những field
-   * Application còn trống.
-   *
-   * Mapper đảm bảo không ghi đè dữ liệu
-   * ứng viên đã nhập.
+   * Prefill thông tin từ CV vào Application form:
+   * Chỉ điền vào các trường còn trống, tuyệt đối không ghi đè dữ liệu người dùng đã nhập.
    */
   useEffect(() => {
     if (!selectedResume) {
       return;
     }
 
-    prefillFromResume(
-      selectedResume,
-    );
-  }, [
-    selectedResume,
-    prefillFromResume,
-  ]);
+    prefillFromResume(selectedResume);
+  }, [selectedResume, prefillFromResume]);
 
-  const selectResume =
-    useCallback(
-      (
-        resumeId: string,
-      ) => {
-        const exists =
-          resumes.some(
-            (resume) =>
-              resume.id === resumeId,
-          );
+  const selectResume = useCallback(
+    (resumeId: string) => {
+      const exists = resumes.some((resume) => resume.id === resumeId);
+      if (!exists) return;
+      setSelectedResumeId(resumeId);
+    },
+    [resumes],
+  );
 
-        if (!exists) {
-          return;
-        }
+  const goToStep = useCallback(
+    (step: ApplicationStep) => {
+      setCurrentStep(step);
+    },
+    [],
+  );
 
-        setSelectedResumeId(
-          resumeId,
-        );
-      },
-      [resumes],
-    );
+  const updateScreeningAnswer = useCallback(
+    (questionId: string, answer: ScreeningAnswerValue) => {
+      setScreeningAnswers((current) => ({
+        ...current,
+        [questionId]: answer,
+      }));
+    },
+    [],
+  );
 
-  const goToStep =
-    useCallback(
-      (
-        step: ApplicationStep,
-      ) => {
-        setCurrentStep(step);
-      },
-      [],
-    );
+  const clearDraft = useCallback(() => {
+    applicationDraftService.clearDraft(userId, jobId);
+    resetDetails();
+    setScreeningAnswers({});
+    setCurrentStep("resume");
+  }, [userId, jobId, resetDetails]);
 
   return {
     job,
@@ -199,6 +238,9 @@ export const useApplicationFlow = ({
     detailsErrors,
     canContinueDetails,
 
+    screeningAnswers,
+    updateScreeningAnswer,
+
     isLoading,
     errorMessage,
 
@@ -206,5 +248,6 @@ export const useApplicationFlow = ({
     updateContact,
     updateDetails,
     goToStep,
+    clearDraft,
   };
 };

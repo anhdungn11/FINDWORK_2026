@@ -1,4 +1,6 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuthStore } from "@/store/authStore";
+import { useSavedJobs } from "@/features/candidate/savedJobs/useSavedJobs";
 
 import type {
   JobRecord,
@@ -7,11 +9,31 @@ import type {
 import styles from "./JobDiscoveryCard.module.css";
 
 interface JobDiscoveryCardProps {
-  job: JobRecord;
+  job: JobRecord | {
+    id: string | number;
+    title: string;
+    company: string;
+    location: string;
+    workplace?: string;
+    type?: string;
+    experience?: string;
+    category?: string;
+    salary: string;
+    skills?: readonly string[];
+    postedAt?: string;
+    matchScore?: number;
+    isMock?: boolean;
+  };
 }
 
 const JobDiscoveryCard = ({ job }: JobDiscoveryCardProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const user = useAuthStore((state) => state.user);
+  const { isSaved, toggleSave } = useSavedJobs();
+
+  const saved = isSaved(job.id);
+  const isMockJob = "isMock" in job ? Boolean(job.isMock) : typeof job.id === "number";
 
   const handleOpenJob = () => {
     navigate(`/jobs/${job.id}`);
@@ -22,8 +44,21 @@ const JobDiscoveryCard = ({ job }: JobDiscoveryCardProps) => {
   ) => {
     event.stopPropagation();
 
-    // Tạm thời chỉ chặn click lan ra card.
-    // Sau này sẽ nối chức năng saved jobs thật.
+    if (!user) {
+      navigate(`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`);
+      return;
+    }
+
+    toggleSave({
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      salary: job.salary,
+      workplace: job.workplace,
+      type: job.type,
+      isMock: isMockJob,
+    });
   };
 
   return (
@@ -46,6 +81,11 @@ const JobDiscoveryCard = ({ job }: JobDiscoveryCardProps) => {
 
           <h2 className={styles.title}>
             {job.title}
+            {isMockJob && (
+              <span className={styles.mockBadge} title="Dữ liệu mẫu minh họa, chưa phải tin backend thật">
+                Bản tin mẫu
+              </span>
+            )}
           </h2>
 
           <p className={styles.company}>
@@ -55,11 +95,13 @@ const JobDiscoveryCard = ({ job }: JobDiscoveryCardProps) => {
 
         <button
           type="button"
-          className={styles.saveButton}
-          aria-label="Lưu việc làm"
+          className={`${styles.saveButton} ${saved ? styles.saveButtonActive : ""}`}
+          aria-label={saved ? "Bỏ lưu việc làm này" : "Lưu việc làm này"}
+          aria-pressed={saved}
           onClick={handleSaveJob}
+          title={saved ? "Bỏ lưu việc làm" : "Lưu việc làm"}
         >
-          ♡
+          {saved ? "♥" : "♡"}
         </button>
       </div>
 
@@ -75,7 +117,7 @@ const JobDiscoveryCard = ({ job }: JobDiscoveryCardProps) => {
       </div>
 
       <div className={styles.skills}>
-        {job.skills.map((skill) => (
+        {(job.skills ?? []).map((skill) => (
           <span key={skill}>
             {skill}
           </span>

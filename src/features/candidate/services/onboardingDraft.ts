@@ -28,8 +28,9 @@ export function draftSnapshot(data: CandidateOnboardingData): CandidateOnboardin
   };
 }
 
-export function restoreDraftData(input: CandidateOnboardingData): CandidateOnboardingData {
+export function restoreDraftData(input: Partial<CandidateOnboardingData>): CandidateOnboardingData {
   // Merge defaults to tolerate adding fields in a future frontend deployment.
+  const preferences = input.preferences ?? INITIAL_ONBOARDING_DATA.preferences;
   return {
     personal: { ...INITIAL_ONBOARDING_DATA.personal, ...input.personal },
     education: Array.isArray(input.education) ? input.education : [],
@@ -38,18 +39,18 @@ export function restoreDraftData(input: CandidateOnboardingData): CandidateOnboa
     languages: Array.isArray(input.languages) ? input.languages : [],
     preferences: {
       ...INITIAL_ONBOARDING_DATA.preferences,
-      ...input.preferences,
+      ...preferences,
       locationPreference: {
         ...INITIAL_ONBOARDING_DATA.preferences.locationPreference,
-        ...input.preferences.locationPreference,
+        ...preferences.locationPreference,
       },
       salaryExpectation: {
         ...INITIAL_ONBOARDING_DATA.preferences.salaryExpectation,
-        ...input.preferences.salaryExpectation,
+        ...preferences.salaryExpectation,
       },
       availability: {
         ...INITIAL_ONBOARDING_DATA.preferences.availability,
-        ...input.preferences.availability,
+        ...preferences.availability,
       },
     },
     resume: { ...INITIAL_ONBOARDING_DATA.resume, ...input.resume },
@@ -57,9 +58,34 @@ export function restoreDraftData(input: CandidateOnboardingData): CandidateOnboa
   };
 }
 
+/**
+ * Normalizes the raw response from GET /api/v1/candidate/onboarding-draft.
+ * When no draft exists, NestJS serializes `null` as an empty 200 OK body (`""`).
+ */
+export function normalizeOnboardingDraftPayload(raw: unknown): OnboardingDraft | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+  const candidate = raw as Record<string, unknown>;
+  if (!candidate.data || typeof candidate.data !== "object" || Array.isArray(candidate.data)) {
+    return null;
+  }
+  const rawVersion = candidate.version;
+  const version =
+    typeof rawVersion === "number" && Number.isInteger(rawVersion) && rawVersion >= 1
+      ? rawVersion
+      : 1;
+  return {
+    data: restoreDraftData(candidate.data as Partial<CandidateOnboardingData>),
+    stepIndex: safeStepIndex(candidate.stepIndex),
+    version,
+    updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : "",
+  };
+}
+
 export async function loadOnboardingDraft(): Promise<OnboardingDraft | null> {
-  const response = await apiClient.get<OnboardingDraft | null>(API_ENDPOINTS.CANDIDATE.ONBOARDING_DRAFT);
-  return response.data;
+  const response = await apiClient.get< unknown >(API_ENDPOINTS.CANDIDATE.ONBOARDING_DRAFT);
+  return normalizeOnboardingDraftPayload(response.data);
 }
 
 export async function saveOnboardingDraft(data: CandidateOnboardingData, stepIndex: number, version: number): Promise<OnboardingDraft> {

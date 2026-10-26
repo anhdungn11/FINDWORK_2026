@@ -33,10 +33,11 @@ export const useForgotPasswordForm = () => {
       return;
     }
 
-    setIsSubmitted(true);
-
-    // Frontend mock.
-    // Sau này thay bằng POST /auth/forgot-password.
+    // Backend Auth Service does not provide self-service /auth/forgot-password yet.
+    // Display honest failure and instruct user rather than fabricating delivery.
+    setError(
+      "Dịch vụ gửi email đặt lại mật khẩu hiện chưa được cấu hình máy chủ (HTTP 503 / Endpoint Unconfigured). Vui lòng liên hệ quản trị viên nền tảng để được hỗ trợ cấp lại quyền truy cập an toàn."
+    );
   };
 
   const resetSubmission = () => {
