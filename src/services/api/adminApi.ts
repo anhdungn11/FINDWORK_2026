@@ -1,4 +1,4 @@
-import { apiClient } from "../http/apiClient";
+import { apiClient, getApiBaseUrl } from "../http/apiClient";
 import { isWorkspaceWritesEnabled } from "../../config/featureFlags";
 import { toApiFailure, writeBlockedFailure } from "./apiFailure";
 import { normalizePaged, type Paged } from "./apiTypes";
@@ -28,10 +28,60 @@ export interface AdminCompanyDto {
   name: string;
   slug: string | null;
   status: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
-  verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
+  verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
   verifiedAt: string | null;
+  verificationRejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminCompanyLocationDto {
+  id: string;
+  countryCode: string | null;
+  provinceId: string | null;
+  wardId: string | null;
+  addressLine: string | null;
+  isHeadquarters: boolean;
+}
+
+export interface AdminCompanyDetailDto extends AdminCompanyDto {
+  createdByUserId: string | null;
+  legalName: string | null;
+  taxCode: string | null;
+  industryId: string | null;
+  description: string | null;
+  website: string | null;
+  employeeSizeRange: string | null;
+  foundedYear: number | null;
+  locations: AdminCompanyLocationDto[];
+  counts: {
+    members: number;
+    jobs: number;
+    applications: number;
+  };
+}
+
+export interface AdminLegalEvidenceDto {
+  id: string;
+  kind: "BUSINESS_REGISTRATION" | "TAX_CERTIFICATE" | "REPRESENTATIVE_AUTHORIZATION" | string;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  sha256: string;
+  createdAt: string;
+}
+
+export interface AdminCompanyLegalDto {
+  profile: {
+    companyId: string;
+    registeredAddress: string;
+    representativeName: string;
+    representativeTitle?: string | null;
+    contactEmail: string;
+    contactPhone: string;
+    updatedAt: string;
+  } | null;
+  evidences: AdminLegalEvidenceDto[];
 }
 
 export interface AdminJobDto {
@@ -45,6 +95,33 @@ export interface AdminJobDto {
   applicationDeadline: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdminJobDetailDto extends AdminJobDto {
+  description: string;
+  employmentType: string;
+  workplaceType: string;
+  experienceMinMonths: number | null;
+  experienceMaxMonths: number | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  currency: string;
+  salaryPeriod: string;
+  salaryNegotiable: boolean;
+  showSalary: boolean;
+  expiresAt: string | null;
+  company: {
+    id: string;
+    name: string;
+    status: string;
+    verificationStatus: string;
+  } | null;
+  category: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
+  applicationsCount: number;
 }
 
 export interface AdminAuditDto {
@@ -73,6 +150,7 @@ type Raw = Record<string, unknown>;
 const obj = (v: unknown): Raw => (v && typeof v === "object" ? (v as Raw) : {});
 const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const bool = (v: unknown): boolean => Boolean(v);
 
 export function normalizeAdminUser(value: unknown): AdminUserDto {
   const r = obj(value);
@@ -93,10 +171,77 @@ export function normalizeAdminCompany(value: unknown): AdminCompanyDto {
     name: str(r.name) ?? "",
     slug: str(r.slug),
     status: (str(r.status) as AdminCompanyDto["status"]) ?? "ACTIVE",
-    verificationStatus: (str(r.verificationStatus) as AdminCompanyDto["verificationStatus"]) ?? "PENDING",
+    verificationStatus: (str(r.verificationStatus) as AdminCompanyDto["verificationStatus"]) ?? "UNVERIFIED",
     verifiedAt: str(r.verifiedAt),
+    verificationRejectionReason: str(r.verificationRejectionReason),
     createdAt: str(r.createdAt) ?? "",
     updatedAt: str(r.updatedAt) ?? "",
+  };
+}
+
+export function normalizeAdminCompanyDetail(value: unknown): AdminCompanyDetailDto {
+  const r = obj(value);
+  const base = normalizeAdminCompany(r);
+  const countsObj = obj(r._count);
+  const locationsArr = Array.isArray(r.locations) ? r.locations : [];
+  return {
+    ...base,
+    createdByUserId: str(r.createdByUserId),
+    legalName: str(r.legalName),
+    taxCode: str(r.taxCode),
+    industryId: str(r.industryId),
+    description: str(r.description),
+    website: str(r.website),
+    employeeSizeRange: str(r.employeeSizeRange),
+    foundedYear: num(r.foundedYear),
+    locations: locationsArr.map((loc) => {
+      const l = obj(loc);
+      return {
+        id: str(l.id) ?? "",
+        countryCode: str(l.countryCode),
+        provinceId: str(l.provinceId),
+        wardId: str(l.wardId),
+        addressLine: str(l.addressLine),
+        isHeadquarters: bool(l.isHeadquarters),
+      };
+    }),
+    counts: {
+      members: num(countsObj.members) ?? 0,
+      jobs: num(countsObj.jobs) ?? 0,
+      applications: num(countsObj.applications) ?? 0,
+    },
+  };
+}
+
+export function normalizeAdminCompanyLegal(value: unknown): AdminCompanyLegalDto {
+  const r = obj(value);
+  const rawProfile = r.profile ? obj(r.profile) : null;
+  const rawEvidences = Array.isArray(r.evidences) ? r.evidences : [];
+
+  return {
+    profile: rawProfile
+      ? {
+          companyId: str(rawProfile.companyId) ?? "",
+          registeredAddress: str(rawProfile.registeredAddress) ?? "",
+          representativeName: str(rawProfile.representativeName) ?? "",
+          representativeTitle: str(rawProfile.representativeTitle),
+          contactEmail: str(rawProfile.contactEmail) ?? "",
+          contactPhone: str(rawProfile.contactPhone) ?? "",
+          updatedAt: str(rawProfile.updatedAt) ?? "",
+        }
+      : null,
+    evidences: rawEvidences.map((ev) => {
+      const e = obj(ev);
+      return {
+        id: str(e.id) ?? "",
+        kind: str(e.kind) ?? "",
+        originalName: str(e.originalName) ?? "",
+        mimeType: str(e.mimeType) ?? "",
+        byteSize: num(e.byteSize) ?? 0,
+        sha256: str(e.sha256) ?? "",
+        createdAt: str(e.createdAt) ?? "",
+      };
+    }),
   };
 }
 
@@ -113,6 +258,46 @@ export function normalizeAdminJob(value: unknown): AdminJobDto {
     applicationDeadline: str(r.applicationDeadline),
     createdAt: str(r.createdAt) ?? "",
     updatedAt: str(r.updatedAt) ?? "",
+  };
+}
+
+export function normalizeAdminJobDetail(value: unknown): AdminJobDetailDto {
+  const r = obj(value);
+  const base = normalizeAdminJob(r);
+  const rawComp = r.company ? obj(r.company) : null;
+  const rawCat = r.category ? obj(r.category) : null;
+  const countObj = obj(r._count);
+
+  return {
+    ...base,
+    description: str(r.description) ?? "",
+    employmentType: str(r.employmentType) ?? "FULL_TIME",
+    workplaceType: str(r.workplaceType) ?? "ON_SITE",
+    experienceMinMonths: num(r.experienceMinMonths),
+    experienceMaxMonths: num(r.experienceMaxMonths),
+    salaryMin: num(r.salaryMin),
+    salaryMax: num(r.salaryMax),
+    currency: str(r.currency) ?? "VND",
+    salaryPeriod: str(r.salaryPeriod) ?? "MONTHLY",
+    salaryNegotiable: bool(r.salaryNegotiable),
+    showSalary: bool(r.showSalary),
+    expiresAt: str(r.expiresAt),
+    company: rawComp
+      ? {
+          id: str(rawComp.id) ?? "",
+          name: str(rawComp.name) ?? "",
+          status: str(rawComp.status) ?? "ACTIVE",
+          verificationStatus: str(rawComp.verificationStatus) ?? "UNVERIFIED",
+        }
+      : null,
+    category: rawCat
+      ? {
+          id: str(rawCat.id) ?? "",
+          code: str(rawCat.code) ?? "",
+          name: str(rawCat.name) ?? "",
+        }
+      : null,
+    applicationsCount: num(countObj.applications) ?? 0,
   };
 }
 
@@ -162,6 +347,9 @@ export const adminApi = {
       );
     }),
 
+  getUser: (userId: string, signal?: AbortSignal): Promise<AdminUserDto> =>
+    run(async () => normalizeAdminUser((await apiClient.get(`/admin/users/${userId}`, { signal })).data)),
+
   setUserStatus: (userId: string, status: "ACTIVE" | "SUSPENDED"): Promise<AdminUserDto> => {
     guardWrite("cập nhật trạng thái người dùng");
     return run(async () =>
@@ -177,7 +365,7 @@ export const adminApi = {
   },
 
   listCompanies: (
-    params: { page?: number; pageSize?: number; status?: string },
+    params: { page?: number; pageSize?: number; status?: string; verificationStatus?: string; q?: string },
     signal?: AbortSignal,
   ): Promise<Paged<AdminCompanyDto>> =>
     run(async () => {
@@ -185,17 +373,31 @@ export const adminApi = {
       if (params.page && params.page > 1) query.page = params.page;
       if (params.pageSize) query.pageSize = params.pageSize;
       if (params.status) query.status = params.status;
+      if (params.verificationStatus) query.verificationStatus = params.verificationStatus;
+      if (params.q?.trim()) query.q = params.q.trim();
       return normalizePaged(
         (await apiClient.get("/admin/companies", { params: query, signal })).data,
         normalizeAdminCompany,
       );
     }),
 
-  verifyCompany: (companyId: string, status: "VERIFIED" | "REJECTED"): Promise<AdminCompanyDto> => {
+  getCompany: (companyId: string, signal?: AbortSignal): Promise<AdminCompanyDetailDto> =>
+    run(async () => normalizeAdminCompanyDetail((await apiClient.get(`/admin/companies/${companyId}`, { signal })).data)),
+
+  getCompanyLegal: (companyId: string, signal?: AbortSignal): Promise<AdminCompanyLegalDto> =>
+    run(async () => normalizeAdminCompanyLegal((await apiClient.get(`/admin/companies/${companyId}/legal`, { signal })).data)),
+
+  getLegalEvidenceDownloadUrl: (companyId: string, evidenceId: string): string =>
+    `${getApiBaseUrl()}/admin/companies/${encodeURIComponent(companyId)}/legal/evidence/${encodeURIComponent(evidenceId)}`,
+
+  verifyCompany: (companyId: string, status: "VERIFIED" | "REJECTED", reason?: string): Promise<AdminCompanyDto> => {
     guardWrite("xét duyệt doanh nghiệp");
     return run(async () =>
       normalizeAdminCompany(
-        (await apiClient.patch(`/admin/companies/${companyId}/verification`, { status })).data,
+        (await apiClient.patch(`/admin/companies/${companyId}/verification`, {
+          status,
+          ...(reason && reason.trim() ? { reason: reason.trim() } : {}),
+        })).data,
       ),
     );
   },
@@ -224,6 +426,9 @@ export const adminApi = {
         normalizeAdminJob,
       );
     }),
+
+  getJob: (jobId: string, signal?: AbortSignal): Promise<AdminJobDetailDto> =>
+    run(async () => normalizeAdminJobDetail((await apiClient.get(`/admin/jobs/${jobId}`, { signal })).data)),
 
   closeJob: (jobId: string): Promise<AdminJobDto> => {
     guardWrite("gỡ bỏ tin tuyển dụng");
