@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { AiAssistantModal } from "./AiAssistantModal";
 import { useI18n } from "../../i18n/i18nStore";
+import styles from "./FindworkAiFloatingWidget.module.css";
 
 interface FindworkAiFloatingWidgetProps {
   contextHint?: string;
@@ -33,41 +34,18 @@ export const FindworkAiFloatingWidget = ({
 
   return (
     <>
-      {/* Floating Action Button - Fixed bottom-right */}
+      {/* Floating Action Button - Fixed bottom-right with subtle ripple/pulse animation */}
       {!isOpen && (
         <button
           ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(true)}
-          aria-label={t.ai.openChat}
-          title={t.ai.widgetSubtitle}
+          className={styles.floatingButton}
+          aria-label={t.ai.openChat || "Trợ lý FINDWORK AI - Mở hộp thoại hỗ trợ trực tuyến"}
+          title={t.ai.widgetSubtitle || "Trợ lý AI FINDWORK"}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           data-testid="findwork-ai-floating-trigger"
-          style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            zIndex: 990,
-            width: 54,
-            height: 54,
-            borderRadius: 27,
-            background: "linear-gradient(135deg, #0284c7 0%, #6366f1 100%)",
-            color: "#ffffff",
-            border: "none",
-            boxShadow: "0 8px 24px rgba(14, 165, 233, 0.4), 0 2px 6px rgba(0,0,0,0.1)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "scale(1.08)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
-          }}
         >
           <Sparkles size={24} aria-hidden="true" />
         </button>

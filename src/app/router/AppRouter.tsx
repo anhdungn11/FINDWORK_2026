@@ -44,6 +44,11 @@ const ResumeBuilderPage = lazy(() => import("@/pages/candidate/ResumeBuilderPage
 const ResumePreviewPage = lazy(() => import("@/pages/candidate/ResumePreviewPage"));
 
 const CareerPage = lazy(() => import("@/pages/public/CareerPage/CareerPage"));
+const AboutPage = lazy(() => import("@/pages/public/AboutPage/AboutPage"));
+const HelpPage = lazy(() => import("@/pages/public/HelpPage/HelpPage"));
+const PrivacyPolicyPage = lazy(() => import("@/pages/public/PrivacyPolicyPage/PrivacyPolicyPage"));
+const TermsOfUsePage = lazy(() => import("@/pages/public/TermsOfUsePage/TermsOfUsePage"));
+const ContactPage = lazy(() => import("@/pages/public/ContactPage/ContactPage"));
 const EmployerRegisterPage = lazy(() => import("@/pages/employer/EmployerRegisterPage"));
 const EmployerOnboardingPage = lazy(() => import("@/pages/employer/EmployerOnboardingPage"));
 const EmployerJobsPage = lazy(() => import("@/pages/employer/EmployerJobsPage"));
@@ -114,6 +119,31 @@ const AppRouter = () => {
             <Route
               path="career"
               element={<CareerPage />}
+            />
+
+            <Route
+              path="about"
+              element={<AboutPage />}
+            />
+
+            <Route
+              path="help"
+              element={<HelpPage />}
+            />
+
+            <Route
+              path="privacy"
+              element={<PrivacyPolicyPage />}
+            />
+
+            <Route
+              path="terms"
+              element={<TermsOfUsePage />}
+            />
+
+            <Route
+              path="contact"
+              element={<ContactPage />}
             />
           </Route>
 
