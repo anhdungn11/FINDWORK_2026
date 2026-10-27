@@ -65,6 +65,17 @@ export const ApplicationChatModal = ({
   };
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     if (isOpen) {
       void fetchMessages();
       // Auto-poll messages every 4 seconds while modal is open to keep conversation synchronized

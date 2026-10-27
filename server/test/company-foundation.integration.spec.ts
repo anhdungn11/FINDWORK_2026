@@ -107,6 +107,8 @@ describe("Phase 4.3A Company Foundation integration", () => {
         await tx.companyMemberRole.deleteMany({ where: { companyId: { in: companyIds } } });
         await tx.rolePermission.deleteMany({ where: { role: { companyId: { in: companyIds } } } });
         await tx.role.deleteMany({ where: { companyId: { in: companyIds } } });
+        await tx.companyLegalEvidence.deleteMany({ where: { companyId: { in: companyIds } } });
+        await tx.companyLegalProfile.deleteMany({ where: { companyId: { in: companyIds } } });
         await tx.companyLocation.deleteMany({ where: { companyId: { in: companyIds } } });
         await tx.companyMember.deleteMany({ where: { companyId: { in: companyIds } } });
         await tx.company.deleteMany({ where: { id: { in: companyIds } } });
@@ -421,7 +423,22 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(400);
     await request(app.getHttpServer()).patch(`${API}/${companyId}/profile`)
       .set("Authorization", `Bearer ${owner.accessToken}`)
-      .send({ legalName: "Review Company LLC", taxCode: "123456789" }).expect(200);
+      .send({ legalName: "Review Company LLC", taxCode: "1234567890" }).expect(200);
+    const missingLegalProfile = await request(app.getHttpServer()).post(`${API}/${companyId}/verification-request`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(400);
+    expect(missingLegalProfile.body.code).toBe("COMPANY_VERIFICATION_PROFILE_INCOMPLETE");
+    await prisma.companyLegalProfile.create({ data: {
+      companyId, registeredAddress: "123 Test Street, Hanoi", representativeName: "Test Owner",
+      contactEmail: "owner@phase43a.test", contactPhone: "+84901234567",
+    } });
+    const missingEvidence = await request(app.getHttpServer()).post(`${API}/${companyId}/verification-request`)
+      .set("Authorization", `Bearer ${owner.accessToken}`).expect(400);
+    expect(missingEvidence.body.code).toBe("COMPANY_VERIFICATION_PROFILE_INCOMPLETE");
+    await prisma.companyLegalEvidence.create({ data: {
+      companyId, uploadedByUserId: owner.id, kind: "BUSINESS_REGISTRATION",
+      originalName: "synthetic-registration.pdf", mimeType: "application/pdf",
+      byteSize: 32, sha256: "0".repeat(64), storageKey: `${companyId}/${randomUUID()}.pdf`,
+    } });
     await request(app.getHttpServer()).post(`${API}/${companyId}/verification-request`)
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(200)
       .expect((r) => expect(r.body.verificationStatus).toBe("PENDING"));
@@ -455,12 +472,12 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .send({ status: "VERIFIED" }).expect(200);
     await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${companyId}/verification`)
       .set("Authorization", `Bearer ${reviewer.accessToken}`)
-      .send({ status: "REJECTED" }).expect(409);
+      .send({ status: "REJECTED", reason: "Synthetic review conflict" }).expect(409);
     await request(app.getHttpServer()).get(`${API}/${companyId}`).expect(200)
       .expect((r) => expect(r.body.isVerified).toBe(true));
     await request(app.getHttpServer()).get(`${API}/${companyId}/profile`)
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(200)
-      .expect((r) => expect(r.body).toMatchObject({ legalName: "Review Company LLC", taxCode: "123456789",
+      .expect((r) => expect(r.body).toMatchObject({ legalName: "Review Company LLC", taxCode: "1234567890",
         verificationStatus: "VERIFIED" }));
     expect(await prisma.company.findUniqueOrThrow({ where: { id: companyId },
       select: { verificationStatus: true } })).toEqual({ verificationStatus: "VERIFIED" });
@@ -470,12 +487,25 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .send({ name: "Rejected Review Company", slug: slug("review-rejected") }).expect(201);
     await request(app.getHttpServer()).patch(`${API}/${rejectedCompany.body.id}/profile`)
       .set("Authorization", `Bearer ${owner.accessToken}`)
-      .send({ legalName: "Rejected Review Company LLC", taxCode: "987654321" }).expect(200);
+      .send({ legalName: "Rejected Review Company LLC", taxCode: "9876543210" }).expect(200);
+    await prisma.companyLegalProfile.create({ data: {
+      companyId: rejectedCompany.body.id, registeredAddress: "456 Test Street, Hanoi",
+      representativeName: "Test Owner", contactEmail: "owner@phase43a.test", contactPhone: "+84901234567",
+    } });
+    await prisma.companyLegalEvidence.create({ data: {
+      companyId: rejectedCompany.body.id, uploadedByUserId: owner.id, kind: "BUSINESS_REGISTRATION",
+      originalName: "synthetic-registration.pdf", mimeType: "application/pdf",
+      byteSize: 32, sha256: "0".repeat(64), storageKey: `${rejectedCompany.body.id}/${randomUUID()}.pdf`,
+    } });
     await request(app.getHttpServer()).post(`${API}/${rejectedCompany.body.id}/verification-request`)
       .set("Authorization", `Bearer ${owner.accessToken}`).expect(200);
+    const missingReason = await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${rejectedCompany.body.id}/verification`)
+      .set("Authorization", `Bearer ${reviewer.accessToken}`)
+      .send({ status: "REJECTED" }).expect(409);
+    expect(missingReason.body.code).toBe("COMPANY_VERIFICATION_REASON_REQUIRED");
     await request(app.getHttpServer()).patch(`/api/v1/admin/companies/${rejectedCompany.body.id}/verification`)
       .set("Authorization", `Bearer ${reviewer.accessToken}`)
-      .send({ status: "REJECTED" }).expect(200);
+      .send({ status: "REJECTED", reason: "Synthetic registration evidence needs correction" }).expect(200);
     expect(await prisma.company.findUniqueOrThrow({ where: { id: rejectedCompany.body.id },
       select: { verificationStatus: true, verifiedAt: true } })).toEqual({
       verificationStatus: "REJECTED", verifiedAt: null,

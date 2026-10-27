@@ -54,14 +54,18 @@ const CandidateSavedJobsPage = () => {
         }
       />
 
-      <aside className={styles.disclosureBanner} role="note">
-        <Info size={16} aria-hidden="true" className={styles.infoIcon} />
-        <div>
-          <span>
-            {t.jobs.emptySavedDesc}
-          </span>
-        </div>
-      </aside>
+      {savedJobs.length > 0 && (
+        <aside className={styles.disclosureBanner} role="note">
+          <Info size={16} aria-hidden="true" className={styles.infoIcon} />
+          <div>
+            <span>
+              {locale === "en"
+                ? "Saved jobs are stored with your account. You can apply directly or remove them when no longer interested."
+                : "Các tin việc làm đã lưu được đồng bộ với tài khoản của bạn. Bạn có thể ứng tuyển trực tiếp hoặc bỏ lưu khi không còn nhu cầu."}
+            </span>
+          </div>
+        </aside>
+      )}
 
       {savedJobs.length === 0 ? (
         <div className={styles.emptyState}>

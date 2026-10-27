@@ -18,7 +18,7 @@ List responses use `{data: [...], pagination: {page, pageSize, total, totalPages
 | `GET /companies/:companyId` | None | Public | ACTIVE public profile; 404 `PUBLIC_COMPANY_NOT_FOUND` otherwise |
 | `GET /companies/:companyId/profile` | None | `company.view` | Private profile including `legalName`, `taxCode`, `verificationStatus`, `verifiedAt`, `status` |
 | `PATCH /companies/:companyId/profile` | Any nonempty subset of `name`, `legalName`, `taxCode`, `industryId`, `description`, `website`, `employeeSizeRange`, `foundedYear`; nullable fields accept null | `company.update` | Updated private profile; legal fields lock while PENDING/VERIFIED |
-| `POST /companies/:companyId/verification-request` | No body | `company.update` | 200 private profile with `verificationStatus: PENDING`; requires legalName and taxCode |
+| `POST /companies/:companyId/verification-request` | No body | `company.update:COMPANY` | 200 private profile with `verificationStatus: PENDING`; requires a valid legal name and Vietnamese tax code, registered entity details in `PATCH /companies/:companyId/legal`, and active `BUSINESS_REGISTRATION` evidence. Missing requirements return 400 `COMPANY_VERIFICATION_PROFILE_INCOMPLETE`. |
 
 Company creation conflicts return 409 `COMPANY_SLUG_ALREADY_EXISTS`. Profile errors include 400 `COMPANY_UPDATE_EMPTY`, `COMPANY_INDUSTRY_INVALID`, `COMPANY_VERIFICATION_PROFILE_INCOMPLETE`; 409 `COMPANY_VERIFIED_LEGAL_DETAILS_LOCKED`, `COMPANY_VERIFICATION_STATE_CONFLICT`; 404 `COMPANY_RESOURCE_NOT_FOUND`.
 

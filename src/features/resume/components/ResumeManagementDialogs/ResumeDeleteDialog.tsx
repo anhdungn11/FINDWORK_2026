@@ -22,6 +22,17 @@ const ResumeDeleteDialog = ({
 
   useEffect(() => setIsSubmitting(false), [resume]);
 
+  useEffect(() => {
+    if (!resume) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [resume, isSubmitting, onClose]);
+
   if (!resume) return null;
 
   const handleDelete = async () => {

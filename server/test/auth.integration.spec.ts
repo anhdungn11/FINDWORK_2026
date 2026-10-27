@@ -189,6 +189,7 @@ describe("Auth integration", () => {
         .send({
           email,
           password: TEST_PASSWORD,
+          accountType: "CANDIDATE",
         })
         .expect(201);
     ownedUserIds.add(response.body.user.id as string);
@@ -211,6 +212,7 @@ describe("Auth integration", () => {
         email,
         status: "ACTIVE",
         emailVerified: false,
+        accountType: "CANDIDATE",
       }),
     );
 
@@ -304,6 +306,7 @@ describe("Auth integration", () => {
         email:
           duplicateEmail.replace("duplicate", "Duplicate").replace("@findwork.local", "@Findwork.Local"),
         password: TEST_PASSWORD,
+        accountType: "CANDIDATE",
       })
       .expect(201);
     ownedUserIds.add(registered.body.user.id as string);
@@ -315,6 +318,7 @@ describe("Auth integration", () => {
           email:
             duplicateEmail,
           password: TEST_PASSWORD,
+          accountType: "CANDIDATE",
         })
         .expect(409);
 
@@ -331,6 +335,7 @@ describe("Auth integration", () => {
           email:
             testEmail.replace("phase2.integration", "validation"),
           password: TEST_PASSWORD,
+          accountType: "CANDIDATE",
           admin: true,
         })
         .expect(400);
@@ -338,6 +343,19 @@ describe("Auth integration", () => {
     expect(response.body.code).toBe(
       "VALIDATION_ERROR",
     );
+    expect(response.body.details).toContain("property admin should not exist");
+  });
+
+  it("requires an explicit account type on the retained registration route", async () => {
+    const response = await request(app.getHttpServer())
+      .post(`${API}/register`)
+      .send({ email: testEmail, password: TEST_PASSWORD })
+      .expect(400);
+    expect(response.body.code).toBe("VALIDATION_ERROR");
+    expect(response.body.details).toEqual(expect.arrayContaining([
+      expect.stringContaining("accountType"),
+    ]));
+    expect(await prisma.user.count({ where: { emailNormalized: testEmail.toLowerCase() } })).toBe(0);
   });
 
   it("logs in an active user and returns identical errors for wrong and nonexistent credentials", async () => {

@@ -280,7 +280,10 @@ function aiProviderConfig(raw: Record<string, unknown>) {
       throw new Error("FINDWORK_AI_TRANSCRIPTION_MAX_COST_MICROS invalid");
     }
   }
-  return { FINDWORK_AI_PROVIDER: provider || "openai", FINDWORK_AI_API_KEY: key,
+  // An unconfigured provider must stay empty: ConfigModule can copy validated
+  // values into process.env, and a later module bootstrap must remain valid.
+  const hasProviderSettings = [key, model, inputPrice, outputPrice, transcriptionModel, transcriptionBudget].some(Boolean);
+  return { FINDWORK_AI_PROVIDER: provider || (hasProviderSettings ? "openai" : ""), FINDWORK_AI_API_KEY: key,
     FINDWORK_AI_MODEL: model, FINDWORK_AI_INPUT_USD_PER_MILLION: inputPrice,
     FINDWORK_AI_OUTPUT_USD_PER_MILLION: outputPrice,
     FINDWORK_AI_TRANSCRIPTION_MODEL: transcriptionModel,

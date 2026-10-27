@@ -20,7 +20,7 @@ describe("OpenAI AI provider adapter", () => {
   it("rejects partial or unsupported AI configuration at API startup", () => {
     const base = { NODE_ENV: "test", DATABASE_URL: "postgresql://u:p@127.0.0.1:5432/findwork_test",
       JWT_ACCESS_SECRET: "unit-test-access-secret-with-at-least-thirty-two", REFRESH_TOKEN_PEPPER: "unit-test-refresh-secret-with-at-least-thirty-two" };
-    expect(() => validateEnvironment({ ...base })).not.toThrow();
+    expect(validateEnvironment({ ...base }).FINDWORK_AI_PROVIDER).toBe("");
     expect(() => validateEnvironment({ ...base, FINDWORK_AI_API_KEY: "test-only-key-with-no-model" })).toThrow("FINDWORK_AI_MODEL");
     expect(() => validateEnvironment({ ...base, ...configured, FINDWORK_AI_PROVIDER: "gemini" })).toThrow("FINDWORK_AI_PROVIDER");
     expect(() => validateEnvironment({ ...base, ...configured, FINDWORK_AI_INPUT_USD_PER_MILLION: "0" })).toThrow("FINDWORK_AI_INPUT_USD_PER_MILLION");

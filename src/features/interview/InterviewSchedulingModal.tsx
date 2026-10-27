@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Calendar, Video, MapPin, AlertCircle, X } from "lucide-react";
 import { ui } from "../../components/ui";
 
@@ -42,6 +42,17 @@ export const InterviewSchedulingModal = ({
   const [interviewerName, setInterviewerName] = useState("");
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState<{ scheduledAt?: string; meetingUrl?: string; locationAddress?: string }>({});
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !loading) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, loading, onClose]);
 
   if (!isOpen) return null;
 

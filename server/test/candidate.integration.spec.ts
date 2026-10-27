@@ -542,10 +542,13 @@ describe("Candidate integration", () => {
     };
   }
 
-  function importDraft(accessToken: string, version = 1, confirmOmitUnsupportedAssets?: boolean) {
+  function importDraft(accessToken: string, version = 1, confirmOmitUnsupportedAssets?: boolean,
+    confirmPrivacyDifferences?: boolean) {
     return request(app.getHttpServer()).post(`${API}/profile/import-onboarding`)
       .set("Authorization", `Bearer ${accessToken}`)
-      .send({ version, confirmPrivacy: true, ...(confirmOmitUnsupportedAssets === undefined ? {} : { confirmOmitUnsupportedAssets }) });
+      .send({ version, confirmPrivacy: true,
+        ...(confirmOmitUnsupportedAssets === undefined ? {} : { confirmOmitUnsupportedAssets }),
+        ...(confirmPrivacyDifferences === undefined ? {} : { confirmPrivacyDifferences }) });
   }
 
   function customImportSkill(name: string, id = "custom-skill") {
@@ -729,7 +732,11 @@ describe("Candidate integration", () => {
     const content = importDraftContent(user.email);
     content.privacy = { searchableProfile: true, showEmail: true, showPhone: true, allowResumeDownload: true, allowJobMatching: false };
     await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
-    await importDraft(accessToken).expect(201);
+    const unconfirmed = await importDraft(accessToken).expect(400);
+    expect(unconfirmed.body.code).toBe("CANDIDATE_IMPORT_PRIVACY_DIFFERENCES");
+    expect(unconfirmed.body.details.privacyDifferences).toHaveLength(5);
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+    await importDraft(accessToken, 1, undefined, true).expect(201);
     expect(await prisma.candidatePrivacySetting.findFirst({ where: { candidateProfile: { userId: user.id } } })).toMatchObject({ searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true });
     expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
   });
@@ -758,7 +765,10 @@ describe("Candidate integration", () => {
     content.resume.fileName = "private-cv.pdf";
     content.privacy.showEmail = true;
     await prisma.candidateOnboardingDraft.create({ data: { userId: user.id, content, stepIndex: 6 } });
-    const response = await importDraft(accessToken, 1, true).expect(201);
+    const missingPrivacyConsent = await importDraft(accessToken, 1, true).expect(400);
+    expect(missingPrivacyConsent.body.code).toBe("CANDIDATE_IMPORT_PRIVACY_DIFFERENCES");
+    expect(await prisma.candidateProfile.count({ where: { userId: user.id } })).toBe(0);
+    const response = await importDraft(accessToken, 1, true, true).expect(201);
     expect(response.body).toMatchObject({ fullName: "Import Fixture", avatarAssetKey: null, privacySetting: { searchableProfile: false, showEmail: false, showPhone: false, allowResumeDownload: false, allowJobMatching: true } });
     expect(await prisma.resume.count({ where: { candidateProfile: { userId: user.id } } })).toBe(0);
     expect((await prisma.candidateOnboardingDraft.findUniqueOrThrow({ where: { userId: user.id } })).content).toEqual(content);
