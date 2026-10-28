@@ -9,20 +9,74 @@ import ResumeTemplateDocument from "@/features/resume/builder/components/ResumeT
 import {
   useResumeBuilder,
   type ResumeBuilderInitialState,
+  INITIAL_CONTENT,
+  INITIAL_SETTINGS,
 } from "@/features/resume/builder/hooks/useResumeBuilder";
+import { useAuthStore } from "@/store/authStore";
 import { resumeService } from "@/features/resume/services/resumeService";
 import type { Resume } from "@/features/resume/types/resume.types";
 
 import styles from "./ResumeBuilderPage.module.css";
 
+
+const DRAFT_PREFIX = "findwork.builder.draft";
+const getDraftKey = (userId: string | null | undefined, resumeId: string | null | undefined) =>
+  `${DRAFT_PREFIX}.${userId ?? "anon"}.${resumeId ?? "new"}`;
+
+interface BuilderDraft {
+  resumeName: string;
+  templateCode: any;
+  content: any;
+  settings: any;
+  savedAt: number;
+}
+
+function saveBuilderDraft(userId: string | null | undefined, resumeId: string | null | undefined, draft: Omit<BuilderDraft, "savedAt">) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = getDraftKey(userId, resumeId);
+    window.sessionStorage.setItem(key, JSON.stringify({ ...draft, savedAt: Date.now() }));
+  } catch {
+    // Best effort
+  }
+}
+
+function loadBuilderDraft(userId: string | null | undefined, resumeId: string | null | undefined): BuilderDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const key = getDraftKey(userId, resumeId);
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as BuilderDraft;
+  } catch {
+    return null;
+  }
+}
+
+function clearBuilderDraft(userId: string | null | undefined, resumeId: string | null | undefined) {
+  if (typeof window === "undefined") return;
+  try {
+    const key = getDraftKey(userId, resumeId);
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // Best effort
+  }
+}
+
 const ResumeBuilderPage = () => {
   const { resumeId } = useParams();
+  const authStatus = useAuthStore((s) => s.status);
   const [existingResume, setExistingResume] = useState<Resume | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(resumeId));
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (!resumeId) return;
+
+    if (authStatus === "idle" || authStatus === "loading") {
+      setIsLoading(true);
+      return;
+    }
 
     let active = true;
     setIsLoading(true);
@@ -47,7 +101,7 @@ const ResumeBuilderPage = () => {
     return () => {
       active = false;
     };
-  }, [resumeId]);
+  }, [resumeId, authStatus]);
 
   if (isLoading) {
     return (
@@ -90,6 +144,7 @@ const ResumeBuilderEditor = ({
   existingResume: Resume | null;
 }) => {
   const navigate = useNavigate();
+  const userId = useAuthStore((s) => s.user?.id);
   const [searchParams] = useSearchParams();
   const rawReturnTo = searchParams.get("returnTo");
   const targetReturnUrl = rawReturnTo ? getReturnDestination(rawReturnTo) : null;
@@ -99,9 +154,23 @@ const ResumeBuilderEditor = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const initialState = getInitialState(existingResume);
+  const savedDraft = loadBuilderDraft(userId, existingResume?.id);
+  const initialState = getInitialState(existingResume, savedDraft);
   const builder = useResumeBuilder(initialState);
   const isEditing = Boolean(existingResume);
+
+  // Auto-save draft so changes are never lost on refresh
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      saveBuilderDraft(userId, existingResume?.id, {
+        resumeName: builder.resumeName,
+        templateCode: builder.templateCode,
+        content: builder.content,
+        settings: builder.settings,
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [userId, existingResume?.id, builder.resumeName, builder.templateCode, builder.content, builder.settings]);
 
   const handleSave = async () => {
     if (!builder.isSavable || isSaving) return;
@@ -128,6 +197,7 @@ const ResumeBuilderEditor = ({
         });
       }
 
+      clearBuilderDraft(userId, existingResume?.id);
       if (isCustomReturn && targetReturnUrl) {
         const separator = targetReturnUrl.includes("?") ? "&" : "?";
         navigate(`${targetReturnUrl}${separator}createdCvId=${encodeURIComponent(savedResume.id)}`);
@@ -349,24 +419,26 @@ const ResumeBuilderEditor = ({
 
 const getInitialState = (
   resume: Resume | null,
+  draft?: BuilderDraft | null,
 ): ResumeBuilderInitialState | undefined => {
+  if (draft) {
+    return {
+      resumeName: draft.resumeName,
+      templateCode: draft.templateCode || "classic",
+      content: draft.content || INITIAL_CONTENT,
+      settings: draft.settings || INITIAL_SETTINGS,
+    };
+  }
+
   if (!resume || resume.sourceType !== "builder") return undefined;
 
   const { currentVersion } = resume;
 
-  if (
-    !currentVersion.builderContent ||
-    !currentVersion.builderSettings ||
-    !currentVersion.templateCode
-  ) {
-    return undefined;
-  }
-
   return {
-    resumeName: resume.name,
-    templateCode: currentVersion.templateCode,
-    content: currentVersion.builderContent,
-    settings: currentVersion.builderSettings,
+    resumeName: resume.name || "CV mới",
+    templateCode: currentVersion?.templateCode || "classic",
+    content: currentVersion?.builderContent || INITIAL_CONTENT,
+    settings: currentVersion?.builderSettings || INITIAL_SETTINGS,
   };
 };
 

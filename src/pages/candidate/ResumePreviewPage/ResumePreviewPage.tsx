@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import ResumeTemplateDocument from "@/features/resume/builder/components/ResumeTemplateDocument";
 import { resumeService } from "@/features/resume/services/resumeService";
+import { useAuthStore } from "@/store/authStore";
+import { INITIAL_SETTINGS } from "@/features/resume/builder/hooks/useResumeBuilder";
 import type { Resume } from "@/features/resume/types/resume.types";
 
 import styles from "./ResumePreviewPage.module.css";
@@ -17,11 +19,17 @@ const ResumePreviewPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [scale, setScale] = useState(0.9);
+  const authStatus = useAuthStore((s) => s.status);
 
   useEffect(() => {
     if (!resumeId) {
       setError("Thiếu mã CV cần xem trước.");
       setIsLoading(false);
+      return;
+    }
+
+    if (authStatus === "idle" || authStatus === "loading") {
+      setIsLoading(true);
       return;
     }
 
@@ -44,7 +52,7 @@ const ResumePreviewPage = () => {
     return () => {
       active = false;
     };
-  }, [resumeId]);
+  }, [resumeId, authStatus]);
 
   const canEdit = resume?.sourceType === "builder";
 
@@ -157,10 +165,11 @@ const PreviewContent = ({
     );
   }
 
-  const { builderContent, builderSettings, templateCode } =
-    resume.currentVersion;
+  const builderContent = resume.currentVersion.builderContent;
+  const templateCode = resume.currentVersion.templateCode || "classic";
+  const builderSettings = resume.currentVersion.builderSettings || INITIAL_SETTINGS;
 
-  if (!builderContent || !builderSettings || !templateCode) {
+  if (!builderContent) {
     return (
       <div className={styles.stateCard}>
         Dữ liệu CV Builder không đầy đủ.

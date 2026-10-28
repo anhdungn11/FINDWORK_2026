@@ -1,7 +1,7 @@
 import type { SavedJobItem } from "./types";
-import { isLiveWritesEnabled } from "@/features/candidate/profile/config/candidateIntegrationConfig";
-import { candidateSavedJobsApi } from "@/services/api/candidateSavedJobsApi";
-import { formatSalary } from "@/services/api/apiTypes";
+import { isLiveWritesEnabled } from "../profile/config/candidateIntegrationConfig";
+import { candidateSavedJobsApi } from "../../../services/api/candidateSavedJobsApi";
+import { formatSalary } from "../../../services/api/apiTypes";
 
 const STORAGE_PREFIX = "findwork_saved_jobs_";
 const EVENT_NAME = "findwork:saved-jobs-changed";
@@ -11,8 +11,40 @@ function getStorageKey(userId: string | null | undefined): string {
   return `${STORAGE_PREFIX}${safeId}`;
 }
 
+
+function migrateGuestSavedJobs(userId: string): void {
+  if (typeof window === "undefined" || !userId || userId === "guest") return;
+  try {
+    const guestKey = `${STORAGE_PREFIX}guest`;
+    const guestRaw = localStorage.getItem(guestKey);
+    if (!guestRaw) return;
+    const guestItems = JSON.parse(guestRaw);
+    if (!Array.isArray(guestItems) || guestItems.length === 0) return;
+
+    const userKey = `${STORAGE_PREFIX}${userId}`;
+    const userRaw = localStorage.getItem(userKey);
+    const userItems: SavedJobItem[] = userRaw ? JSON.parse(userRaw) : [];
+    const existingIds = new Set(userItems.map((i) => String(i.id)));
+
+    const merged = [...userItems];
+    for (const item of guestItems) {
+      if (item && item.id && !existingIds.has(String(item.id))) {
+        merged.push(item);
+        existingIds.add(String(item.id));
+      }
+    }
+    localStorage.setItem(userKey, JSON.stringify(merged));
+    localStorage.removeItem(guestKey);
+  } catch {
+    // Best-effort migration
+  }
+}
+
 export const savedJobsService = {
   getSavedJobs(userId: string | null | undefined): SavedJobItem[] {
+    if (userId && userId !== "guest") {
+      migrateGuestSavedJobs(userId);
+    }
     try {
       const key = getStorageKey(userId);
       const raw = localStorage.getItem(key);
