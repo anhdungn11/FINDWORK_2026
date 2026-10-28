@@ -116,7 +116,7 @@ describe("Final Accelerated Frontend Release Sprint P0 & P1 Regression", () => {
     );
   });
 
-  it("AiAssistantModal distinguishes CANDIDATE AI PRO and EMPLOYER BUSINESS AI with honest pricing disclaimers", () => {
+  it("AiAssistantModal keeps employer AI in employer workspace and removes unapproved pricing", () => {
     const aiModalSrc = readFileSync(
       new URL("../../../features/ai/AiAssistantModal.tsx", import.meta.url),
       "utf8"
@@ -127,24 +127,20 @@ describe("Final Accelerated Frontend Release Sprint P0 & P1 Regression", () => {
       "AiAssistantModal must inspect accountType"
     );
     assert.ok(
-      aiModalSrc.includes("BUSINESS AI"),
-      "AiAssistantModal must render BUSINESS AI badge for employers"
+      aiModalSrc.includes("/employer/ai"),
+      "AiAssistantModal must direct employers to the dedicated employer AI workspace"
     );
     assert.ok(
-      aiModalSrc.includes("CANDIDATE PRO AI"),
-      "AiAssistantModal must render CANDIDATE PRO AI badge for candidates"
+      !aiModalSrc.includes("BUSINESS AI"),
+      "AiAssistantModal must not mix Employer Business AI into candidate/public chat"
     );
     assert.ok(
-      aiModalSrc.includes("showPricingModal"),
-      "AiAssistantModal must provide pricing and product tier modal"
+      !aiModalSrc.includes("showPricingModal"),
+      "AiAssistantModal must not render speculative unapproved pricing modal"
     );
     assert.ok(
-      aiModalSrc.includes("Chưa mở bán (Thanh toán chưa khả dụng)"),
-      "AiAssistantModal must display honest unpurchasable state for paid tiers"
-    );
-    assert.ok(
-      aiModalSrc.includes("CHƯA được ban hành chính thức"),
-      "AiAssistantModal must explicitly disclose that prices are not yet officially approved"
+      !aiModalSrc.includes("CHƯA được ban hành chính thức"),
+      "AiAssistantModal must remove unapproved pricing disclaimers by removing unapproved pricing entirely"
     );
   });
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Sparkles,
-  CreditCard,
   Send,
   Trash2,
   X,
@@ -74,7 +73,6 @@ export const AiAssistantModal = ({
 
   // Layout & UI mode
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showPricingModal, setShowPricingModal] = useState(false);
   const [showHistorySidebar, setShowHistorySidebar] = useState(false);
   const [activeCategory, setActiveCategory] = useState<PromptCategory>("ALL");
 
@@ -581,28 +579,32 @@ export const AiAssistantModal = ({
                     letterSpacing: "-0.01em",
                   }}
                 >
-                  {user?.accountType === "EMPLOYER"
-                    ? "BUSINESS AI"
-                    : user?.accountType === "CANDIDATE"
-                    ? "CANDIDATE PRO AI"
-                    : "FINDWORK AI"}
+                  {locale === "en" ? "FINDWORK AI Career Assistant" : "Trợ lý Nghề nghiệp FINDWORK AI"}
                 </h2>
                 <span
                   style={{
                     fontSize: 10,
                     fontWeight: 600,
-                    padding: "2px 6px",
+                    padding: "2px 8px",
                     borderRadius: 999,
-                    backgroundColor: user?.accountType === "EMPLOYER" ? "rgba(99, 102, 241, 0.25)" : "rgba(14, 165, 233, 0.2)",
-                    color: user?.accountType === "EMPLOYER" ? "#a5b4fc" : "#38bdf8",
-                    border: user?.accountType === "EMPLOYER" ? "1px solid rgba(165, 180, 252, 0.3)" : "1px solid rgba(56, 189, 248, 0.3)",
+                    backgroundColor: "rgba(16, 185, 129, 0.15)",
+                    color: "#34d399",
+                    border: "1px solid rgba(52, 211, 153, 0.3)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
                   }}
                 >
-                  {user?.accountType === "EMPLOYER"
-                    ? "Doanh nghiệp (Company-scoped)"
-                    : user?.accountType === "CANDIDATE"
-                    ? "Ứng viên (Candidate Pro)"
-                    : "Gói Miễn Phí"}
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      backgroundColor: "#10b981",
+                      display: "inline-block",
+                    }}
+                  />
+                  <span>{locale === "en" ? "Online" : "Trực tuyến"}</span>
                 </span>
               </div>
               <p
@@ -612,39 +614,31 @@ export const AiAssistantModal = ({
                   margin: "2px 0 0",
                 }}
               >
-                {user?.accountType === "EMPLOYER"
-                  ? `Không gian tuyển dụng doanh nghiệp (${user?.email})`
-                  : user?.accountType === "CANDIDATE"
-                  ? `Trợ lý sự nghiệp & CV cá nhân (${user?.email})`
-                  : "Chế độ Khách (Guest Session — Không bắt buộc tài khoản)"}
+                {user?.accountType === "EMPLOYER" ? (
+                  <span>
+                    Tài khoản Doanh nghiệp ·{" "}
+                    <a
+                      href="/employer/ai"
+                      style={{ color: "#38bdf8", textDecoration: "underline" }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onClose();
+                        window.location.assign("/employer/ai");
+                      }}
+                    >
+                      Đến AI Tuyển dụng Doanh nghiệp →
+                    </a>
+                  </span>
+                ) : user?.accountType === "CANDIDATE" ? (
+                  `Trợ lý nghề nghiệp & CV cá nhân (${user?.email})`
+                ) : (
+                  "Chế độ Khách (Bảo mật & Không bắt buộc tài khoản)"
+                )}
               </p>
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {/* Pricing / Product Tier Button */}
-            <button
-              type="button"
-              onClick={() => setShowPricingModal((prev) => !prev)}
-              title="Xem thông tin các gói sản phẩm AI & lộ trình"
-              style={{
-                padding: "6px 10px",
-                borderRadius: 6,
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                backgroundColor: showPricingModal ? "rgba(14, 165, 233, 0.3)" : "rgba(255, 255, 255, 0.08)",
-                color: "#f8fafc",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                fontSize: 12,
-                fontWeight: 500,
-              }}
-            >
-              <CreditCard size={14} />
-              <span>Gói AI</span>
-            </button>
-
             {/* New Conversation Button */}
             <button
               type="button"
@@ -757,204 +751,11 @@ export const AiAssistantModal = ({
           </div>
         )}
 
-        {/* ================= PRICING / PRODUCT ROADMAP VIEW ================= */}
-        {showPricingModal && (
-          <div
-            style={{
-              padding: "16px 20px",
-              backgroundColor: "#f8fafc",
-              borderBottom: "1px solid #e2e8f0",
-              overflowY: "auto",
-              maxHeight: "60vh",
-              zIndex: 10,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
-                  Bảng giá & Phân biệt Sản phẩm AI FINDWORK
-                </h3>
-                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>
-                  Minh bạch tuyệt đối: Thanh toán trực tuyến đang trong lộ trình phát triển.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPricingModal(false)}
-                style={{
-                  padding: "4px 8px",
-                  borderRadius: 6,
-                  border: "1px solid #cbd5e1",
-                  backgroundColor: "#ffffff",
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                Đóng
-              </button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
-              {/* Free Plan */}
-              <div
-                style={{
-                  padding: 14,
-                  borderRadius: 12,
-                  border: "1px solid #e2e8f0",
-                  backgroundColor: "#ffffff",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Gói Cơ Bản (Free)</span>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 999, backgroundColor: "#dcfce7", color: "#15803d" }}>
-                    Khả dụng
-                  </span>
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>0đ</div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#64748b", lineHeight: 1.6 }}>
-                  <li>Tra cứu thông tin tuyển dụng FINDWORK</li>
-                  <li>Cẩm nang gợi ý phỏng vấn chung</li>
-                  <li>Dành cho cả tài khoản Khách & Đăng ký</li>
-                </ul>
-                <div style={{ marginTop: "auto", paddingTop: 8 }}>
-                  <button
-                    type="button"
-                    disabled
-                    style={{
-                      width: "100%",
-                      padding: "6px 0",
-                      borderRadius: 6,
-                      border: "1px solid #cbd5e1",
-                      backgroundColor: "#f1f5f9",
-                      color: "#475569",
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
-                  >
-                    Đang áp dụng
-                  </button>
-                </div>
-              </div>
-
-              {/* Candidate AI Pro */}
-              <div
-                style={{
-                  padding: 14,
-                  borderRadius: 12,
-                  border: "1px solid #bae6fd",
-                  backgroundColor: "#f0f9ff",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#0369a1" }}>Candidate AI Pro</span>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 999, backgroundColor: "#e0f2fe", color: "#0284c7" }}>
-                    Lộ trình P1
-                  </span>
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#0369a1" }}>Sắp ra mắt <span style={{ fontSize: 11, fontWeight: 400, color: "#0284c7" }}>(Mức giá dự kiến chưa phê duyệt)</span></div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#0369a1", lineHeight: 1.6 }}>
-                  <li>Tối ưu bố cục CV theo chuẩn ATS</li>
-                  <li>Phân tích mức độ phù hợp với JD</li>
-                  <li>Luyện phỏng vấn chuyên sâu cá nhân hóa</li>
-                  <li>Không áp dụng cho tài khoản Doanh nghiệp</li>
-                </ul>
-                <div style={{ marginTop: "auto", paddingTop: 8 }}>
-                  <button
-                    type="button"
-                    disabled
-                    title="Cổng thanh toán chưa kích hoạt"
-                    style={{
-                      width: "100%",
-                      padding: "6px 0",
-                      borderRadius: 6,
-                      border: "1px dashed #7dd3fc",
-                      backgroundColor: "#e0f2fe",
-                      color: "#0369a1",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: "not-allowed",
-                    }}
-                  >
-                    Chưa mở bán (Thanh toán chưa khả dụng)
-                  </button>
-                </div>
-              </div>
-
-              {/* Employer Business AI */}
-              <div
-                style={{
-                  padding: 14,
-                  borderRadius: 12,
-                  border: "1px solid #c7d2fe",
-                  backgroundColor: "#eef2ff",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#4338ca" }}>Employer Business AI</span>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 6px", borderRadius: 999, backgroundColor: "#e0e7ff", color: "#4f46e5" }}>
-                    Lộ trình P1
-                  </span>
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#4338ca" }}>Sắp ra mắt <span style={{ fontSize: 11, fontWeight: 400, color: "#6366f1" }}>(Mức giá dự kiến chưa phê duyệt)</span></div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#4338ca", lineHeight: 1.6 }}>
-                  <li>Tự động soạn thảo JD chuẩn ngành</li>
-                  <li>Sinh bộ câu hỏi sàng lọc ứng viên</li>
-                  <li>Phân quyền theo tổ chức doanh nghiệp</li>
-                  <li>Độc lập, không dùng chung với gói Ứng viên</li>
-                </ul>
-                <div style={{ marginTop: "auto", paddingTop: 8 }}>
-                  <button
-                    type="button"
-                    disabled
-                    title="Cổng thanh toán chưa kích hoạt"
-                    style={{
-                      width: "100%",
-                      padding: "6px 0",
-                      borderRadius: 6,
-                      border: "1px dashed #a5b4fc",
-                      backgroundColor: "#e0e7ff",
-                      color: "#4338ca",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: "not-allowed",
-                    }}
-                  >
-                    Chưa mở bán (Thanh toán chưa khả dụng)
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, backgroundColor: "#fffbeb", border: "1px solid #fde68a", fontSize: 11, color: "#92400e" }}>
-              <strong>Lưu ý minh bạch:</strong> Bảng giá trên chỉ mang tính chất minh họa theo đề xuất lộ trình P1 và CHƯA được ban hành chính thức. FINDWORK không kích hoạt cổng thanh toán hay tạo giao dịch giả mạo khi chưa có phê duyệt chính thức.
-            </div>
-          </div>
-        )}
-
         {/* ================= MAIN CONTENT (CHAT + OPTIONAL HISTORY) ================= */}
         <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
           {/* History Sidebar */}
           {showHistorySidebar && (
-            <div
-              style={{
-                width: 240,
-                borderRight: "1px solid #e2e8f0",
-                backgroundColor: "#f8fafc",
-                display: "flex",
-                flexDirection: "column",
-                overflowY: "auto",
-                zIndex: 2,
-              }}
-            >
+            <div className={styles.historySidebar}>
               <div
                 style={{
                   padding: "10px 12px",
@@ -962,9 +763,28 @@ export const AiAssistantModal = ({
                   fontWeight: 600,
                   color: "#475569",
                   borderBottom: "1px solid #e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                 }}
               >
-                Các phiên trò chuyện
+                <span>Các phiên trò chuyện</span>
+                <button
+                  type="button"
+                  onClick={() => setShowHistorySidebar(false)}
+                  style={{
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    color: "#64748b",
+                    padding: 2,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                  title="Đóng danh sách lịch sử"
+                >
+                  <X size={14} />
+                </button>
               </div>
               {conversations.length === 0 ? (
                 <div style={{ padding: 16, fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
@@ -1045,14 +865,7 @@ export const AiAssistantModal = ({
                   key={cat.key}
                   type="button"
                   onClick={() => setActiveCategory(cat.key)}
-                  className={styles.categoryPill}
-                  style={{
-                    fontWeight: activeCategory === cat.key ? 600 : 500,
-                    border: "1px solid",
-                    borderColor: activeCategory === cat.key ? "#0ea5e9" : "#e2e8f0",
-                    backgroundColor: activeCategory === cat.key ? "#f0f9ff" : "#ffffff",
-                    color: activeCategory === cat.key ? "#0369a1" : "#64748b",
-                  }}
+                  className={`${styles.categoryPill} ${activeCategory === cat.key ? styles.categoryPillActive : ""}`}
                 >
                   {cat.label}
                 </button>
@@ -1060,17 +873,7 @@ export const AiAssistantModal = ({
             </div>
 
             {/* Message Scroll Area */}
-            <div
-              ref={scrollRef}
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: 16,
-                display: "flex",
-                flexDirection: "column",
-                gap: 14,
-              }}
-            >
+            <div ref={scrollRef} className={styles.chatMessagesArea}>
               {messages.length === 0 ? (
                 <div
                   style={{
@@ -1113,7 +916,7 @@ export const AiAssistantModal = ({
                       lineHeight: 1.5,
                     }}
                   >
-                    Hỗ trợ tối ưu CV, câu hỏi phỏng vấn, tư vấn nghề nghiệp, viết thư ứng tuyển hoặc giải đáp quy trình nhà tuyển dụng trên FINDWORK.
+                    Nhận gợi ý tối ưu CV, luyện tập phỏng vấn theo phương pháp STAR, xây dựng lộ trình sự nghiệp và tìm kiếm việc làm đa ngành nghề.
                   </p>
 
                   {/* Suggested Prompts Grid */}
@@ -1296,7 +1099,7 @@ export const AiAssistantModal = ({
                 })
               )}
 
-              {/* Loading Indicator */}
+              {/* Loading Indicator with Typing Wave */}
               {loading && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 36 }}>
                   <div
@@ -1309,6 +1112,7 @@ export const AiAssistantModal = ({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
+                      flexShrink: 0,
                     }}
                   >
                     <Sparkles size={14} />
@@ -1318,15 +1122,19 @@ export const AiAssistantModal = ({
                       padding: "8px 14px",
                       borderRadius: "16px 16px 16px 4px",
                       backgroundColor: "#f1f5f9",
-                      fontSize: 12,
-                      color: "#64748b",
+                      fontSize: 12.5,
+                      color: "#475569",
                       display: "flex",
                       alignItems: "center",
-                      gap: 6,
+                      gap: 8,
                     }}
                   >
-                    <RefreshCw size={12} className="animate-spin" />
-                    <span>FINDWORK AI đang xử lý câu trả lời...</span>
+                    <div className={styles.typingIndicator} aria-hidden="true">
+                      <span className={styles.typingDot} />
+                      <span className={styles.typingDot} />
+                      <span className={styles.typingDot} />
+                    </div>
+                    <span>FINDWORK AI đang trả lời...</span>
                   </div>
                 </div>
               )}
@@ -1629,7 +1437,7 @@ export const AiAssistantModal = ({
                   padding: "0 2px",
                 }}
               >
-                <span>AI có thể tạo thông tin không chuẩn xác. Hãy kiểm tra các quy chuẩn pháp lý.</span>
+                <span>AI hỗ trợ tư vấn và định hướng nghề nghiệp. Vui lòng đối chiếu các quy định pháp luật lao động và tuyển dụng thực tế.</span>
                 <span>{input.length}/4000</span>
               </div>
             </form>

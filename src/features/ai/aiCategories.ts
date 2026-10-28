@@ -4,7 +4,6 @@ export type PromptCategory =
   | "CAREER"
   | "JOBS"
   | "APPLICATION"
-  | "RECRUITING"
   | "INTERVIEW"
   | "FINDWORK";
 
@@ -19,73 +18,64 @@ export const VI_CATEGORIES: CategoryMeta[] = [
     key: "ALL",
     label: "Tất cả gợi ý",
     prompts: [
-      "Cách viết CV thu hút nhà tuyển dụng ngành công nghệ",
-      "Gợi ý 5 câu hỏi phỏng vấn vị trí Senior React Developer",
-      "Chiến lược đàm phán lương khi nhận được lời mời làm việc (Offer)",
-      "Quy trình xác minh hồ sơ pháp lý doanh nghiệp trên FINDWORK",
+      "Cách viết CV gây ấn tượng với nhà tuyển dụng đa ngành nghề",
+      "Kinh nghiệm trả lời câu hỏi phỏng vấn theo phương pháp STAR",
+      "Chiến lược đàm phán mức lương và đãi ngộ khi nhận việc",
+      "Mẹo tìm kiếm việc làm minh bạch, uy tín trên FINDWORK",
     ],
   },
   {
     key: "CV",
     label: "Tạo & Tối ưu CV",
     prompts: [
-      "Góp ý bố cục CV cho vị trí Frontend Developer chuẩn ATS",
-      "Cách nêu bật thành tích bằng số liệu (Metrics) trong phần kinh nghiệm",
-      "Những sai lầm phổ biến khiến CV bị loại ngay từ vòng lọc hồ sơ",
-    ],
-  },
-  {
-    key: "CAREER",
-    label: "Định hướng sự nghiệp",
-    prompts: [
-      "Lộ trình phát triển từ Middle lên Senior Software Engineer",
-      "Những kỹ năng cần trau dồi để chuyển hướng sang Tech Lead / Engineering Manager",
-      "Làm sao để cân bằng giữa chuyên môn sâu (Specialist) và đa năng (Generalist)?",
-    ],
-  },
-  {
-    key: "JOBS",
-    label: "Tìm kiếm việc làm",
-    prompts: [
-      "Cách tìm kiếm việc làm Remote chất lượng cao tại Việt Nam & khu vực",
-      "Tiêu chí đánh giá văn hóa công ty và chế độ đãi ngộ trước khi ứng tuyển",
-      "Cách đọc hiểu bản mô tả công việc (JD) để nhận diện yêu cầu thực tế",
-    ],
-  },
-  {
-    key: "APPLICATION",
-    label: "Thư ứng tuyển & Tiếp cận",
-    prompts: [
-      "Cách viết thư ứng tuyển (Cover Letter) ngắn gọn, chuyên nghiệp và gây ấn tượng",
-      "Nội dung email xin phép theo dõi tiến độ hồ sơ (Follow-up) sau 5 ngày ứng tuyển",
-      "Cách trả lời thư từ chối một cách lịch thiệp để giữ mối quan hệ lâu dài",
-    ],
-  },
-  {
-    key: "RECRUITING",
-    label: "Dành cho nhà tuyển dụng",
-    prompts: [
-      "Cách cấu trúc bản mô tả công việc (JD) thu hút ứng viên chất lượng",
-      "Tiêu chí đánh giá bài kiểm tra kỹ năng (Technical Assessment) công bằng",
-      "Quy chuẩn thiết lập quy trình tuyển dụng từ Sơ tuyển tới Phỏng vấn & Onboarding",
+      "Cách làm nổi bật thành tích bằng số liệu (KPIs/Metrics) trong CV",
+      "Tối ưu hóa từ khóa chuyên môn để CV vượt qua bộ lọc ATS",
+      "Bố cục CV chuẩn mực cho người chuyển đổi định hướng nghề nghiệp",
     ],
   },
   {
     key: "INTERVIEW",
     label: "Luyện phỏng vấn",
     prompts: [
-      "Gợi ý 5 câu hỏi tình huống thường gặp khi phỏng vấn System Design",
-      "Cách trả lời câu hỏi 'Điểm yếu lớn nhất của bạn là gì?' chân thành và thuyết phục",
-      "Bộ câu hỏi ứng viên nên hỏi ngược lại người phỏng vấn ở cuối buổi",
+      "Cách trả lời câu hỏi 'Hãy giới thiệu về bản thân bạn' tự tin và mạch lạc",
+      "Cách xử lý câu hỏi tình huống về giải quyết mâu thuẫn hoặc áp lực công việc",
+      "Bộ câu hỏi thông minh ứng viên nên đặt cho nhà tuyển dụng ở cuối buổi phỏng vấn",
+    ],
+  },
+  {
+    key: "CAREER",
+    label: "Định hướng sự nghiệp",
+    prompts: [
+      "Lộ trình phát triển từ nhân viên chuyên môn lên cấp quản lý",
+      "Kỹ năng cần chuẩn bị khi mở rộng sang lĩnh vực kinh doanh, vận hành hoặc quản trị",
+      "Cách duy trì năng lượng và nâng cao năng lực cạnh tranh trong nghề nghiệp",
+    ],
+  },
+  {
+    key: "JOBS",
+    label: "Tìm kiếm việc làm",
+    prompts: [
+      "Tiêu chí đánh giá văn hóa doanh nghiệp và cơ hội thăng tiến trước khi ứng tuyển",
+      "Cách đọc hiểu bản mô tả công việc (JD) để nhận diện đúng yêu cầu thực tế",
+      "Tìm kiếm cơ hội việc làm linh hoạt (Hybrid / Remote) tại Việt Nam",
+    ],
+  },
+  {
+    key: "APPLICATION",
+    label: "Thư & Giao tiếp tuyển dụng",
+    prompts: [
+      "Cách viết thư ứng tuyển (Cover Letter) ngắn gọn, thuyết phục cho từng vị trí",
+      "Mẫu email theo dõi tiến độ hồ sơ (Follow-up) chuyên nghiệp sau 5 ngày nộp đơn",
+      "Cách viết thư cảm ơn sau buổi phỏng vấn để tạo ấn tượng tốt đẹp",
     ],
   },
   {
     key: "FINDWORK",
     label: "Hỗ trợ FINDWORK",
     prompts: [
-      "Hướng dẫn xác minh hồ sơ pháp lý công ty để nhận huy hiệu Verified",
-      "Cách thêm địa điểm trụ sở và chi nhánh có mã đơn vị hành chính chuẩn",
-      "Quy trình lên lịch phỏng vấn trực tiếp và trực tuyến cho ứng viên trên FINDWORK",
+      "Cách tạo và xuất CV chuyên nghiệp với công cụ Resume Builder",
+      "Hướng dẫn lưu việc làm quan tâm và đồng bộ danh sách trên mọi thiết bị",
+      "Cách theo dõi tiến độ và lịch phỏng vấn hồ sơ ứng tuyển trên FINDWORK",
     ],
   },
 ];
@@ -95,73 +85,64 @@ export const EN_CATEGORIES: CategoryMeta[] = [
     key: "ALL",
     label: "All Suggestions",
     prompts: [
-      "How to write a tech CV that stands out to recruiters",
-      "5 essential interview questions for Senior React Developer",
-      "Salary negotiation strategies after receiving an offer",
-      "Company legal verification process on FINDWORK",
+      "How to tailor your resume across various industries and roles",
+      "STAR method interview strategies for practical scenarios",
+      "Salary and compensation negotiation tactics after receiving an offer",
+      "Tips for discovering transparent and verified jobs on FINDWORK",
     ],
   },
   {
     key: "CV",
     label: "CV Optimization",
     prompts: [
-      "ATS-friendly layout tips for Frontend Developer resumes",
-      "Highlighting impact and metrics in work experience",
-      "Common mistakes that lead to instant CV rejection",
-    ],
-  },
-  {
-    key: "CAREER",
-    label: "Career Roadmap",
-    prompts: [
-      "Roadmap to advance from Mid-level to Senior Software Engineer",
-      "Key capabilities required when moving toward Tech Lead / Manager",
-      "Balancing deep domain specialization vs full-stack generalism",
-    ],
-  },
-  {
-    key: "JOBS",
-    label: "Job Search",
-    prompts: [
-      "How to target verified remote positions in Vietnam and APAC",
-      "Evaluating culture and total rewards before submitting applications",
-      "Decoding job descriptions (JD) to spot hidden expectations",
-    ],
-  },
-  {
-    key: "APPLICATION",
-    label: "Outreach & Letters",
-    prompts: [
-      "Writing a concise and memorable cover letter",
-      "Polite follow-up email template 5 business days after applying",
-      "Gracious response to rejection letters to sustain network relationships",
-    ],
-  },
-  {
-    key: "RECRUITING",
-    label: "For Employers",
-    prompts: [
-      "How to craft job descriptions that attract high-caliber candidates",
-      "Objective evaluation criteria for candidate technical assessments",
-      "Designing a seamless screening-to-interview recruitment pipeline",
+      "Quantifying career impact with key metrics and achievements",
+      "ATS keyword optimization techniques for professional resumes",
+      "Structuring effective resumes for career changers and transitioners",
     ],
   },
   {
     key: "INTERVIEW",
     label: "Interview Prep",
     prompts: [
-      "Top situational system design architecture interview questions",
-      "Authentic and strong answers to 'What is your greatest weakness?'",
-      "Impactful questions candidates should ask interviewers at the wrap-up",
+      "How to craft a compelling and authentic 'Tell me about yourself'",
+      "Navigating situational questions about conflict resolution and deadline pressure",
+      "Smart questions candidates should ask interviewers during wrap-up",
+    ],
+  },
+  {
+    key: "CAREER",
+    label: "Career Growth",
+    prompts: [
+      "Advancing from individual contributor to team lead or manager",
+      "Essential capabilities when broadening into management and operations",
+      "Staying competitive and maintaining career resilience in evolving markets",
+    ],
+  },
+  {
+    key: "JOBS",
+    label: "Job Search",
+    prompts: [
+      "Evaluating company culture and career growth prior to applying",
+      "Decoding job descriptions to understand real operational expectations",
+      "Targeting hybrid and flexible employment opportunities across Vietnam",
+    ],
+  },
+  {
+    key: "APPLICATION",
+    label: "Outreach & Letters",
+    prompts: [
+      "Writing concise and tailored cover letters for specialized roles",
+      "Professional follow-up email template 5 days after submission",
+      "Post-interview thank you note etiquette to reinforce interest",
     ],
   },
   {
     key: "FINDWORK",
     label: "FINDWORK Guide",
     prompts: [
-      "Step-by-step enterprise legal document verification for Verified badge",
-      "Registering company headquarters and branches with official division codes",
-      "Conducting in-person and video interview workflows on FINDWORK",
+      "Creating and exporting polished resumes with Resume Builder",
+      "Saving bookmark jobs and syncing across mobile and desktop",
+      "Tracking real-time application stages and interview schedules on FINDWORK",
     ],
   },
 ];

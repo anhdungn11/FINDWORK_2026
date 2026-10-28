@@ -533,20 +533,24 @@ const AdminDashboardPage = () => {
               </div>
             </Card>
 
-            {/* Explicit Unavailable Metrics (Honest platform statement) */}
-            <Card title="Chỉ số chưa hỗ trợ từ Backend (Trung thực dữ liệu)">
+            {/* Explicit Unavailable Metrics & Codex Backend Contract Backlog */}
+            <Card title="Chỉ số chưa hỗ trợ & Hợp đồng Backend cần bổ sung">
               <div style={{ display: "grid", gap: 10, fontSize: "0.825rem", color: "#64748b" }}>
-                <div style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: 6 }}>
-                  <strong style={{ color: "#475569" }}>Doanh thu dịch vụ (Platform Revenue):</strong>{" "}
-                  <span>Chưa có API — Sẽ kích hoạt khi tích hợp cổng thanh toán trực tuyến.</span>
+                <div style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: 6, border: "1px solid #f1f5f9" }}>
+                  <strong style={{ color: "#334155" }}>1. Doanh thu nền tảng (Platform Revenue):</strong>{" "}
+                  <span>Chưa có backend endpoint tính toán doanh thu hoặc tích hợp cổng thanh toán trực tuyến. Không giả lập số liệu tài chính.</span>
                 </div>
-                <div style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: 6 }}>
-                  <strong style={{ color: "#475569" }}>Tốc độ tăng trưởng tuyển dụng (Growth Analytics):</strong>{" "}
-                  <span>Chưa có dữ liệu chuỗi thời gian (time-series).</span>
+                <div style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: 6, border: "1px solid #f1f5f9" }}>
+                  <strong style={{ color: "#334155" }}>2. Quan hệ hợp tác & Đối tác (Partnerships):</strong>{" "}
+                  <span>Chưa có mô hình đối tác. Toàn bộ {d.companies} doanh nghiệp là tài khoản đăng ký trên sàn, không dán nhãn đối tác khi chưa có thỏa thuận chính thức.</span>
                 </div>
-                <div style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: 6 }}>
-                  <strong style={{ color: "#475569" }}>Thời gian hoạt động máy chủ (Uptime SLA):</strong>{" "}
-                  <span>Cần kết nối hệ thống giám sát hạ tầng Prometheus/Grafana.</span>
+                <div style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: 6, border: "1px solid #f1f5f9" }}>
+                  <strong style={{ color: "#334155" }}>3. Thông báo thời gian thực & Số đếm chưa đọc (Real-time Notifications):</strong>{" "}
+                  <span>Chưa có API quản lý thông báo tập trung hoặc WebSocket stream từ Backend Codex. Không giả lập sự kiện hoặc số đếm chưa đọc giả mạo.</span>
+                </div>
+                <div style={{ padding: "8px 10px", background: "#f8fafc", borderRadius: 6, border: "1px solid #f1f5f9" }}>
+                  <strong style={{ color: "#334155" }}>4. Báo cáo chuỗi thời gian (Time-series Growth Analytics):</strong>{" "}
+                  <span>Cần backend endpoint tổng hợp số liệu lịch sử người dùng và tin đăng theo chu kỳ thời gian.</span>
                 </div>
               </div>
             </Card>

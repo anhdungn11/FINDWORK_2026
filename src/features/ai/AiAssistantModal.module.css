@@ -17,7 +17,7 @@
 }
 
 .overlayExpanded {
-  background-color: rgba(15, 23, 42, 0.7);
+  background-color: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(4px);
   pointer-events: auto;
   align-items: center;
@@ -31,19 +31,20 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 }
 
 .containerFloating {
-  width: min(460px, 100vw);
-  height: min(640px, 90vh);
-  margin: 0 16px 16px 0;
-  border-radius: 16px 16px 12px 12px;
+  width: min(440px, 100vw);
+  height: min(640px, 92vh);
+  margin: 0 20px 20px 0;
+  border-radius: 16px;
 }
 
 .containerExpanded {
-  width: min(940px, 95vw);
+  width: min(920px, 95vw);
   height: min(840px, 92vh);
   margin: 0;
   border-radius: 16px;
@@ -56,24 +57,54 @@
   padding: 8px 12px;
   border-bottom: 1px solid #f1f5f9;
   overflow-x: auto;
-  background-color: #fcfdfe;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+  background-color: #fafbfc;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
 }
 
 .categoryPillsScroll::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
+  display: none;
 }
 
 .categoryPill {
   flex-shrink: 0;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 11.5px;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.categoryPill:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.categoryPillActive {
+  background-color: #e0f2fe !important;
+  border-color: #38bdf8 !important;
+  color: #0369a1 !important;
+  font-weight: 600 !important;
+}
+
+/* Main chat message scroll area */
+.chatMessagesArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background-color: #ffffff;
+  overscroll-behavior: contain;
 }
 
 /* Message bubble responsive styles */
@@ -87,11 +118,11 @@
 .userBubble {
   padding: 10px 14px;
   border-radius: 16px 16px 4px 16px;
-  background-color: #0284c7;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
   color: #ffffff;
   font-size: 13.5px;
   line-height: 1.5;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.2);
   word-break: break-word;
 }
 
@@ -105,6 +136,46 @@
   line-height: 1.55;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   word-break: break-word;
+}
+
+/* Typing Indicator Animation */
+.typingIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.typingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #0284c7;
+  opacity: 0.6;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typingDot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typingDot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.typingDot:nth-child(3) {
+  animation-delay: 0s;
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .retryBtn {
@@ -125,19 +196,31 @@
   color: #0369a1;
 }
 
+/* History Sidebar */
+.historySidebar {
+  width: 220px;
+  border-right: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 5;
+  flex-shrink: 0;
+}
+
 /* MOBILE ADAPTATION (Screen width <= 640px) */
 @media (max-width: 640px) {
   .overlayFloating {
-    background-color: rgba(15, 23, 42, 0.45);
+    background-color: rgba(15, 23, 42, 0.5);
     pointer-events: auto;
   }
 
   .containerFloating {
     width: 100% !important;
     max-width: 100vw !important;
-    height: min(680px, 88vh) !important;
+    height: 90vh !important;
     margin: 0 !important;
-    border-radius: 16px 16px 0 0 !important;
+    border-radius: 18px 18px 0 0 !important;
     border-bottom: none !important;
   }
 
@@ -151,14 +234,43 @@
   }
 
   .messageBubbleContainer {
-    max-width: 93% !important;
+    max-width: 92% !important;
   }
 
   .assistantBubble {
-    padding: 10px 13px !important;
+    padding: 10px 14px !important;
   }
 
   .userBubble {
-    padding: 9px 12px !important;
+    padding: 9px 13px !important;
+  }
+
+  /* History sidebar turns into drawer on mobile to avoid squeezing chat */
+  .historySidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 80% !important;
+    max-width: 280px !important;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+    background-color: #ffffff;
+    z-index: 30;
+  }
+}
+
+/* ACCESSIBILITY: PREFERS REDUCED MOTION */
+@media (prefers-reduced-motion: reduce) {
+  .container {
+    transition: none !important;
+  }
+
+  .categoryPill {
+    transition: none !important;
+  }
+
+  .typingDot {
+    animation: none !important;
+    opacity: 0.8 !important;
   }
 }
