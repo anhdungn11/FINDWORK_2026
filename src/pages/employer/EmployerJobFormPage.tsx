@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Briefcase,
@@ -108,6 +108,7 @@ const EmployerJobFormPage = () => {
   const isEdit = Boolean(jobId);
   const { active } = useCompanyWorkspace();
   const navigate = useNavigate();
+  const location = useLocation();
   const writes = isWorkspaceWritesEnabled();
 
   const categories = useAsyncData((s) => publicApi.listJobCategories(s), []);
@@ -131,6 +132,25 @@ const EmployerJobFormPage = () => {
   useEffect(() => {
     if (existing.data) setValues(fromJob(existing.data));
   }, [existing.data]);
+
+  // Wire AI JD prefill into create-job form without auto-publish or overwriting existing edits
+  useEffect(() => {
+    if (isEdit || !location.state) return;
+    const state = location.state as {
+      prefillTitle?: string;
+      prefillDescription?: string;
+      prefillRequirements?: string;
+      prefillBenefits?: string;
+    };
+
+    setValues((prev) => ({
+      ...prev,
+      title: prev.title.trim() ? prev.title : (state.prefillTitle ?? prev.title),
+      description: prev.description.trim() ? prev.description : (state.prefillDescription ?? prev.description),
+      requirements: prev.requirements.trim() ? prev.requirements : (state.prefillRequirements ?? prev.requirements),
+      benefits: prev.benefits.trim() ? prev.benefits : (state.prefillBenefits ?? prev.benefits),
+    }));
+  }, [isEdit, location.state]);
 
   useEffect(() => {
     if (screeningData.data?.questions) {

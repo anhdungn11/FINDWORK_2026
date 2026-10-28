@@ -7,7 +7,6 @@ import {
   formatSalary,
 } from "@/services/api/apiTypes";
 import type { JobRecord } from "@/features/jobs/types/job.types";
-import { jobs as mockJobs } from "@/data/mock/jobs.mock";
 import JobCard from "@/features/jobs/components/JobCard";
 import { LoadingBlock, EmptyState } from "@/components/ui";
 import { useI18n } from "@/i18n/i18nStore";
@@ -67,12 +66,8 @@ const FeaturedJobs = () => {
           }));
           setJobsList(mapped);
         } else {
-          // If only integration-test records exist in DB, showcase verified curated positions
-          const curated: JobRecord[] = mockJobs.slice(0, 6).map((job) => ({
-            ...job,
-            isMock: true,
-          }));
-          setJobsList(curated);
+          // If no real production jobs exist, display empty state
+          setJobsList([]);
         }
         setLoading(false);
       })

@@ -11,7 +11,7 @@
  * - DELETE /api/v1/candidate/saved-jobs/:jobId (HTTP 204)
  */
 
-import { apiClient } from "../http/apiClient";
+import { apiClient, getAuthSessionId, getAuthToken, getAuthUserId } from "../http/apiClient";
 import { toApiFailure } from "./apiFailure";
 import {
   normalizeJob,
@@ -38,6 +38,51 @@ export interface BackendSavedJobStatusDto {
 export interface SavedJobsQuery {
   page?: number;
   pageSize?: number;
+}
+
+export interface CandidateSavedJobsRequestOptions {
+  signal?: AbortSignal;
+  userId?: string | null;
+  originatingToken?: string | null;
+  originatingUserId?: string | null;
+  originatingSessionId?: number | null;
+}
+
+function resolveSessionBinding(
+  optionsOrSignal?: AbortSignal | CandidateSavedJobsRequestOptions,
+) {
+  const currentToken = getAuthToken();
+  const currentUserId = getAuthUserId();
+  const currentSessionId = getAuthSessionId();
+
+  if (!optionsOrSignal) {
+    return {
+      signal: undefined,
+      originatingToken: currentToken,
+      originatingUserId: currentUserId,
+      originatingSessionId: currentSessionId,
+    };
+  }
+
+  if (optionsOrSignal instanceof AbortSignal) {
+    return {
+      signal: optionsOrSignal,
+      originatingToken: currentToken,
+      originatingUserId: currentUserId,
+      originatingSessionId: currentSessionId,
+    };
+  }
+
+  return {
+    signal: optionsOrSignal.signal,
+    originatingToken: optionsOrSignal.originatingToken ?? currentToken,
+    originatingUserId:
+      optionsOrSignal.originatingUserId ??
+      optionsOrSignal.userId ??
+      currentUserId,
+    originatingSessionId:
+      optionsOrSignal.originatingSessionId ?? currentSessionId,
+  };
 }
 
 type Raw = Record<string, unknown>;
@@ -70,12 +115,21 @@ export const candidateSavedJobsApi = {
    * POST /api/v1/candidate/saved-jobs
    * Lưu tin tuyển dụng thật (UUID).
    */
-  async save(jobId: string, signal?: AbortSignal): Promise<BackendSavedJobItemDto> {
+  async save(
+    jobId: string,
+    options?: AbortSignal | CandidateSavedJobsRequestOptions,
+  ): Promise<BackendSavedJobItemDto> {
     try {
+      const binding = resolveSessionBinding(options);
       const res = await apiClient.post(
         "/candidate/saved-jobs",
         { jobId },
-        { signal },
+        {
+          signal: binding.signal,
+          originatingToken: binding.originatingToken,
+          originatingUserId: binding.originatingUserId,
+          originatingSessionId: binding.originatingSessionId,
+        },
       );
       return normalizeSavedJobItem(unwrapData(res.data));
     } catch (e) {
@@ -89,14 +143,21 @@ export const candidateSavedJobsApi = {
    */
   async list(
     query: SavedJobsQuery = {},
-    signal?: AbortSignal,
+    options?: AbortSignal | CandidateSavedJobsRequestOptions,
   ): Promise<Paged<BackendSavedJobItemDto>> {
     try {
+      const binding = resolveSessionBinding(options);
       const params: Record<string, number> = {};
       if (query.page && query.page > 1) params.page = query.page;
       if (query.pageSize) params.pageSize = query.pageSize;
 
-      const res = await apiClient.get("/candidate/saved-jobs", { params, signal });
+      const res = await apiClient.get("/candidate/saved-jobs", {
+        params,
+        signal: binding.signal,
+        originatingToken: binding.originatingToken,
+        originatingUserId: binding.originatingUserId,
+        originatingSessionId: binding.originatingSessionId,
+      });
       return normalizePaged(res.data, normalizeSavedJobItem);
     } catch (e) {
       throw toApiFailure(e);
@@ -109,12 +170,18 @@ export const candidateSavedJobsApi = {
    */
   async getStatus(
     jobId: string,
-    signal?: AbortSignal,
+    options?: AbortSignal | CandidateSavedJobsRequestOptions,
   ): Promise<BackendSavedJobStatusDto> {
     try {
+      const binding = resolveSessionBinding(options);
       const res = await apiClient.get(
         `/candidate/saved-jobs/${encodeURIComponent(jobId)}/status`,
-        { signal },
+        {
+          signal: binding.signal,
+          originatingToken: binding.originatingToken,
+          originatingUserId: binding.originatingUserId,
+          originatingSessionId: binding.originatingSessionId,
+        },
       );
       return normalizeSavedJobStatus(unwrapData(res.data));
     } catch (e) {
@@ -126,11 +193,20 @@ export const candidateSavedJobsApi = {
    * DELETE /api/v1/candidate/saved-jobs/:jobId
    * Bỏ lưu tin tuyển dụng (HTTP 204).
    */
-  async remove(jobId: string, signal?: AbortSignal): Promise<void> {
+  async remove(
+    jobId: string,
+    options?: AbortSignal | CandidateSavedJobsRequestOptions,
+  ): Promise<void> {
     try {
+      const binding = resolveSessionBinding(options);
       await apiClient.delete(
         `/candidate/saved-jobs/${encodeURIComponent(jobId)}`,
-        { signal },
+        {
+          signal: binding.signal,
+          originatingToken: binding.originatingToken,
+          originatingUserId: binding.originatingUserId,
+          originatingSessionId: binding.originatingSessionId,
+        },
       );
     } catch (e) {
       throw toApiFailure(e);

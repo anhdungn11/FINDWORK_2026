@@ -2,14 +2,39 @@ import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestCo
 import { getLocalizedApiError } from "../../i18n/errorCodes";
 import { getCurrentLocale } from "../../i18n/i18nStore";
 
-let inMemoryAccessToken: string | null = null;
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    originatingSessionId?: number | null;
+    originatingUserId?: string | null;
+    originatingToken?: string | null;
+  }
+  export interface InternalAxiosRequestConfig {
+    originatingSessionId?: number | null;
+    originatingUserId?: string | null;
+    originatingToken?: string | null;
+  }
+}
 
-export const setAuthToken = (token: string | null): void => {
+let inMemoryAccessToken: string | null = null;
+let inMemoryAuthUserId: string | null = null;
+let inMemoryAuthSessionId = 0;
+
+export const setAuthToken = (token: string | null, userId?: string | null): void => {
   inMemoryAccessToken = token;
+  inMemoryAuthUserId = userId ?? null;
+  inMemoryAuthSessionId += 1;
 };
 
 export const getAuthToken = (): string | null => {
   return inMemoryAccessToken;
+};
+
+export const getAuthUserId = (): string | null => {
+  return inMemoryAuthUserId;
+};
+
+export const getAuthSessionId = (): number => {
+  return inMemoryAuthSessionId;
 };
 
 export interface ApiErrorResponse {
@@ -48,9 +73,46 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = getAuthToken();
-  if (token) {
-    config.headers.set("Authorization", `Bearer ${token}`);
+  const currentToken = getAuthToken();
+  const currentUserId = getAuthUserId();
+  const currentSessionId = getAuthSessionId();
+
+  // If this request is bound to an originating session or user, verify that
+  // the session has not changed or been invalidated prior to dispatch.
+  if (config.originatingToken !== undefined && config.originatingToken !== currentToken) {
+    return Promise.reject(
+      new axios.CanceledError(
+        "Request cancelled: auth session token changed before dispatch"
+      )
+    );
+  }
+
+  if (
+    config.originatingUserId !== undefined &&
+    config.originatingUserId !== null &&
+    currentUserId !== config.originatingUserId
+  ) {
+    return Promise.reject(
+      new axios.CanceledError(
+        "Request cancelled: auth session user changed before dispatch"
+      )
+    );
+  }
+
+  if (
+    config.originatingSessionId !== undefined &&
+    config.originatingSessionId !== null &&
+    currentSessionId !== config.originatingSessionId
+  ) {
+    return Promise.reject(
+      new axios.CanceledError(
+        "Request cancelled: auth session revision changed before dispatch"
+      )
+    );
+  }
+
+  if (currentToken) {
+    config.headers.set("Authorization", `Bearer ${currentToken}`);
   }
   if (typeof FormData !== "undefined" && config.data instanceof FormData) {
     // Clear Content-Type to let browser and Axios adapter generate multipart boundary

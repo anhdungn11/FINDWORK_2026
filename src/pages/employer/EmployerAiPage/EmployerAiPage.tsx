@@ -137,15 +137,50 @@ export const EmployerAiPage: React.FC = () => {
   const [planResult, setPlanResult] = useState<RecruitmentPlanResponse | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
 
-  // Load existing company jobs for selection in review / interview questions
+  // Reference tracking active company and in-flight request controller
+  const activeCompanyIdRef = React.useRef<string | undefined>(active?.id);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
+  // Clear/scope Business AI state and reject late responses on company switch
   useEffect(() => {
+    activeCompanyIdRef.current = active?.id;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    setDraftResult(null);
+    setDraftError(null);
+    setDraftLoading(false);
+
+    setImproveResult(null);
+    setImproveError(null);
+    setImproveLoading(false);
+
+    setScreeningResult(null);
+    setScreeningError(null);
+    setScreeningLoading(false);
+
+    setInterviewResult(null);
+    setInterviewError(null);
+    setInterviewLoading(false);
+
+    setPlanResult(null);
+    setPlanError(null);
+    setPlanLoading(false);
+
+    setProbeResult(null);
+    setProbingBackend(false);
+    setCompanyJobs([]);
+
     let unmounted = false;
     if (active?.id) {
       setLoadingJobs(true);
       companyWorkspaceApi
         .listJobs(active.id, { pageSize: 30 })
         .then((res) => {
-          if (!unmounted && res.data) {
+          if (!unmounted && res.data && activeCompanyIdRef.current === active.id) {
             setCompanyJobs(res.data.map((j) => ({ id: j.id, title: j.title, status: j.status })));
           }
         })
@@ -153,35 +188,54 @@ export const EmployerAiPage: React.FC = () => {
           // ignore or fallback to empty
         })
         .finally(() => {
-          if (!unmounted) setLoadingJobs(false);
+          if (!unmounted && activeCompanyIdRef.current === active.id) setLoadingJobs(false);
         });
     }
     return () => {
       unmounted = true;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
     };
   }, [active?.id]);
 
   // Handle probe backend connection
   const handleProbeBackend = async () => {
     if (!active?.id) return;
+    const requestCompanyId = active.id;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setProbingBackend(true);
-    const endpoint = `/companies/${active.id}/ai/status`;
+    const endpoint = `/companies/${requestCompanyId}/ai/status`;
     try {
-      const service = await employerAiApi.checkStatus(active.id);
+      const service = await employerAiApi.checkStatus(requestCompanyId, controller.signal);
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       if (service.status !== "available") {
-        setProbeResult({ checked: true, status: 503, endpoint,
-          message: service.status === "unconfigured" ? "Business AI provider is not configured on this server." : "Business AI is unavailable for this company.",
-          timestamp: new Date().toLocaleTimeString("vi-VN") });
+        setProbeResult({
+          checked: true,
+          status: 503,
+          endpoint,
+          message:
+            service.status === "unconfigured"
+              ? "Business AI provider is not configured on this server."
+              : "Business AI is unavailable for this company.",
+          timestamp: new Date().toLocaleTimeString("vi-VN"),
+        });
         return;
       }
       setProbeResult({
         checked: true,
         status: 200,
         endpoint,
-        message: "Backend AI doanh nghiệp đã được cấu hình. Trạng thái nhà cung cấp được kiểm tra khi tạo nội dung.",
+        message:
+          "Backend AI doanh nghiệp đã được cấu hình. Trạng thái nhà cung cấp được kiểm tra khi tạo nội dung.",
         timestamp: new Date().toLocaleTimeString("vi-VN"),
       });
     } catch (err) {
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       const isNotImplemented = err instanceof CompanyAiNotImplementedError;
       setProbeResult({
         checked: true,
@@ -193,7 +247,9 @@ export const EmployerAiPage: React.FC = () => {
         timestamp: new Date().toLocaleTimeString("vi-VN"),
       });
     } finally {
-      setProbingBackend(false);
+      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
+        setProbingBackend(false);
+      }
     }
   };
 
@@ -210,6 +266,11 @@ export const EmployerAiPage: React.FC = () => {
   const handleSubmitDraft = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!draftForm.title.trim() || !active?.id) return;
+    const requestCompanyId = active.id;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setDraftLoading(true);
     setDraftError(null);
 
@@ -224,13 +285,17 @@ export const EmployerAiPage: React.FC = () => {
     };
 
     try {
-      const res = await employerAiApi.draftJob(active.id, payload);
+      const res = await employerAiApi.draftJob(requestCompanyId, payload, controller.signal);
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setDraftResult(res);
     } catch (err) {
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setDraftResult(null);
       setDraftError((err as Error).message);
     } finally {
-      setDraftLoading(false);
+      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
+        setDraftLoading(false);
+      }
     }
   };
 
@@ -238,17 +303,26 @@ export const EmployerAiPage: React.FC = () => {
   const handleSubmitImprove = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!improveForm.title.trim() || !active?.id) return;
+    const requestCompanyId = active.id;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setImproveLoading(true);
     setImproveError(null);
 
     try {
-      const res = await employerAiApi.improveJob(active.id, improveForm);
+      const res = await employerAiApi.improveJob(requestCompanyId, improveForm, controller.signal);
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setImproveResult(res);
     } catch (err) {
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setImproveResult(null);
       setImproveError((err as Error).message);
     } finally {
-      setImproveLoading(false);
+      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
+        setImproveLoading(false);
+      }
     }
   };
 
@@ -256,6 +330,11 @@ export const EmployerAiPage: React.FC = () => {
   const handleSubmitScreening = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!screeningForm.jobTitle.trim() || !active?.id) return;
+    const requestCompanyId = active.id;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setScreeningLoading(true);
     setScreeningError(null);
 
@@ -270,13 +349,17 @@ export const EmployerAiPage: React.FC = () => {
     };
 
     try {
-      const res = await employerAiApi.suggestScreeningQuestions(active.id, payload);
+      const res = await employerAiApi.suggestScreeningQuestions(requestCompanyId, payload, controller.signal);
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setScreeningResult(res);
     } catch (err) {
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setScreeningResult(null);
       setScreeningError((err as Error).message);
     } finally {
-      setScreeningLoading(false);
+      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
+        setScreeningLoading(false);
+      }
     }
   };
 
@@ -284,6 +367,11 @@ export const EmployerAiPage: React.FC = () => {
   const handleSubmitInterview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!interviewForm.jobTitle.trim() || !active?.id) return;
+    const requestCompanyId = active.id;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setInterviewLoading(true);
     setInterviewError(null);
 
@@ -298,13 +386,17 @@ export const EmployerAiPage: React.FC = () => {
     };
 
     try {
-      const res = await employerAiApi.generateInterviewQuestions(active.id, payload);
+      const res = await employerAiApi.generateInterviewQuestions(requestCompanyId, payload, controller.signal);
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setInterviewResult(res);
     } catch (err) {
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setInterviewResult(null);
       setInterviewError((err as Error).message);
     } finally {
-      setInterviewLoading(false);
+      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
+        setInterviewLoading(false);
+      }
     }
   };
 
@@ -312,17 +404,26 @@ export const EmployerAiPage: React.FC = () => {
   const handleSubmitPlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planForm.jobTitle.trim() || !active?.id) return;
+    const requestCompanyId = active.id;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setPlanLoading(true);
     setPlanError(null);
 
     try {
-      const res = await employerAiApi.generateRecruitmentPlan(active.id, planForm);
+      const res = await employerAiApi.generateRecruitmentPlan(requestCompanyId, planForm, controller.signal);
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setPlanResult(res);
     } catch (err) {
+      if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
       setPlanResult(null);
       setPlanError((err as Error).message);
     } finally {
-      setPlanLoading(false);
+      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
+        setPlanLoading(false);
+      }
     }
   };
 

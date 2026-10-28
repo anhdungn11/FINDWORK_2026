@@ -151,5 +151,61 @@ describe("FINDWORK CP13B — Employer Business AI Regression Suite", () => {
         "Must support exporting draft directly to job creation flow"
       );
     });
+
+    it("EmployerAiPage clears Business AI state and aborts/rejects late responses on company switch", () => {
+      const aiPageContent = fs.readFileSync(
+        new URL("../../../pages/employer/EmployerAiPage/EmployerAiPage.tsx", import.meta.url),
+        "utf8"
+      );
+
+      assert(
+        aiPageContent.includes("activeCompanyIdRef") && aiPageContent.includes("abortControllerRef"),
+        "Must maintain active company ref and abort controller ref"
+      );
+      assert(
+        aiPageContent.includes("setDraftResult(null)") && aiPageContent.includes("setImproveResult(null)"),
+        "Must reset draft and improve results when active company changes"
+      );
+      assert(
+        aiPageContent.includes("requestCompanyId !== activeCompanyIdRef.current"),
+        "Must reject late AI responses if company context changed before response settled"
+      );
+    });
+
+    it("EmployerJobFormPage wires AI JD prefill into create-job form without auto-publish or overwriting edits", () => {
+      const jobFormContent = fs.readFileSync(
+        new URL("../../../pages/employer/EmployerJobFormPage.tsx", import.meta.url),
+        "utf8"
+      );
+
+      assert(
+        jobFormContent.includes("useLocation") && jobFormContent.includes("location.state"),
+        "EmployerJobFormPage must read location.state for prefill"
+      );
+      assert(
+        jobFormContent.includes("prefillTitle") && jobFormContent.includes("prefillDescription"),
+        "EmployerJobFormPage must extract prefillTitle and prefillDescription"
+      );
+      assert(
+        jobFormContent.includes("prev.title.trim() ? prev.title :"),
+        "EmployerJobFormPage must never overwrite existing user edits with prefill values"
+      );
+    });
+
+    it("FeaturedJobs eliminates mock-job fallback on homepage and displays honest empty state", () => {
+      const featuredJobsContent = fs.readFileSync(
+        new URL("../../../features/jobs/components/FeaturedJobs/FeaturedJobs.tsx", import.meta.url),
+        "utf8"
+      );
+
+      assert(
+        !featuredJobsContent.includes("mockJobs"),
+        "FeaturedJobs must NOT import or fall back to mockJobs"
+      );
+      assert(
+        featuredJobsContent.includes("setJobsList([])") && featuredJobsContent.includes("<EmptyState"),
+        "FeaturedJobs must set empty list and render honest EmptyState component"
+      );
+    });
   });
 });

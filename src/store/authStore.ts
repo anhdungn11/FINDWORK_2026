@@ -66,13 +66,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setAuth: (user: AuthUser, accessToken: string) => {
     authRevision += 1;
     setLogoutPending(false);
-    setAuthToken(accessToken);
+    setAuthToken(accessToken, user.id);
     set({ user, accessToken, status: "authenticated", error: null, logoutError: null });
   },
 
   clearAuth: () => {
     authRevision += 1;
-    setAuthToken(null);
+    setAuthToken(null, null);
     set({ user: null, accessToken: null, status: "unauthenticated", error: null });
   },
 

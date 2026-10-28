@@ -107,11 +107,13 @@ export const savedJobsService = {
       if (isLiveWritesEnabled() && typeof item.id === "string") {
         const currentAuthUser = useAuthStore.getState().user?.id;
         if (!currentAuthUser || currentAuthUser === userId) {
-          candidateSavedJobsApi.save(item.id).catch((err: { status?: number }) => {
-            if (err?.status !== 409) {
-              // Không xóa local bookmark nếu gặp lỗi mạng đột xuất
-            }
-          });
+          candidateSavedJobsApi
+            .save(item.id, { userId: userId ?? undefined })
+            .catch((err: { status?: number }) => {
+              if (err?.status !== 409) {
+                // Không xóa local bookmark nếu gặp lỗi mạng đột xuất
+              }
+            });
         }
       }
 
@@ -137,9 +139,11 @@ export const savedJobsService = {
       if (isLiveWritesEnabled() && typeof jobId === "string") {
         const currentAuthUser = useAuthStore.getState().user?.id;
         if (!currentAuthUser || currentAuthUser === userId) {
-          candidateSavedJobsApi.remove(jobId).catch(() => {
-            // Ignore removal error
-          });
+          candidateSavedJobsApi
+            .remove(jobId, { userId: userId ?? undefined })
+            .catch(() => {
+              // Ignore removal error
+            });
         }
       }
 
@@ -196,7 +200,10 @@ export const savedJobsService = {
     if (isStale()) return;
 
     try {
-      const paged = await candidateSavedJobsApi.list({ page: 1, pageSize: 100 });
+      const paged = await candidateSavedJobsApi.list(
+        { page: 1, pageSize: 100 },
+        { userId },
+      );
       if (isStale()) return;
 
       const remoteItems: SavedJobItem[] = paged.data.map((r) => {
@@ -243,7 +250,7 @@ export const savedJobsService = {
         if (!item.isMock && typeof item.id === "string") {
           if (isStale()) return;
           try {
-            await candidateSavedJobsApi.save(item.id);
+            await candidateSavedJobsApi.save(item.id, { userId });
           } catch {
             // Lưu thất bại hoặc mạng chập chờn: tiếp tục bảo toàn trong local để không mất bookmark
           }
