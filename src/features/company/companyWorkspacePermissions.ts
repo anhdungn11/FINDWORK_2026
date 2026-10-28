@@ -63,6 +63,20 @@ export function canInviteMembers(roles: string[] | undefined | null): boolean {
   return roles.some((role) => MEMBER_INVITING_ROLES.has(role.trim().toUpperCase()));
 }
 
+export const BUSINESS_AI_ROLES = new Set([
+  "OWNER",
+  "COMPANY_OWNER",
+  "ADMIN",
+  "HR_MANAGER",
+  "RECRUITER",
+  "HIRING_MANAGER",
+]);
+
+export function canUseBusinessAi(roles: string[] | undefined | null): boolean {
+  if (!roles || roles.length === 0) return false;
+  return roles.some((role) => BUSINESS_AI_ROLES.has(role.trim().toUpperCase()));
+}
+
 export const COMPANY_ROLE_LABELS: Record<string, string> = {
   OWNER: "Chủ sở hữu",
   COMPANY_OWNER: "Chủ sở hữu",
