@@ -27,15 +27,16 @@ export class EmailDeliveryWorker {
   ) {}
 
   /** One bounded unit of work. Separate worker process controls scheduling. */
-  async processOne(): Promise<boolean> {
-    this.settings.assertWorkerReady();
+  async processOne(onlyJobId?: string): Promise<boolean> {
+    if (onlyJobId) this.settings.assertCanQueue();
+    else this.settings.assertWorkerReady();
     this.crypto.assertReady();
-    for (const keyId of await this.repo.pendingKeyIds()) {
+    for (const keyId of await this.repo.pendingKeyIds(onlyJobId)) {
       // If old key material has gone missing, STOP without consuming the job.
       this.crypto.assertKeyAvailable(keyId);
     }
     const owner = randomUUID();
-    const job = await this.repo.claim(owner);
+    const job = await this.repo.claim(owner, onlyJobId);
     if (!job) return false;
     try {
       if (!(await this.repo.verifyEligible(job, owner))) {

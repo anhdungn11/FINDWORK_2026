@@ -38,17 +38,18 @@ export class EmailOutboxRepository {
     return result.count;
   }
 
-  async pendingKeyIds(): Promise<string[]> {
+  async pendingKeyIds(onlyJobId?: string): Promise<string[]> {
     // Protect queued ciphertext across rotations: never claim with missing historical keys.
     const rows = await this.prisma.$queryRaw<Array<{ encryptionKeyId: string }>>`
       SELECT DISTINCT "encryptionKeyId" FROM "EmailOutbox"
       WHERE "kind" = 'VERIFY_EMAIL'::"EmailOutboxKind"
         AND "status" IN ('QUEUED'::"EmailOutboxStatus", 'PROCESSING'::"EmailOutboxStatus")
+        AND (${onlyJobId ?? null}::uuid IS NULL OR "id" = ${onlyJobId ?? null}::uuid)
     `;
     return rows.map((row) => row.encryptionKeyId);
   }
 
-  async claim(owner: string): Promise<ClaimedEmailJob | null> {
+  async claim(owner: string, onlyJobId?: string): Promise<ClaimedEmailJob | null> {
     // A crashed final-attempt worker cannot remain PROCESSING forever.
     await this.prisma.$executeRaw`
       UPDATE "EmailOutbox"
@@ -58,6 +59,7 @@ export class EmailOutboxRepository {
           "lastErrorCode" = 'LEASE_EXHAUSTED', "updatedAt" = NOW()
       WHERE "kind" = 'VERIFY_EMAIL'::"EmailOutboxKind"
         AND "status" = 'PROCESSING'::"EmailOutboxStatus"
+        AND (${onlyJobId ?? null}::uuid IS NULL OR "id" = ${onlyJobId ?? null}::uuid)
         AND "leaseUntil" < NOW() AND "attemptCount" >= "maxAttempts"
     `;
     // Atomic claim: row locks protect concurrent workers, owner is unique per claim.
@@ -65,6 +67,7 @@ export class EmailOutboxRepository {
       WITH candidate AS (
         SELECT "id" FROM "EmailOutbox"
         WHERE "kind" = 'VERIFY_EMAIL'::"EmailOutboxKind"
+          AND (${onlyJobId ?? null}::uuid IS NULL OR "id" = ${onlyJobId ?? null}::uuid)
           AND "attemptCount" < "maxAttempts"
           AND (
             ("status" = 'QUEUED'::"EmailOutboxStatus" AND "nextAttemptAt" <= NOW())
