@@ -14,8 +14,6 @@ import {
   AlertTriangle,
   Info,
   RefreshCw,
-  Code2,
-  X,
   PlusCircle,
   Briefcase,
   CheckCircle2,
@@ -52,7 +50,6 @@ export const EmployerAiPage: React.FC = () => {
 
   const [currentTab, setCurrentTab] = useState<TabId>("draft");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [showContractModal, setShowContractModal] = useState(false);
 
   // Backend Diagnostic Probe State
   const [probingBackend, setProbingBackend] = useState(false);
@@ -290,7 +287,7 @@ export const EmployerAiPage: React.FC = () => {
         status: isNotImplemented ? 404 : 503,
         endpoint,
         message: isNotImplemented
-          ? "Endpoint chưa được kích hoạt trên backend (HTTP 404). Backend Codex đang thực hiện tích hợp theo hợp đồng CP13B."
+          ? "Tính năng AI doanh nghiệp chưa được kích hoạt trên hệ thống máy chủ (HTTP 404). Vui lòng liên hệ quản trị viên hệ thống để được hỗ trợ."
           : (err as Error).message,
         timestamp: new Date().toLocaleTimeString("vi-VN"),
       });
@@ -521,7 +518,7 @@ export const EmployerAiPage: React.FC = () => {
                   Trợ lý AI Doanh nghiệp — FINDWORK Business AI
                 </h1>
                 <p className={styles.heroSubtitle}>
-                  Không gian công cụ trí tuệ nhân tạo chuyên biệt dành cho Nhà tuyển dụng. Hỗ trợ soạn thảo mô tả công việc,
+                  Không gian công cụ trí tuệ nhân tạo chuyên biệt dành cho Nhà tuyển dụng đa ngành nghề. Hỗ trợ soạn thảo mô tả công việc,
                   tối ưu hóa tiêu chí ứng tuyển, chuẩn hóa câu hỏi phỏng vấn và lập kế hoạch tuyển dụng hiệu quả.
                 </p>
               </div>
@@ -533,16 +530,6 @@ export const EmployerAiPage: React.FC = () => {
                 <span>{active.name}</span>
                 {active.verificationStatus === "VERIFIED" && <span style={{ color: "#4ade80" }}>✓ Đã xác minh</span>}
               </div>
-
-              <button
-                type="button"
-                className={styles.heroBtnSecondary}
-                onClick={() => setShowContractModal(true)}
-                title="Xem tài liệu đặc tả API Backend cho kỹ sư Codex"
-              >
-                <Code2 size={15} aria-hidden="true" />
-                <span>Đặc tả API Codex</span>
-              </button>
 
               <button
                 type="button"
@@ -721,7 +708,7 @@ export const EmployerAiPage: React.FC = () => {
                   id={`${idPrefix}-draft-title`}
                   type="text"
                   required
-                  placeholder="Ví dụ: Senior Frontend Developer, Chuyên viên Tuyển dụng..."
+                  placeholder="Ví dụ: Giám đốc Kinh doanh B2B, Kế toán trưởng, Kỹ sư sản xuất, Điều dưỡng đa khoa..."
                   className={styles.input}
                   value={draftForm.title}
                   onChange={(e) => setDraftForm({ ...draftForm, title: e.target.value })}
@@ -734,7 +721,7 @@ export const EmployerAiPage: React.FC = () => {
                 <input
                   id={`${idPrefix}-draft-dept`}
                   type="text"
-                  placeholder="Ví dụ: Kỹ thuật (Engineering), Marketing..."
+                  placeholder="Ví dụ: Kinh doanh & Bán hàng, Tài chính - Kế toán, Vận hành & Logistics, Chăm sóc sức khỏe..."
                   className={styles.input}
                   value={draftForm.department || ""}
                   onChange={(e) => setDraftForm({ ...draftForm, department: e.target.value })}
@@ -752,12 +739,12 @@ export const EmployerAiPage: React.FC = () => {
                   disabled={!hasAiAccess || draftLoading}
                 >
                   <option value="INTERN">Thực tập sinh (Intern)</option>
-                  <option value="FRESHER">Mới tốt nghiệp (Fresher)</option>
-                  <option value="JUNIOR">Nhân viên mới (Junior 1-2 năm)</option>
-                  <option value="MIDDLE">Chuyên viên (Middle 2-4 năm)</option>
-                  <option value="SENIOR">Chuyên viên cấp cao (Senior 5+ năm)</option>
-                  <option value="LEAD">Trưởng nhóm (Team Lead)</option>
-                  <option value="MANAGER">Quản lý (Manager)</option>
+                  <option value="FRESHER">Mới tốt nghiệp (Fresher / Chưa có kinh nghiệm)</option>
+                  <option value="JUNIOR">Nhân viên (1 - 2 năm kinh nghiệm)</option>
+                  <option value="MIDDLE">Chuyên viên (2 - 4 năm kinh nghiệm)</option>
+                  <option value="SENIOR">Chuyên viên cao cấp (5+ năm kinh nghiệm)</option>
+                  <option value="LEAD">Trưởng nhóm (Team Lead / Giám sát chuyên môn)</option>
+                  <option value="MANAGER">Quản lý / Trưởng bộ phận (Manager / Department Head)</option>
                 </select>
               </div>
 
@@ -786,9 +773,9 @@ export const EmployerAiPage: React.FC = () => {
                   onChange={(e) => setDraftForm({ ...draftForm, workplaceType: e.target.value as WorkplaceType })}
                   disabled={!hasAiAccess || draftLoading}
                 >
-                  <option value="ON_SITE">Tại văn phòng (On-site)</option>
-                  <option value="HYBRID">Linh hoạt (Hybrid)</option>
-                  <option value="REMOTE">Làm việc từ xa (Remote)</option>
+                  <option value="ON_SITE">Tại văn phòng / Cơ sở làm việc (On-site)</option>
+                  <option value="HYBRID">Linh hoạt (Hybrid - Kết hợp văn phòng & từ xa)</option>
+                  <option value="REMOTE">Làm việc từ xa (Remote / Không cố định)</option>
                 </select>
               </div>
 
@@ -797,7 +784,7 @@ export const EmployerAiPage: React.FC = () => {
                 <input
                   id={`${idPrefix}-draft-location`}
                   type="text"
-                  placeholder="Ví dụ: TP. Hồ Chí Minh, Hà Nội..."
+                  placeholder="Ví dụ: TP. Hồ Chí Minh, Hà Nội, Bình Dương, Đà Nẵng..."
                   className={styles.input}
                   value={draftForm.location || ""}
                   onChange={(e) => setDraftForm({ ...draftForm, location: e.target.value })}
@@ -810,7 +797,7 @@ export const EmployerAiPage: React.FC = () => {
                 <input
                   id={`${idPrefix}-draft-salary`}
                   type="text"
-                  placeholder="Ví dụ: 25 - 40 triệu VND hoặc Thỏa thuận"
+                  placeholder="Ví dụ: 15 - 25 triệu VND, 1,000 - 1,500 USD hoặc Thỏa thuận"
                   className={styles.input}
                   value={draftForm.salaryRange || ""}
                   onChange={(e) => setDraftForm({ ...draftForm, salaryRange: e.target.value })}
@@ -819,11 +806,11 @@ export const EmployerAiPage: React.FC = () => {
               </div>
 
               <div className={`${styles.formGroup} ${styles.formFull}`}>
-                <label htmlFor={`${idPrefix}-draft-skills`} className={styles.label}>Kỹ năng trọng tâm (cách nhau bằng dấu phẩy)</label>
+                <label htmlFor={`${idPrefix}-draft-skills`} className={styles.label}>Kỹ năng & Chuyên môn trọng tâm (cách nhau bằng dấu phẩy)</label>
                 <input
                   id={`${idPrefix}-draft-skills`}
                   type="text"
-                  placeholder="Ví dụ: React, TypeScript, Next.js, REST API"
+                  placeholder="Ví dụ: Đàm phán B2B, Kế toán MISA, Quản lý kho WMS, Chuẩn đoán điều dưỡng, Tiêu chuẩn GMP, Phân tích dữ liệu..."
                   className={styles.input}
                   value={skillsInput}
                   onChange={(e) => setSkillsInput(e.target.value)}
@@ -836,7 +823,7 @@ export const EmployerAiPage: React.FC = () => {
                 <textarea
                   id={`${idPrefix}-draft-resp`}
                   rows={3}
-                  placeholder="Nhập 2-3 gạch đầu dòng về nhiệm vụ công việc chính..."
+                  placeholder="Ví dụ: Phát triển thị trường khách hàng doanh nghiệp; Lập báo cáo tài chính định kỳ; Điều phối chuỗi cung ứng; Chăm sóc bệnh nhân nội trú..."
                   className={styles.textarea}
                   value={draftForm.responsibilitiesBrief || ""}
                   onChange={(e) => setDraftForm({ ...draftForm, responsibilitiesBrief: e.target.value })}
@@ -849,7 +836,7 @@ export const EmployerAiPage: React.FC = () => {
                 <textarea
                   id={`${idPrefix}-draft-req`}
                   rows={3}
-                  placeholder="Số năm kinh nghiệm, bằng cấp hoặc yêu cầu đặc thù..."
+                  placeholder="Ví dụ: Tốt nghiệp Đại học/Cao đẳng chuyên ngành phù hợp; Kỹ năng giao tiếp và xử lý tình huống; Chứng chỉ nghiệp vụ liên quan..."
                   className={styles.textarea}
                   value={draftForm.requirementsBrief || ""}
                   onChange={(e) => setDraftForm({ ...draftForm, requirementsBrief: e.target.value })}
@@ -998,7 +985,7 @@ export const EmployerAiPage: React.FC = () => {
                 <FileText size={48} className={styles.emptyIcon} aria-hidden="true" />
                 <h3 className={styles.emptyTitle}>Chưa có bản thảo nào</h3>
                 <p className={styles.emptyDesc}>
-                  Điền các thông tin vị trí ở biểu mẫu bên trái và bấm &quot;Tạo bản thảo với AI&quot; để xem cấu trúc gợi ý.
+                  Điền các thông tin vị trí ở biểu mẫu bên trái và bấm &quot;Tạo bản thảo với AI&quot; để xem cấu trúc gợi ý cho mọi ngành nghề.
                 </p>
               </div>
             )}
@@ -1066,7 +1053,7 @@ export const EmployerAiPage: React.FC = () => {
                   id={`${idPrefix}-improve-title`}
                   type="text"
                   required
-                  placeholder="Ví dụ: Product Designer, Backend Engineer..."
+                  placeholder="Ví dụ: Trưởng phòng Marketing, Chuyên viên Xuất nhập khẩu, Quản lý Nhà hàng, Kỹ sư Cơ khí..."
                   className={styles.input}
                   value={improveForm.title}
                   onChange={(e) => setImproveForm({ ...improveForm, title: e.target.value })}
@@ -1079,7 +1066,7 @@ export const EmployerAiPage: React.FC = () => {
                 <textarea
                   id={`${idPrefix}-improve-desc`}
                   rows={4}
-                  placeholder="Dán nội dung mô tả công việc (Job Description) cần rà soát..."
+                  placeholder="Dán nội dung mô tả công việc (Job Description) thuộc bất kỳ ngành nghề nào cần rà soát..."
                   className={styles.textarea}
                   value={improveForm.description}
                   onChange={(e) => setImproveForm({ ...improveForm, description: e.target.value })}
@@ -1092,7 +1079,7 @@ export const EmployerAiPage: React.FC = () => {
                 <textarea
                   id={`${idPrefix}-improve-req`}
                   rows={4}
-                  placeholder="Dán các tiêu chí yêu cầu ứng viên để phân tích tính bao hàm..."
+                  placeholder="Dán các tiêu chí yêu cầu về kinh nghiệm, kỹ năng, bằng cấp để phân tích tính bao hàm..."
                   className={styles.textarea}
                   value={improveForm.requirements || ""}
                   onChange={(e) => setImproveForm({ ...improveForm, requirements: e.target.value })}
@@ -1110,9 +1097,9 @@ export const EmployerAiPage: React.FC = () => {
                   disabled={!hasAiAccess || improveLoading}
                 >
                   <option value="ALL">Toàn diện (Tất cả tiêu chí)</option>
-                  <option value="INCLUSIVITY">Tính bao hàm & Tránh định kiến (Anti-Bias)</option>
+                  <option value="INCLUSIVITY">Tính bao hàm & Tránh định kiến (Giới tính, tuổi tác, vùng miền)</option>
                   <option value="CLARITY">Độ rõ ràng & Dễ hiểu</option>
-                  <option value="ENGAGEMENT">Độ hấp dẫn nhân tài</option>
+                  <option value="ENGAGEMENT">Độ hấp dẫn ứng viên & Thương hiệu tuyển dụng</option>
                   <option value="COMPLIANCE">Tuân thủ quy định pháp luật lao động</option>
                 </select>
               </div>
@@ -1218,7 +1205,7 @@ export const EmployerAiPage: React.FC = () => {
                 <Sparkles size={48} className={styles.emptyIcon} aria-hidden="true" />
                 <h3 className={styles.emptyTitle}>Chưa có kết quả phân tích</h3>
                 <p className={styles.emptyDesc}>
-                  Chọn hoặc dán nội dung JD ở bên trái và bấm &quot;Rà soát &amp; Đánh giá&quot; để phát hiện điểm cần tối ưu.
+                  Chọn tin tuyển dụng hiện có hoặc dán nội dung JD ở bên trái và bấm &quot;Rà soát &amp; Đánh giá&quot; để phát hiện điểm cần tối ưu.
                 </p>
               </div>
             )}
@@ -1251,7 +1238,7 @@ export const EmployerAiPage: React.FC = () => {
                   id={`${idPrefix}-screen-title`}
                   type="text"
                   required
-                  placeholder="Ví dụ: Mobile Flutter Developer, Kế toán tổng hợp..."
+                  placeholder="Ví dụ: Quản lý Khách sạn, Kế toán tổng hợp, Giám sát chất lượng (QA/QC), Kỹ sư Tự động hóa..."
                   className={styles.input}
                   value={screeningForm.jobTitle}
                   onChange={(e) => setScreeningForm({ ...screeningForm, jobTitle: e.target.value })}
@@ -1260,11 +1247,11 @@ export const EmployerAiPage: React.FC = () => {
               </div>
 
               <div className={`${styles.formGroup} ${styles.formFull}`}>
-                <label htmlFor={`${idPrefix}-screen-skills`} className={styles.label}>Kỹ năng cần kiểm tra (cách nhau bởi dấu phẩy)</label>
+                <label htmlFor={`${idPrefix}-screen-skills`} className={styles.label}>Kỹ năng & Chuyên môn cần kiểm tra (cách nhau bởi dấu phẩy)</label>
                 <input
                   id={`${idPrefix}-screen-skills`}
                   type="text"
-                  placeholder="Ví dụ: Flutter, Dart, REST API, Git"
+                  placeholder="Ví dụ: Kế toán thuế, Bán hàng kỹ thuật, Dịch vụ F&B, Vận hành dây chuyền, Chăm sóc khách hàng, Kỹ năng phần mềm..."
                   className={styles.input}
                   value={screeningSkillsInput}
                   onChange={(e) => setScreeningSkillsInput(e.target.value)}
@@ -1303,7 +1290,7 @@ export const EmployerAiPage: React.FC = () => {
 
               <div className={`${styles.actionRow} ${styles.formFull}`}>
                 <span className={styles.helperText}>
-                  Câu hỏi được định dạng để có thể áp dụng trực tiếp vào cấu hình tin tuyển dụng.
+                  Câu hỏi được định dạng để có thể áp dụng trực tiếp vào cấu hình tin tuyển dụng (Trắc nghiệm, Có/Không, Số năm kinh nghiệm, Tự luận ngắn).
                 </span>
                 <button
                   type="submit"
@@ -1398,7 +1385,7 @@ export const EmployerAiPage: React.FC = () => {
                 <HelpCircle size={48} className={styles.emptyIcon} aria-hidden="true" />
                 <h3 className={styles.emptyTitle}>Chưa có câu hỏi sàng lọc</h3>
                 <p className={styles.emptyDesc}>
-                  Nhập vị trí và kỹ năng ở biểu mẫu bên trái để nhận bộ câu hỏi sàng lọc chuẩn mực.
+                  Nhập vị trí và năng lực cần đánh giá ở biểu mẫu bên trái để nhận bộ câu hỏi sàng lọc ứng viên phù hợp với từng lĩnh vực.
                 </p>
               </div>
             )}
@@ -1431,7 +1418,7 @@ export const EmployerAiPage: React.FC = () => {
                   id={`${idPrefix}-interview-title`}
                   type="text"
                   required
-                  placeholder="Ví dụ: Lead DevOps Engineer, Chuyên viên Marketing..."
+                  placeholder="Ví dụ: Trưởng ca Sản xuất, Chuyên viên Marketing, Kế toán viên, Quản lý Vận tải, Dược sĩ tư vấn..."
                   className={styles.input}
                   value={interviewForm.jobTitle}
                   onChange={(e) => setInterviewForm({ ...interviewForm, jobTitle: e.target.value })}
@@ -1448,10 +1435,10 @@ export const EmployerAiPage: React.FC = () => {
                   onChange={(e) => setInterviewForm({ ...interviewForm, stage: e.target.value as any })}
                   disabled={!hasAiAccess || interviewLoading}
                 >
-                  <option value="HR_SCREENING">Vòng 1: HR Sàng lọc & Động lực</option>
-                  <option value="TECHNICAL">Vòng 2: Kỹ thuật & Chuyên môn sâu</option>
-                  <option value="CULTURE_FIT">Vòng 3: Văn hóa & Kỹ năng mềm</option>
-                  <option value="HIRING_MANAGER">Vòng 4: Quản lý cấp cao & Đàm phán</option>
+                  <option value="HR_SCREENING">Vòng 1: Sàng lọc nhân sự & Động lực ứng tuyển</option>
+                  <option value="TECHNICAL">Vòng 2: Đánh giá nghiệp vụ & Năng lực chuyên môn sâu</option>
+                  <option value="CULTURE_FIT">Vòng 3: Phù hợp văn hóa & Kỹ năng làm việc nhóm</option>
+                  <option value="HIRING_MANAGER">Vòng 4: Phỏng vấn cấp quản lý & Định hướng phát triển</option>
                 </select>
               </div>
 
@@ -1464,20 +1451,20 @@ export const EmployerAiPage: React.FC = () => {
                   onChange={(e) => setInterviewForm({ ...interviewForm, level: e.target.value as any })}
                   disabled={!hasAiAccess || interviewLoading}
                 >
-                  <option value="JUNIOR">Junior (1 - 2 năm)</option>
-                  <option value="MIDDLE">Middle (2 - 4 năm)</option>
-                  <option value="SENIOR">Senior (5+ năm)</option>
-                  <option value="LEAD">Team Lead / Tech Lead</option>
-                  <option value="MANAGER">Manager</option>
+                  <option value="JUNIOR">Nhân viên (1 - 2 năm)</option>
+                  <option value="MIDDLE">Chuyên viên (2 - 4 năm)</option>
+                  <option value="SENIOR">Chuyên viên cao cấp (5+ năm)</option>
+                  <option value="LEAD">Trưởng nhóm / Giám sát chuyên môn (Team Lead / Supervisor)</option>
+                  <option value="MANAGER">Quản lý / Trưởng bộ phận (Manager / Department Head)</option>
                 </select>
               </div>
 
               <div className={`${styles.formGroup} ${styles.formFull}`}>
-                <label htmlFor={`${idPrefix}-interview-skills`} className={styles.label}>Kỹ năng / Chủ đề trọng tâm</label>
+                <label htmlFor={`${idPrefix}-interview-skills`} className={styles.label}>Kỹ năng & Chủ đề trọng tâm (cách nhau bằng dấu phẩy)</label>
                 <input
                   id={`${idPrefix}-interview-skills`}
                   type="text"
-                  placeholder="Ví dụ: Xử lý sự cố, Kiến trúc Microservices, Quản lý tiến độ..."
+                  placeholder="Ví dụ: Đàm phán giá, Xử lý khiếu nại khách hàng, Quy trình an toàn lao động, Quản lý dòng tiền, Giải quyết sự cố..."
                   className={styles.input}
                   value={interviewSkillsInput}
                   onChange={(e) => setInterviewSkillsInput(e.target.value)}
@@ -1487,7 +1474,7 @@ export const EmployerAiPage: React.FC = () => {
 
               <div className={`${styles.actionRow} ${styles.formFull}`}>
                 <span className={styles.helperText}>
-                  Phương pháp STAR: Tình huống (Situation) - Nhiệm vụ (Task) - Hành động (Action) - Kết quả (Result).
+                  Phương pháp STAR: Tình huống (Situation) — Nhiệm vụ (Task) — Hành động (Action) — Kết quả (Result). Áp dụng cho mọi vị trí chuyên môn.
                 </span>
                 <button
                   type="submit"
@@ -1574,7 +1561,7 @@ export const EmployerAiPage: React.FC = () => {
                 <Users size={48} className={styles.emptyIcon} aria-hidden="true" />
                 <h3 className={styles.emptyTitle}>Chưa có câu hỏi phỏng vấn</h3>
                 <p className={styles.emptyDesc}>
-                  Chọn vị trí và vòng phỏng vấn để nhận ngân hàng câu hỏi đánh giá theo năng lực.
+                  Chọn vị trí và vòng phỏng vấn để nhận ngân hàng câu hỏi đánh giá theo khung năng lực chuyên ngành.
                 </p>
               </div>
             )}
@@ -1607,7 +1594,7 @@ export const EmployerAiPage: React.FC = () => {
                   id={`${idPrefix}-plan-title`}
                   type="text"
                   required
-                  placeholder="Ví dụ: Senior Data Analyst, Trưởng phòng Kinh doanh..."
+                  placeholder="Ví dụ: Trưởng phòng Kinh doanh, Kỹ sư Vận hành, Bác sĩ Đa khoa, Quản lý Kho bãi, Chuyên viên Truyền thông..."
                   className={styles.input}
                   value={planForm.jobTitle}
                   onChange={(e) => setPlanForm({ ...planForm, jobTitle: e.target.value })}
@@ -1660,7 +1647,7 @@ export const EmployerAiPage: React.FC = () => {
 
               <div className={`${styles.actionRow} ${styles.formFull}`}>
                 <span className={styles.helperText}>
-                  AI ước tính lộ trình tối ưu dựa trên tiêu chuẩn tuyển dụng ngành.
+                  AI ước tính lộ trình tối ưu dựa trên tiêu chuẩn tuyển dụng và mức độ cạnh tranh của từng ngành nghề.
                 </span>
                 <button
                   type="submit"
@@ -1751,7 +1738,7 @@ export const EmployerAiPage: React.FC = () => {
                 <Calendar size={48} className={styles.emptyIcon} aria-hidden="true" />
                 <h3 className={styles.emptyTitle}>Chưa có kế hoạch tuyển dụng</h3>
                 <p className={styles.emptyDesc}>
-                  Điền các thông số tuyển dụng bên trái để nhận lộ trình các giai đoạn cụ thể.
+                  Điền các thông số tuyển dụng bên trái để nhận lộ trình phân kỳ, kênh tìm kiếm ứng viên (sourcing) và mốc tiến độ cụ thể.
                 </p>
               </div>
             )}
@@ -1814,151 +1801,6 @@ export const EmployerAiPage: React.FC = () => {
               <div>
                 Hệ thống tuyển dụng FINDWORK không tự động gán nhãn hồ sơ hay đưa ra quyết định thay cho con người.
                 Mọi nhận định về năng lực ứng viên phải được thực hiện thông qua buổi phỏng vấn trực tiếp và đánh giá thực tế của Hội đồng tuyển dụng.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 6. CODEX API CONTRACT DIALOG (INTERACTIVE SPEC MODAL) */}
-      {showContractModal && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setShowContractModal(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={`${idPrefix}-modal-title`}
-        >
-          <div className={styles.modalDialog} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h3 id={`${idPrefix}-modal-title`} className={styles.modalTitle}>
-                Đặc tả Kỹ thuật API AI Doanh nghiệp (Codex CP13B Contract)
-              </h3>
-              <button
-                type="button"
-                className={styles.modalCloseBtn}
-                onClick={() => setShowContractModal(false)}
-                aria-label="Đóng hộp thoại"
-              >
-                <X size={20} aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className={styles.modalBody}>
-              <p>
-                Đây là hợp đồng API chính thức (API Contract RFC) định nghĩa giữa giao diện Frontend và máy chủ Backend (Codex).
-                Tất cả các endpoint bắt buộc phải kiểm tra quyền <strong>Company RBAC</strong> (Scope: COMPANY).
-              </p>
-
-              <h4>1. POST /companies/:companyId/ai/draft-job</h4>
-              <p>Yêu cầu quyền: <code>company.update</code> (Chủ sở hữu, Quản trị viên, HR Manager, Recruiter)</p>
-              <pre className={styles.codeBlock}>
-{`POST /companies/:companyId/ai/draft-job
-Headers:
-  Authorization: Bearer <access_token>
-  Content-Type: application/json
-
-Request Body:
-{
-  "title": "Senior Frontend Developer",
-  "department": "Engineering",
-  "employmentType": "FULL_TIME",
-  "workplaceType": "HYBRID",
-  "experienceLevel": "SENIOR",
-  "location": "Hồ Chí Minh",
-  "salaryRange": "35,000,000 - 50,000,000 VND",
-  "primarySkills": ["React", "TypeScript", "Next.js"],
-  "responsibilitiesBrief": "Phát triển giao diện web, tối ưu Core Web Vitals",
-  "requirementsBrief": "5 năm kinh nghiệm React, tư duy kiến trúc",
-  "tone": "PROFESSIONAL"
-}
-
-Response (200 OK):
-{
-  "title": "Senior Frontend Developer",
-  "summary": "...",
-  "responsibilities": ["..."],
-  "requirements": ["..."],
-  "benefits": ["..."],
-  "suggestedSkills": ["React", "TypeScript"],
-  "fullMarkdown": "# Senior Frontend Developer\\n\\n..."
-}`}
-              </pre>
-
-              <h4>2. POST /companies/:companyId/ai/improve-job</h4>
-              <pre className={styles.codeBlock}>
-{`POST /companies/:companyId/ai/improve-job
-Request Body:
-{
-  "jobId": "optional-uuid",
-  "title": "Product Designer",
-  "description": "...",
-  "requirements": "...",
-  "focusArea": "INCLUSIVITY"
-}
-
-Response (200 OK):
-{
-  "improvedDescription": "...",
-  "improvedRequirements": "...",
-  "critique": [
-    { "category": "inclusivity", "feedback": "...", "severity": "RECOMMENDED" }
-  ],
-  "readabilityScore": 85,
-  "inclusivityScore": 92
-}`}
-              </pre>
-
-              <h4>3. POST /companies/:companyId/ai/screening-questions</h4>
-              <pre className={styles.codeBlock}>
-{`POST /companies/:companyId/ai/screening-questions
-Request Body:
-{
-  "jobTitle": "DevOps Engineer",
-  "keySkills": ["Kubernetes", "AWS", "CI/CD"],
-  "experienceYears": 3,
-  "questionCount": 4
-}`}
-              </pre>
-
-              <h4>4. POST /companies/:companyId/ai/interview-questions</h4>
-              <pre className={styles.codeBlock}>
-{`POST /companies/:companyId/ai/interview-questions
-Request Body:
-{
-  "jobTitle": "Backend Engineer",
-  "level": "SENIOR",
-  "stage": "TECHNICAL",
-  "focusSkills": ["Database Optimization", "System Architecture"]
-}`}
-              </pre>
-
-              <h4>5. GET /companies/:companyId/ai/status</h4>
-              <pre className={styles.codeBlock}>
-{`GET /companies/:companyId/ai/status
-Response (200 OK):
-{
-  "status": "available",
-  "version": "1.0.0",
-  "features": {
-    "jobDrafting": true,
-    "jobReview": true,
-    "screeningQuestions": true,
-    "interviewQuestions": true,
-    "recruitmentPlan": true
-  },
-  "supportedModels": ["gpt-4o", "gemini-1.5-pro"]
-}`}
-              </pre>
-
-              <div style={{ marginTop: 16 }}>
-                <Link
-                  to="/employer/jobs"
-                  className={styles.exportBtn}
-                  style={{ display: "inline-block", padding: "8px 16px" }}
-                >
-                  Đến trang Quản lý Tin tuyển dụng →
-                </Link>
               </div>
             </div>
           </div>

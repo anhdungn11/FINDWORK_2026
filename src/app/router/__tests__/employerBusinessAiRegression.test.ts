@@ -112,27 +112,49 @@ describe("FINDWORK CP13B — Employer Business AI Regression Suite", () => {
       );
     });
 
-    it("EmployerAiPage contains live backend connection probe and Codex API Contract documentation", () => {
+    it("EmployerAiPage removes developer Codex contract modal and provides balanced multi-industry UX", () => {
       const aiPageContent = fs.readFileSync(
         new URL("../../../pages/employer/EmployerAiPage/EmployerAiPage.tsx", import.meta.url),
         "utf8"
       );
 
+      // Must preserve live backend connection probe
       assert(
         aiPageContent.includes("handleProbeBackend"),
         "Must contain live probe for testing backend connection without fabrication"
       );
+
+      // Must remove developer-facing Codex API button and contract modal
       assert(
-        aiPageContent.includes("Đặc tả Kỹ thuật API AI Doanh nghiệp (Codex CP13B Contract)"),
-        "Must contain Codex API Contract viewer dialog"
+        !aiPageContent.includes("Đặc tả API Codex"),
+        "Must remove developer-facing 'Đặc tả API Codex' button from product UI"
       );
       assert(
-        aiPageContent.includes("POST /companies/:companyId/ai/draft-job"),
-        "Must specify draft-job contract endpoint"
+        !aiPageContent.includes("Codex CP13B Contract"),
+        "Must remove internal Codex API Contract specification modal from product UI"
+      );
+
+      // Multi-industry coverage across all five forms:
+      // Sales, Accounting, Marketing, Logistics, Hospitality, Manufacturing, Healthcare, IT
+      assert(
+        aiPageContent.includes("Kinh doanh") &&
+        aiPageContent.includes("Kế toán") &&
+        aiPageContent.includes("Marketing") &&
+        aiPageContent.includes("Logistics") &&
+        aiPageContent.includes("Khách sạn") &&
+        aiPageContent.includes("Sản xuất") &&
+        aiPageContent.includes("Điều dưỡng"),
+        "Must include balanced multi-industry Vietnamese examples across all major sectors"
+      );
+
+      // Neutral labels for seniority and interview stages
+      assert(
+        aiPageContent.includes("Đánh giá nghiệp vụ & Năng lực chuyên môn sâu"),
+        "Must use neutral label for interview stage instead of IT-only 'Kỹ thuật'"
       );
       assert(
-        aiPageContent.includes("POST /companies/:companyId/ai/screening-questions"),
-        "Must specify screening-questions contract endpoint"
+        aiPageContent.includes("Trưởng nhóm / Giám sát chuyên môn"),
+        "Must use neutral label for leadership level instead of IT-specific 'Tech Lead'"
       );
     });
 
