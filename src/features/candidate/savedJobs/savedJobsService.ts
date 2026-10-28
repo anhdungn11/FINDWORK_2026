@@ -11,7 +11,6 @@ function getStorageKey(userId: string | null | undefined): string {
   return `${STORAGE_PREFIX}${safeId}`;
 }
 
-
 function migrateGuestSavedJobs(userId: string): void {
   if (typeof window === "undefined" || !userId || userId === "guest") return;
   try {
@@ -138,6 +137,7 @@ export const savedJobsService = {
 
   /**
    * Đồng bộ từ Backend khi live writes bật và người dùng đã xác thực.
+   * Giữ lại mọi bookmark cục bộ chưa có trên server để chống mất mát dữ liệu (data loss).
    */
   async syncFromBackend(userId: string | null | undefined): Promise<void> {
     if (!userId || !isLiveWritesEnabled()) {
@@ -172,13 +172,34 @@ export const savedJobsService = {
 
       const key = getStorageKey(userId);
       const currentList = savedJobsService.getSavedJobs(userId);
-      // Giữ lại các demo mock jobs trong local
-      const mockItems = currentList.filter((item) => item.isMock);
-      const merged = [...remoteItems, ...mockItems];
+      const remoteIdSet = new Set(remoteItems.map((r) => String(r.id)));
+
+      // Bảo toàn các bookmark cục bộ (bao gồm cả mock và real jobs chưa kịp sync lên server)
+      const preservedLocal: SavedJobItem[] = [];
+
+      for (const item of currentList) {
+        const idStr = String(item.id);
+        if (remoteIdSet.has(idStr)) {
+          continue; // Đã có trên remote
+        }
+
+        // Nếu là job thực tế (UUID) chưa có trên server, gửi request lưu lên backend
+        if (!item.isMock && typeof item.id === "string") {
+          try {
+            await candidateSavedJobsApi.save(item.id);
+          } catch {
+            // Lưu thất bại hoặc mạng chập chờn: tiếp tục bảo toàn trong local để không mất bookmark
+          }
+        }
+
+        preservedLocal.push(item);
+      }
+
+      const merged = [...remoteItems, ...preservedLocal];
       localStorage.setItem(key, JSON.stringify(merged));
       window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { userId, action: "sync" } }));
     } catch {
-      // Fallback an toàn về local storage nếu offline
+      // Fallback an toàn về local storage nếu offline: bảo toàn nguyên vẹn danh sách cục bộ
     }
   },
 

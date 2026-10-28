@@ -14,54 +14,20 @@ import {
 } from "@/features/resume/builder/hooks/useResumeBuilder";
 import { useAuthStore } from "@/store/authStore";
 import { resumeService } from "@/features/resume/services/resumeService";
-import type { Resume } from "@/features/resume/types/resume.types";
+import type { Resume, ResumeBuilderContent, ResumeBuilderSettings, ResumeTemplateCode } from "@/features/resume/types/resume.types";
 
 import styles from "./ResumeBuilderPage.module.css";
 
 
-const DRAFT_PREFIX = "findwork.builder.draft";
-const getDraftKey = (userId: string | null | undefined, resumeId: string | null | undefined) =>
-  `${DRAFT_PREFIX}.${userId ?? "anon"}.${resumeId ?? "new"}`;
+import {
+  type BuilderDraft,
+  saveBuilderDraft,
+  loadBuilderDraft,
+  clearBuilderDraft,
+} from "@/features/resume/builder/utils/builderDraftStorage";
 
-interface BuilderDraft {
-  resumeName: string;
-  templateCode: any;
-  content: any;
-  settings: any;
-  savedAt: number;
-}
-
-function saveBuilderDraft(userId: string | null | undefined, resumeId: string | null | undefined, draft: Omit<BuilderDraft, "savedAt">) {
-  if (typeof window === "undefined") return;
-  try {
-    const key = getDraftKey(userId, resumeId);
-    window.sessionStorage.setItem(key, JSON.stringify({ ...draft, savedAt: Date.now() }));
-  } catch {
-    // Best effort
-  }
-}
-
-function loadBuilderDraft(userId: string | null | undefined, resumeId: string | null | undefined): BuilderDraft | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const key = getDraftKey(userId, resumeId);
-    const raw = window.sessionStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as BuilderDraft;
-  } catch {
-    return null;
-  }
-}
-
-function clearBuilderDraft(userId: string | null | undefined, resumeId: string | null | undefined) {
-  if (typeof window === "undefined") return;
-  try {
-    const key = getDraftKey(userId, resumeId);
-    window.sessionStorage.removeItem(key);
-  } catch {
-    // Best effort
-  }
-}
+export type { BuilderDraft };
+export { saveBuilderDraft, loadBuilderDraft, clearBuilderDraft };
 
 const ResumeBuilderPage = () => {
   const { resumeId } = useParams();
@@ -159,17 +125,31 @@ const ResumeBuilderEditor = ({
   const builder = useResumeBuilder(initialState);
   const isEditing = Boolean(existingResume);
 
-  // Auto-save draft so changes are never lost on refresh
+  // Auto-save draft with immediate flush on beforeunload/pagehide/unmount so typing is never lost
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const flushDraft = () => {
       saveBuilderDraft(userId, existingResume?.id, {
         resumeName: builder.resumeName,
         templateCode: builder.templateCode,
         content: builder.content,
         settings: builder.settings,
       });
-    }, 400);
-    return () => clearTimeout(timer);
+    };
+
+    const timer = setTimeout(flushDraft, 300);
+    if (typeof window !== "undefined") {
+      window.addEventListener("beforeunload", flushDraft);
+      window.addEventListener("pagehide", flushDraft);
+    }
+
+    return () => {
+      clearTimeout(timer);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("beforeunload", flushDraft);
+        window.removeEventListener("pagehide", flushDraft);
+      }
+      flushDraft();
+    };
   }, [userId, existingResume?.id, builder.resumeName, builder.templateCode, builder.content, builder.settings]);
 
   const handleSave = async () => {

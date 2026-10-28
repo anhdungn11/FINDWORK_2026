@@ -177,7 +177,3 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return promise;
   },
 }));
-
-if (typeof window !== "undefined") {
-  (window as any).__FINDWORK_AUTH_STORE__ = useAuthStore;
-}
