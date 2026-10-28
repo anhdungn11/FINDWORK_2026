@@ -7,7 +7,12 @@ import { EmailDeliverySettings } from "./email-delivery-settings.service";
 export type RecruitmentNotice =
   | { kind: "APPLICATION_CONFIRMED"; applicationId: string }
   | { kind: "APPLICATION_STATUS"; applicationId: string; status: string; version: number }
-  | { kind: "INTERVIEW_INVITATION"; applicationId: string; interviewId: string; scheduledAt: Date };
+  | { kind: "INTERVIEW_INVITATION"; applicationId: string; interviewId: string; scheduledAt: Date }
+  | { kind: "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED"; applicationId: string;
+      interviewId: string; scheduledAt: Date; eventId: string };
+
+const isInterviewNotice = (notice: RecruitmentNotice): notice is Extract<RecruitmentNotice, { interviewId: string }> =>
+  notice.kind.startsWith("INTERVIEW_");
 
 @Injectable()
 export class RecruitmentNotificationService {
@@ -30,20 +35,22 @@ export class RecruitmentNotificationService {
       ? `application:confirmed:${notice.applicationId}`
       : notice.kind === "APPLICATION_STATUS"
         ? `application:status:${notice.applicationId}:${notice.version}`
-        : `interview:invite:${notice.interviewId}`;
+        : notice.kind === "INTERVIEW_INVITATION"
+          ? `interview:invite:${notice.interviewId}`
+          : `interview:${notice.kind.toLowerCase()}:${notice.eventId}`;
     const id = randomUUID();
     const sealed = this.crypto.encrypt(id, "RECRUITMENT_EMAIL", notice.applicationId, {
       version: 1, kind: notice.kind, applicationId: notice.applicationId,
-      interviewId: notice.kind === "INTERVIEW_INVITATION" ? notice.interviewId : null,
+      interviewId: isInterviewNotice(notice) ? notice.interviewId : null,
       recipientUserId: recipient.id, recipient: recipient.emailNormalized,
       jobTitle: application.job.title,
       status: notice.kind === "APPLICATION_STATUS" ? notice.status : null,
-      scheduledAt: notice.kind === "INTERVIEW_INVITATION" ? notice.scheduledAt.toISOString() : null,
+      scheduledAt: isInterviewNotice(notice) ? notice.scheduledAt.toISOString() : null,
       applicationBaseUrl: this.settings.applicationUrl, sender: this.settings.sender,
     });
     await tx.recruitmentEmailOutbox.create({ data: { id, kind: notice.kind,
       applicationId: notice.applicationId,
-      interviewId: notice.kind === "INTERVIEW_INVITATION" ? notice.interviewId : null,
+      interviewId: isInterviewNotice(notice) ? notice.interviewId : null,
       recipientUserId: recipient.id, idempotencyKey,
       payloadCiphertext: Uint8Array.from(sealed.payloadCiphertext),
       payloadNonce: Uint8Array.from(sealed.payloadNonce),

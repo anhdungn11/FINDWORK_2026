@@ -213,6 +213,45 @@ describe("Email delivery fail-closed crypto/config", () => {
     } finally { fetchMock.mockRestore(); }
   });
 
+  it.each([
+    ["INTERVIEW_INVITATION", "FINDWORK interview invitation", "You are invited to interview"],
+    ["INTERVIEW_RESCHEDULED", "FINDWORK interview rescheduled", "has been rescheduled"],
+    ["INTERVIEW_CANCELLED", "FINDWORK interview cancelled", "has been cancelled"],
+  ] as const)("renders distinct %s mail without claiming an interview outcome", async (kind, subject, phrase) => {
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, status: 200,
+      json: async () => ({ id: "mock-notice-id" }) } as Response);
+    try {
+      const service = new EmailProviderService({ mode: "resend", resendApiKey: "fake-only-key",
+        assertCanQueueRecruitment: () => {} } as unknown as EmailDeliverySettings);
+      await service.sendRecruitmentNotice({ to: "candidate@example.invalid", from: "sender@example.invalid",
+        url: "https://example.invalid/applications/one", jobTitle: "Test role", kind,
+        scheduledAt: "2026-11-01T09:00:00.000Z", idempotencyKey: `event:${kind}` });
+      const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+      expect(body.to).toEqual(["candidate@example.invalid"]);
+      expect(body.subject).toBe(subject);
+      expect(body.text).toContain(phrase);
+      expect(body.text).toContain("https://example.invalid/applications/one");
+      expect(body.text).not.toMatch(/successful interview/i);
+    } finally { fetchMock.mockRestore(); }
+  });
+
+  it("describes application INTERVIEW as a stage and OFFERED as an offer", async () => {
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, status: 200,
+      json: async () => ({ id: "mock-notice-id" }) } as Response);
+    try {
+      const service = new EmailProviderService({ mode: "resend", resendApiKey: "fake-only-key",
+        assertCanQueueRecruitment: () => {} } as unknown as EmailDeliverySettings);
+      for (const [status, phrase] of [["INTERVIEW", "interview stage"], ["OFFERED", "received an offer"]] as const) {
+        await service.sendRecruitmentNotice({ to: "candidate@example.invalid", from: "sender@example.invalid",
+          url: "https://example.invalid/applications/one", jobTitle: "Test role",
+          kind: "APPLICATION_STATUS", status, idempotencyKey: `status:${status}` });
+        const body = JSON.parse(String(fetchMock.mock.calls.at(-1)?.[1]?.body));
+        expect(body.text).toContain(phrase);
+        expect(body.text).not.toMatch(/successful interview/i);
+      }
+    } finally { fetchMock.mockRestore(); }
+  });
+
   it("classifies permanent and retryable Resend HTTP failures", async () => {
     const fetchMock = jest.spyOn(globalThis, "fetch");
     try {

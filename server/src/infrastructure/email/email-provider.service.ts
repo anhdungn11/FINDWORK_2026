@@ -22,7 +22,8 @@ export type PasswordResetProviderRequest = {
 };
 export type RecruitmentProviderRequest = {
   to: string; from: string; url: string; jobTitle: string;
-  kind: "APPLICATION_CONFIRMED" | "APPLICATION_STATUS" | "INTERVIEW_INVITATION";
+  kind: "APPLICATION_CONFIRMED" | "APPLICATION_STATUS" | "INTERVIEW_INVITATION" |
+    "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED";
   status?: string; scheduledAt?: string; idempotencyKey: string;
 };
 export class EmailProviderError extends Error {
@@ -34,6 +35,30 @@ export class EmailProviderError extends Error {
 function escapeHtml(input: string): string {
   return input.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** Shared by delivery and the restricted one-job preview. */
+export function renderRecruitmentNotice(input: RecruitmentProviderRequest) {
+  const title = input.jobTitle.slice(0, 200);
+  const subject = input.kind === "APPLICATION_CONFIRMED" ? "FINDWORK application received"
+    : input.kind === "APPLICATION_STATUS" ? "FINDWORK application status update"
+      : input.kind === "INTERVIEW_INVITATION" ? "FINDWORK interview invitation"
+        : input.kind === "INTERVIEW_RESCHEDULED" ? "FINDWORK interview rescheduled"
+          : "FINDWORK interview cancelled";
+  const detail = input.kind === "APPLICATION_CONFIRMED" ? `We received your application for ${title}.`
+    : input.kind === "APPLICATION_STATUS" ? input.status === "INTERVIEW"
+      ? `Your application for ${title} has moved to the interview stage.`
+      : input.status === "OFFERED"
+        ? `Your application for ${title} has received an offer.`
+        : `Your application for ${title} is now ${input.status}.`
+      : input.kind === "INTERVIEW_INVITATION"
+        ? `You are invited to interview for ${title} on ${input.scheduledAt}.`
+        : input.kind === "INTERVIEW_RESCHEDULED"
+          ? `Your interview for ${title} has been rescheduled to ${input.scheduledAt}.`
+          : `Your interview for ${title} scheduled for ${input.scheduledAt} has been cancelled.`;
+  return { from: input.from, to: [input.to], subject,
+    text: `${detail}\n\nView your application: ${input.url}`,
+    html: `<p>${escapeHtml(detail)}</p><p><a href="${escapeHtml(input.url)}">View application</a></p>` };
 }
 
 /** Production adapter: Resend API. No provider call while disabled. */
@@ -74,18 +99,7 @@ export class EmailProviderService {
 
   async sendRecruitmentNotice(input: RecruitmentProviderRequest): Promise<DeliveryResult> {
     this.settings.assertCanQueueRecruitment();
-    const title = input.jobTitle.slice(0, 200);
-    const subject = input.kind === "APPLICATION_CONFIRMED" ? "FINDWORK application received"
-      : input.kind === "APPLICATION_STATUS" ? "FINDWORK application status update"
-        : "FINDWORK interview invitation";
-    const detail = input.kind === "APPLICATION_CONFIRMED" ? `We received your application for ${title}.`
-      : input.kind === "APPLICATION_STATUS" ? `Your application for ${title} is now ${input.status}.`
-        : `Your interview for ${title} is scheduled for ${input.scheduledAt}.`;
-    return this.send(input.idempotencyKey, {
-      from: input.from, to: [input.to], subject,
-      text: `${detail}\n\nView your application: ${input.url}`,
-      html: `<p>${escapeHtml(detail)}</p><p><a href="${escapeHtml(input.url)}">View application</a></p>`,
-    });
+    return this.send(input.idempotencyKey, renderRecruitmentNotice(input));
   }
 
   private async send(idempotencyKey: string, body: Record<string, unknown>): Promise<DeliveryResult> {

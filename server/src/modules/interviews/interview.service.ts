@@ -90,7 +90,7 @@ export class InterviewService {
     const scheduledAt = action === "reschedule" ? this.future(scheduledAtText!) : undefined;
     return this.db.$transaction(async (tx) => {
       const row = await tx.interview.findFirst({ where: { id: interviewId, companyId },
-        select: { status: true, scheduledAt: true } });
+        select: { status: true, scheduledAt: true, applicationId: true } });
       if (!row) throw new NotFoundException({ code: "INTERVIEW_NOT_FOUND" });
       if (row.status !== "SCHEDULED" && row.status !== "RESCHEDULED") throw new ConflictException({ code: "INTERVIEW_STATE_CONFLICT" });
       if (action === "complete" && row.scheduledAt > new Date()) {
@@ -103,10 +103,16 @@ export class InterviewService {
       const status = action === "cancel" ? "CANCELLED" : action === "complete" ? "COMPLETED" : "RESCHEDULED";
       const updated = await tx.interview.update({ where: { id: interviewId },
         data: { status, ...(scheduledAt && { scheduledAt }) }, select: view });
-      await tx.auditLog.create({ data: { actorUserId, companyId, action: `company.interview.${action}`,
+      const event = await tx.auditLog.create({ data: { actorUserId, companyId, action: `company.interview.${action}`,
         targetType: "Interview", targetId: interviewId,
         beforeData: { status: row.status, scheduledAt: row.scheduledAt.toISOString() },
         afterData: { status, scheduledAt: updated.scheduledAt.toISOString() } } });
+      if (action === "reschedule" || action === "cancel") {
+        await this.notifications?.enqueue(tx, { kind: action === "reschedule"
+          ? "INTERVIEW_RESCHEDULED" : "INTERVIEW_CANCELLED",
+          applicationId: row.applicationId, interviewId, scheduledAt: updated.scheduledAt,
+          eventId: event.id });
+      }
       return updated;
     });
   }

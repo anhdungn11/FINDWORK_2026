@@ -7,7 +7,8 @@ import { EmailProviderError, EmailProviderService } from "./email-provider.servi
 
 const scrub = { payloadCiphertext: null, payloadNonce: null, payloadTag: null,
   encryptionKeyId: null, claimedBy: null, leaseUntil: null } as const;
-type Payload = { version: 1; kind: "APPLICATION_CONFIRMED" | "APPLICATION_STATUS" | "INTERVIEW_INVITATION";
+type Payload = { version: 1; kind: "APPLICATION_CONFIRMED" | "APPLICATION_STATUS" |
+  "INTERVIEW_INVITATION" | "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED";
   applicationId: string; interviewId: string | null; recipientUserId: string; recipient: string;
   jobTitle: string; status: string | null; scheduledAt: string | null;
   applicationBaseUrl: string; sender: string };
@@ -15,7 +16,8 @@ type Payload = { version: 1; kind: "APPLICATION_CONFIRMED" | "APPLICATION_STATUS
 function isPayload(value: unknown): value is Payload {
   if (!value || typeof value !== "object") return false;
   const p = value as Record<string, unknown>;
-  return p.version === 1 && ["APPLICATION_CONFIRMED", "APPLICATION_STATUS", "INTERVIEW_INVITATION"].includes(String(p.kind)) &&
+  return p.version === 1 && ["APPLICATION_CONFIRMED", "APPLICATION_STATUS", "INTERVIEW_INVITATION",
+    "INTERVIEW_RESCHEDULED", "INTERVIEW_CANCELLED"].includes(String(p.kind)) &&
     typeof p.applicationId === "string" && typeof p.recipientUserId === "string" &&
     typeof p.recipient === "string" && typeof p.jobTitle === "string" &&
     typeof p.applicationBaseUrl === "string" && typeof p.sender === "string" &&
@@ -29,18 +31,20 @@ export class RecruitmentNotificationWorker {
   constructor(private readonly db: PrismaService, private readonly settings: EmailDeliverySettings,
     private readonly crypto: EmailCryptoService, private readonly provider: EmailProviderService) {}
 
-  async processOne(): Promise<boolean> {
+  // An explicit ID lets an operator test one reviewed notice without draining older jobs.
+  async processOne(onlyJobId?: string): Promise<boolean> {
     if (!this.settings.recruitmentEnabled) return false;
     this.settings.assertCanQueueRecruitment();
     this.crypto.assertReady();
     const keys = await this.db.recruitmentEmailOutbox.findMany({ where: {
-      status: { in: ["QUEUED", "PROCESSING"] } }, distinct: ["encryptionKeyId"],
+      ...(onlyJobId && { id: onlyJobId }), status: { in: ["QUEUED", "PROCESSING"] } }, distinct: ["encryptionKeyId"],
       select: { encryptionKeyId: true } });
     for (const row of keys) this.crypto.assertKeyAvailable(row.encryptionKeyId!);
-    await this.db.recruitmentEmailOutbox.updateMany({ where: { status: "PROCESSING",
+    await this.db.recruitmentEmailOutbox.updateMany({ where: { ...(onlyJobId && { id: onlyJobId }), status: "PROCESSING",
       leaseUntil: { lt: new Date() }, attemptCount: { gte: 8 } },
       data: { status: "FAILED", ...scrub, lastErrorCode: "LEASE_EXHAUSTED" } });
-    const next = await this.db.recruitmentEmailOutbox.findFirst({ where: { attemptCount: { lt: 8 }, OR: [
+    const next = await this.db.recruitmentEmailOutbox.findFirst({ where: { ...(onlyJobId && { id: onlyJobId }),
+      attemptCount: { lt: 8 }, OR: [
       { status: "QUEUED", nextAttemptAt: { lte: new Date() } },
       { status: "PROCESSING", leaseUntil: { lt: new Date() } },
     ] }, orderBy: [{ nextAttemptAt: "asc" }, { createdAt: "asc" }, { id: "asc" }], select: { id: true } });
@@ -80,8 +84,9 @@ export class RecruitmentNotificationWorker {
         recipient.emailNormalized === value.recipient && application?.submittedAt &&
         application.candidateProfile.userId === job.recipientUserId &&
         (value.kind !== "APPLICATION_STATUS" || application.status === value.status) &&
-        (value.kind !== "INTERVIEW_INVITATION" || (interview?.applicationId === job.applicationId &&
-          ["SCHEDULED", "RESCHEDULED"].includes(interview.status) &&
+        (!value.kind.startsWith("INTERVIEW_") || (interview?.applicationId === job.applicationId &&
+          (value.kind === "INTERVIEW_CANCELLED" ? interview.status === "CANCELLED"
+            : ["SCHEDULED", "RESCHEDULED"].includes(interview.status)) &&
           interview.scheduledAt.toISOString() === value.scheduledAt));
       if (!eligible) {
         await this.finish(job.id, owner, "CANCELLED", "RECIPIENT_INELIGIBLE");
