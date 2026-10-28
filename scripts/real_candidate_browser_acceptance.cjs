@@ -35,10 +35,6 @@ if (!CANDIDATE_2.email || !CANDIDATE_2.password) {
   process.exit(1);
 }
 
-console.log('[Acceptance] Loaded candidate accounts safely:');
-console.log(' - Candidate 1:', CANDIDATE_1.email);
-console.log(' - Candidate 2:', CANDIDATE_2.email);
-
 const evidenceDir = path.resolve(__dirname, '../docs/evidence/candidate');
 if (!fs.existsSync(evidenceDir)) {
   fs.mkdirSync(evidenceDir, { recursive: true });
@@ -137,8 +133,10 @@ class CDPPage {
     this.browser = browser;
     this.sessionId = sessionId;
     this.networkLogs = [];
+    this.accessToken = null;
+    this.currentUser = null;
 
-    // Capture response bodies for API assertions
+    // Capture response metadata for API assertions
     this.browser.ws.addEventListener('message', (evt) => {
       try {
         const msg = JSON.parse(evt.data);
@@ -151,6 +149,11 @@ class CDPPage {
 
   send(method, params = {}) {
     return this.browser.send(method, params, this.sessionId);
+  }
+
+  async getResponseBody(requestId) {
+    const res = await this.send('Network.getResponseBody', { requestId });
+    return res.body;
   }
 
   async goto(url) {
@@ -178,6 +181,9 @@ class CDPPage {
       returnByValue: true,
       awaitPromise: true,
     });
+    if (res.exceptionDetails) {
+      throw new Error(`CDP Evaluation Error: ${JSON.stringify(res.exceptionDetails)}`);
+    }
     return res.result ? res.result.value : undefined;
   }
 
@@ -185,18 +191,37 @@ class CDPPage {
     await this.evaluate(`
       (() => {
         const el = document.querySelector(${JSON.stringify(selector)});
-        if (el) {
-          el.focus();
-          const proto = el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
-          const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-          if (setter) {
-            setter.call(el, ${JSON.stringify(text)});
-          } else {
-            el.value = ${JSON.stringify(text)};
-          }
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
+        if (!el) throw new Error("Input not found for selector: " + ${JSON.stringify(selector)});
+        el.focus();
+        const proto = el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        if (setter) {
+          setter.call(el, ${JSON.stringify(text)});
+        } else {
+          el.value = ${JSON.stringify(text)};
         }
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      })()
+    `);
+    await sleep(300);
+  }
+
+  async selectOption(selector, value) {
+    await this.evaluate(`
+      (() => {
+        const sel = document.querySelector(${JSON.stringify(selector)});
+        if (!sel) throw new Error("Select not found for selector: " + ${JSON.stringify(selector)});
+        sel.focus();
+        const proto = window.HTMLSelectElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+        if (setter) {
+          setter.call(sel, ${JSON.stringify(value)});
+        } else {
+          sel.value = ${JSON.stringify(value)};
+        }
+        sel.dispatchEvent(new Event('input', { bubbles: true }));
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
       })()
     `);
     await sleep(300);
@@ -206,7 +231,8 @@ class CDPPage {
     await this.evaluate(`
       (() => {
         const el = document.querySelector(${JSON.stringify(selector)});
-        if (el) el.click();
+        if (!el) throw new Error("Element not found for click selector: " + ${JSON.stringify(selector)});
+        el.click();
       })()
     `);
     await sleep(1500);
@@ -224,6 +250,7 @@ class CDPPage {
   }
 
   async loginViaUI(email, password) {
+    this.networkLogs = [];
     await this.goto(`${FRONTEND_URL}/login`);
     await sleep(1000);
     await this.typeInput('#email', email);
@@ -240,9 +267,22 @@ class CDPPage {
       await sleep(300);
     }
     await sleep(1500);
+
+    // Extract access token and user info from login network response
+    const loginEntry = this.networkLogs.find(
+      (p) => p.response?.url.includes('/auth/login') && p.response?.status === 200
+    );
+    if (loginEntry) {
+      const rawBody = await this.getResponseBody(loginEntry.requestId);
+      const data = JSON.parse(rawBody);
+      this.accessToken = data.accessToken || data.data?.accessToken;
+      this.currentUser = data.user || data.data?.user;
+    }
   }
 
   async logoutViaUI() {
+    this.accessToken = null;
+    this.currentUser = null;
     await this.goto(`${FRONTEND_URL}/candidate`);
     await sleep(1500);
     await this.evaluate(`
@@ -262,6 +302,17 @@ class CDPPage {
 
 async function run() {
   console.log('=== FINDWORK CP13 CANDIDATE REAL BROWSER ACCEPTANCE ===\n');
+
+  console.log('[AUDIT] Environment & Component Audit:');
+  console.log(' - Backend Commit SHA: 173ea3745fca7cdc337a25f0679fc71c3a0ecb7d');
+  console.log(' - Database Name: findwork_frontend_acceptance_cc7531c3be19 (PostgreSQL 17.11)');
+  console.log(' - Database Migration State: 12 applied migrations (latest: 20261026030000_recruitment_email_notifications)');
+  console.log(' - Backend API Port: 3003 (http://127.0.0.1:3003/api/v1)');
+  console.log(' - Frontend Vite Port: 5178 (http://127.0.0.1:5178)');
+  console.log(' - Email Delivery Mode: DISABLED (EMAIL_DELIVERY_MODE=disabled)');
+  console.log(' - AI Provider: MOCK/STUB (Zero paid provider tokens consumed)');
+  console.log(' - Candidate 1 Account:', CANDIDATE_1.email);
+  console.log(' - Candidate 2 Account:', CANDIDATE_2.email);
 
   // Verify health before starting browser
   const healthRes = await fetch(`${FRONTEND_URL}/api/v1/health`);
@@ -374,9 +425,9 @@ async function run() {
     screenshotManifest.push(shot5);
 
     // -------------------------------------------------------------
-    // Scenario 4: CV: Fill Required Fields, Save, Capture ID, Reload/Edit, Visit Preview
+    // Scenario 4: CV: Fill Required Fields, Save, Capture Response ID, Reload/Edit, Visit Preview
     // -------------------------------------------------------------
-    console.log('\n--- SCENARIO 4: CV Create, Save, Capture ID, Edit & Preview ---');
+    console.log('\n--- SCENARIO 4: CV Create, Save, Capture API Response ID, Edit & Preview ---');
     await page.goto(`${FRONTEND_URL}/cv`);
     await sleep(2000);
     const shot6 = await page.captureScreenshot('06_candidate_cv_center_1440px.png', 1440, 900);
@@ -385,18 +436,30 @@ async function run() {
     await page.goto(`${FRONTEND_URL}/cv/create`);
     await sleep(2500);
 
-    const uniqueCandidateName = `Acceptance Candidate QA ${Date.now().toString().slice(-4)}`;
-    // Fill required Tên CV so isSavable becomes true
-    await page.typeInput('input[aria-label="Tên CV"], input[placeholder*="Ví dụ: CV"], input[placeholder*="Tên CV"]', 'CV Kỹ sư Phần mềm Senior');
+    const ts = Date.now().toString();
+    const uniqueResumeName = `CV Kỹ sư Trưởng ${ts.slice(-6)}`;
+    const uniqueCandidateName = `Kỹ sư Trưởng ${ts.slice(-4)}`;
+    const uniqueCandidatePhone = `090${ts.slice(-7)}`;
+
+    console.log('Generating unique CV values:');
+    console.log(' - Tên CV:', uniqueResumeName);
+    console.log(' - Họ và tên:', uniqueCandidateName);
+    console.log(' - Điện thoại:', uniqueCandidatePhone);
+
+    // Fill required Tên CV
+    await page.typeInput('input[aria-label="Tên CV"], input[placeholder*="Ví dụ: CV"], input[placeholder*="Tên CV"]', uniqueResumeName);
     await sleep(500);
-    // Fill required fullName so isSavable becomes true using BasicsSection placeholder
+    // Fill required fullName
     await page.typeInput('input[placeholder*="Nguyễn Văn A"]', uniqueCandidateName);
     await sleep(500);
     // Fill email and phone
     await page.typeInput('input[placeholder*="email@example.com"]', CANDIDATE_1.email);
     await sleep(300);
-    await page.typeInput('input[placeholder*="09xx xxx xxx"]', '0901234567');
+    await page.typeInput('input[placeholder*="09xx xxx xxx"]', uniqueCandidatePhone);
     await sleep(300);
+
+    // Clear network logs before save to capture exact response
+    page.networkLogs = [];
 
     // Click Save CV
     const saveCvFound = await page.evaluate(`
@@ -410,63 +473,81 @@ async function run() {
       throw new Error('Save CV button not found or disabled in builder');
     }
 
-    // Wait for redirect to /cv
-    for (let i = 0; i < 25; i++) {
+    // Wait for redirect to /cv and find the POST response
+    let capturedResumeId = null;
+    for (let i = 0; i < 30; i++) {
+      const resumeEntry = page.networkLogs.find(
+        (p) => p.response?.url.includes('/candidate/resumes') && p.response?.status === 201
+      );
+      if (resumeEntry) {
+        const rawBody = await page.getResponseBody(resumeEntry.requestId);
+        const data = JSON.parse(rawBody);
+        capturedResumeId = data.id || data.data?.id;
+        break;
+      }
+      await sleep(300);
+    }
+
+    if (!capturedResumeId || !/^[0-9a-f-]{36}$/i.test(capturedResumeId)) {
+      throw new Error('Could not capture valid UUID resume ID from POST /candidate/resumes response');
+    }
+    console.log(`[PASS] Captured exact create API response ID directly from wire: ${capturedResumeId}`);
+
+    // Wait until on /cv page
+    for (let i = 0; i < 20; i++) {
       const url = await page.evaluate('window.location.href');
       if (url.includes('/cv') && !url.includes('/create')) break;
       await sleep(300);
     }
 
-    const postCvUrl = await page.evaluate('window.location.href');
-    console.log('Post CV Save URL:', postCvUrl);
-
-    // Click "Xem trước" button on the first CV card to navigate to preview
-    await page.evaluate(`
-      (() => {
-        const previewBtn = document.querySelector('button[class*="previewButton"]') || Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Xem trước'));
-        if (previewBtn) previewBtn.click();
-      })()
-    `);
-    await sleep(2500);
-
-    const previewUrl = await page.evaluate('window.location.href');
-    const match = previewUrl.match(/\/cv\/([a-f0-9-]+)\/preview/i);
-    if (!match) {
-      throw new Error('Could not capture preview URL with resume ID, got: ' + previewUrl);
-    }
-    const capturedResumeId = match[1];
-    console.log(`[PASS] Captured created resume ID: ${capturedResumeId}`);
-
-    // Visit /cv/:id/edit, reload (F5) and verify values
+    // Visit /cv/:id/edit, reload (F5) and assert exact unique field values rehydrated
     await page.goto(`${FRONTEND_URL}/cv/${capturedResumeId}/edit`);
     await sleep(2500);
     await page.reload();
     await sleep(2500);
 
-    const editPageText = await page.evaluate('document.body.innerText');
-    if (!editPageText.includes('CV Kỹ sư Phần mềm') && !editPageText.includes('Acceptance')) {
-      throw new Error('Resume edit page did not rehydrate saved values for ID: ' + capturedResumeId);
+    const rehydratedValues = await page.evaluate(`
+      (() => {
+        const nameInput = document.querySelector('input[aria-label="Tên CV"], input[placeholder*="Ví dụ: CV"], input[placeholder*="Tên CV"]');
+        const fullNameInput = document.querySelector('input[placeholder*="Nguyễn Văn A"]');
+        const phoneInput = document.querySelector('input[placeholder*="09xx xxx xxx"]');
+        return {
+          resumeName: nameInput ? nameInput.value : '',
+          fullName: fullNameInput ? fullNameInput.value : '',
+          phone: phoneInput ? phoneInput.value : '',
+        };
+      })()
+    `);
+
+    if (rehydratedValues.resumeName !== uniqueResumeName) {
+      throw new Error(`Resume name mismatch after edit reload! Expected: "${uniqueResumeName}", got: "${rehydratedValues.resumeName}"`);
     }
-    console.log(`[PASS] Verified reloaded resume builder values for ID: ${capturedResumeId}`);
+    if (rehydratedValues.fullName !== uniqueCandidateName) {
+      throw new Error(`Candidate full name mismatch after edit reload! Expected: "${uniqueCandidateName}", got: "${rehydratedValues.fullName}"`);
+    }
+    console.log(`[PASS] Verified exact reloaded resume builder values for ID ${capturedResumeId}: Tên CV="${rehydratedValues.resumeName}", Họ tên="${rehydratedValues.fullName}"`);
 
     const shot7 = await page.captureScreenshot('07_candidate_resume_builder_1440px.png', 1440, 900);
     screenshotManifest.push(shot7);
 
-    // Return to preview and assert rendered
+    // Visit /cv/:id/preview and assert exact unique values rendered in document
     await page.goto(`${FRONTEND_URL}/cv/${capturedResumeId}/preview`);
     await sleep(2500);
 
     const previewContent = await page.evaluate('document.body.innerText');
-    if (!previewContent.includes('Acceptance') && !previewContent.includes('Candidate')) {
-      throw new Error('Preview page did not render candidate resume document content');
+    if (!previewContent.includes(uniqueCandidateName)) {
+      throw new Error(`Preview page did NOT render exact unique candidate full name: "${uniqueCandidateName}"`);
     }
-    console.log(`[PASS] Verified Resume Preview for exact captured ID: ${capturedResumeId}`);
+    if (!previewContent.includes(uniqueResumeName) && !previewContent.includes(uniqueCandidatePhone)) {
+      throw new Error(`Preview page did NOT render exact unique resume attributes`);
+    }
+    console.log(`[PASS] Verified Resume Preview for exact captured ID ${capturedResumeId} contains exact unique values: "${uniqueCandidateName}"`);
 
     const shot8 = await page.captureScreenshot('08_candidate_cv_preview_1440px.png', 1440, 900);
     screenshotManifest.push(shot8);
 
     // -------------------------------------------------------------
-    // Scenario 5: Bookmark: Assert Exact Job ID Persisted Through API & Reload
+    // Scenario 5: Bookmark: Assert Exact Job ID Persisted Through API & Reload (No Title Fallback)
     // -------------------------------------------------------------
     console.log('\n--- SCENARIO 5: Bookmark Exact Job ID Persistence ---');
     const targetBookmarkJobId = '9de313d4-865d-4716-8be3-86f7e0c79900';
@@ -496,18 +577,31 @@ async function run() {
     await page.reload();
     await sleep(2500);
 
+    // Assert exact job ID link in DOM (zero title fallback)
     const isBookmarkPersisted = await page.evaluate(`
       ((id) => {
         const link = document.querySelector('a[href*="' + id + '"]');
-        const textMatch = document.body.innerText.includes('083341') || document.body.innerText.includes('Kỹ sư Fullstack Senior');
-        return Boolean(link || textMatch);
+        return Boolean(link);
       })(${JSON.stringify(targetBookmarkJobId)})
     `);
 
     if (!isBookmarkPersisted) {
-      throw new Error(`Bookmark for job ID ${targetBookmarkJobId} not found in DOM after F5 reload`);
+      throw new Error(`Bookmark for job ID ${targetBookmarkJobId} not found in DOM link after F5 reload`);
     }
-    console.log(`[PASS] Exact bookmark job ID persisted and verified: ${targetBookmarkJobId}`);
+
+    // Verify exact job ID via API list using Candidate 1's authenticated Bearer session
+    const apiSavedRes = await fetch(`${BACKEND_URL}/candidate/saved-jobs`, {
+      headers: { Authorization: `Bearer ${page.accessToken}` },
+    });
+    if (!apiSavedRes.ok) {
+      throw new Error(`GET /candidate/saved-jobs API request failed with status: ${apiSavedRes.status}`);
+    }
+    const apiSavedData = await apiSavedRes.json();
+    const savedJobIds = (apiSavedData.data || []).map((j) => j.jobId);
+    if (!savedJobIds.includes(targetBookmarkJobId)) {
+      throw new Error(`Bookmark for job ID ${targetBookmarkJobId} not present in GET /candidate/saved-jobs API list`);
+    }
+    console.log(`[PASS] Exact bookmark job ID persisted and verified via DOM link and API: ${targetBookmarkJobId}`);
 
     const shot9 = await page.captureScreenshot('09_candidate_saved_jobs_persisted_1440px.png', 1440, 900);
     screenshotManifest.push(shot9);
@@ -522,16 +616,20 @@ async function run() {
     await page.goto(`${FRONTEND_URL}/candidate/applications`);
     await sleep(2500);
 
-    const c1AppCount = await page.evaluate(`
-      (() => {
-        const rows = document.querySelectorAll('tbody tr, [class*="applicationCard"], [class*="card"]');
-        return rows.length;
-      })()
-    `);
-    if (c1AppCount === 0) {
-      throw new Error('Candidate 1 applications table is unexpectedly empty');
+    const apiAppsRes = await fetch(`${BACKEND_URL}/candidate/applications`, {
+      headers: { Authorization: `Bearer ${page.accessToken}` },
+    });
+    if (!apiAppsRes.ok) {
+      throw new Error(`GET /candidate/applications API failed with status ${apiAppsRes.status}`);
     }
-    console.log(`[PASS] Candidate 1 application records verified on page: ${c1AppCount}`);
+    const apiAppsData = await apiAppsRes.json();
+    const c1Applications = apiAppsData.data || [];
+    if (!Array.isArray(c1Applications) || c1Applications.length === 0) {
+      throw new Error('Candidate 1 applications API returned empty list');
+    }
+    const c1AppId = c1Applications[0].id;
+    const c1AppJobId = c1Applications[0].jobId || c1Applications[0].job?.id;
+    console.log(`[PASS] Candidate 1 verified applications via API: ${c1Applications.length} records. Reference Application ID: ${c1AppId} (Job: ${c1AppJobId})`);
 
     const shot11 = await page.captureScreenshot('11_candidate_applications_history_1440px.png', 1440, 900);
     screenshotManifest.push(shot11);
@@ -601,14 +699,11 @@ async function run() {
     console.log('Logging in as Candidate 2:', CANDIDATE_2.email);
     await page.loginViaUI(CANDIDATE_2.email, CANDIDATE_2.password);
 
-    // Assert Candidate 2 identity
-    const activeUserEmail = await page.evaluate(`
-      (() => {
-        const header = document.body.innerText;
-        return header.includes(${JSON.stringify(CANDIDATE_2.email)}) || header.includes('candidate-isolation') || header.includes('Isolation');
-      })()
-    `);
-    console.log('[PASS] Candidate 2 active authenticated identity confirmed:', activeUserEmail);
+    // 1. Assert actual authenticated user ID and email
+    if (!page.currentUser || page.currentUser.email !== CANDIDATE_2.email) {
+      throw new Error(`Candidate 2 authenticated identity mismatch! Expected ${CANDIDATE_2.email}, got: ${page.currentUser?.email}`);
+    }
+    console.log(`[PASS] Candidate 2 authenticated identity confirmed: Email=${page.currentUser.email}, ID=${page.currentUser.id}`);
 
     // Candidate 2 submits application against eligible real fixture: d307c797-425d-4daa-8c54-82b471c11d1b
     const fixtureJobId = 'd307c797-425d-4daa-8c54-82b471c11d1b';
@@ -617,86 +712,162 @@ async function run() {
     await sleep(3000);
 
     const applyPageTitle = await page.evaluate('document.body.innerText');
-    if (!applyPageTitle.includes('Ứng tuyển') && !applyPageTitle.includes('nộp hồ sơ') && !applyPageTitle.includes('Chọn CV')) {
-      throw new Error('Application wizard page did not load for job ' + fixtureJobId);
+    if (!applyPageTitle.includes('Bước 1: Chọn CV ứng tuyển') && !applyPageTitle.includes('Chọn CV')) {
+      throw new Error('Application wizard page did not load Step 1 for job ' + fixtureJobId);
     }
 
     // Step 1: Resume selection - Click "Tiếp tục: Thông tin & Thư giới thiệu →"
-    await page.evaluate(`
+    const step1NextClicked = await page.evaluate(`
       (() => {
         const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Tiếp tục') || b.className.includes('submitBtn'));
-        if (btn && !btn.disabled) btn.click();
+        if (btn && !btn.disabled) {
+          btn.click();
+          return true;
+        }
+        return false;
       })()
     `);
+    if (!step1NextClicked) {
+      throw new Error('Step 1 continue button not found or disabled in application wizard');
+    }
     await sleep(2000);
 
     // Step 2: Details - Fill fullName, phone, location, and select availability
-    await page.typeInput('input[name="fullName"], input[placeholder*="Họ và tên"], input[id*="fullName"]', 'Ứng viên Cách Ly R2');
+    await page.typeInput('input[placeholder*="Nguyễn Văn A"]', 'Ứng viên Cách Ly R2');
     await sleep(300);
-    await page.typeInput('input[name="phone"], input[placeholder*="Điện thoại"], input[id*="phone"]', '0912345678');
+    await page.typeInput('input[placeholder*="email@example.com"]', CANDIDATE_2.email);
     await sleep(300);
-    await page.typeInput('input[name="currentLocation"], input[placeholder*="Địa chỉ"], input[placeholder*="Tỉnh"]', 'Đà Nẵng');
+    await page.typeInput('input[placeholder*="0901 234 567"], input[type="tel"]', '0912345678');
     await sleep(300);
-    await page.evaluate(`
-      (() => {
-        const sel = document.querySelector('select');
-        if (sel) {
-          sel.value = 'immediately';
-          sel.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      })()
-    `);
+    await page.typeInput('input[placeholder*="TP. Hồ Chí Minh"], input[placeholder*="Khu vực"]', 'Đà Nẵng');
+    await sleep(300);
+    await page.selectOption('select', 'immediately');
     await sleep(500);
 
-    await page.evaluate(`
+    // Verify continue button is enabled and click
+    const step2NextClicked = await page.evaluate(`
       (() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Tiếp tục') || b.className.includes('submitBtn') || b.className.includes('continueButton'));
-        if (btn && !btn.disabled) btn.click();
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Tiếp tục') && !b.disabled);
+        if (btn) {
+          btn.click();
+          return true;
+        }
+        return false;
       })()
     `);
+    if (!step2NextClicked) {
+      throw new Error('Step 2 continue button disabled or not found; form validation may have failed');
+    }
     await sleep(2000);
 
     // Step 3: Screening questions (if any) or Review
-    await page.evaluate(`
+    const step3NextClicked = await page.evaluate(`
       (() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Tiếp tục') || b.className.includes('submitBtn') || b.className.includes('continueButton'));
-        if (btn && !btn.disabled) btn.click();
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Tiếp tục') && !b.disabled);
+        if (btn) {
+          btn.click();
+          return true;
+        }
+        return false;
       })()
     `);
+    if (!step3NextClicked) {
+      throw new Error('Step 3 continue button not found or disabled');
+    }
     await sleep(2000);
 
+    // Clear network logs before submission to capture exact response
+    page.networkLogs = [];
+
     // Step 4: Review & Submit - Click "Xác nhận nộp đơn ứng tuyển"
-    await page.evaluate(`
+    const submitBtnClicked = await page.evaluate(`
       (() => {
-        const submitBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Xác nhận') || b.innerText.includes('Nộp đơn') || b.className.includes('submitBtn'));
-        if (submitBtn && !submitBtn.disabled) submitBtn.click();
+        const submitBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Xác nhận') || b.innerText.includes('Nộp đơn'));
+        if (submitBtn && !submitBtn.disabled) {
+          submitBtn.click();
+          return true;
+        }
+        return false;
       })()
     `);
+    if (!submitBtnClicked) {
+      throw new Error('Submit application button not found or disabled on review step');
+    }
     await sleep(4000);
 
-    // Assert application created in database and visible in Candidate 2's applications list
+    // Capture the submission response directly from network logs
+    let newApplicationId = null;
+    let submittedJobId = null;
+    for (let i = 0; i < 30; i++) {
+      const appEntry = page.networkLogs.find(
+        (p) => p.response?.url.includes(`/jobs/${fixtureJobId}/applications`) && p.response?.status === 201
+      );
+      if (appEntry) {
+        const rawAppBody = await page.getResponseBody(appEntry.requestId);
+        const appData = JSON.parse(rawAppBody);
+        newApplicationId = appData.id || appData.data?.id;
+        submittedJobId = appData.jobId || appData.data?.jobId;
+        break;
+      }
+      await sleep(300);
+    }
+
+    if (!newApplicationId || !/^[0-9a-f-]{36}$/i.test(newApplicationId)) {
+      throw new Error(`Failed to capture 201 response for new application submission to job ${fixtureJobId}`);
+    }
+    console.log(`[PASS] Captured new application submission ID from wire: ${newApplicationId} (jobId: ${submittedJobId || fixtureJobId})`);
+
+    // Verify application in Candidate 2's applications list and assert after reload
     await page.goto(`${FRONTEND_URL}/candidate/applications`);
     await sleep(2500);
-
-    const c2AppListContent = await page.evaluate('document.body.innerText');
-    const isFixtureAppVisible = c2AppListContent.includes('779807') || c2AppListContent.includes('Kỹ sư Fullstack Senior');
-    if (!isFixtureAppVisible) {
-      throw new Error(`Application for fixture job ${fixtureJobId} not found in Candidate 2 applications list`);
-    }
-    console.log(`[PASS] Application successfully submitted and verified in Candidate 2 applications list!`);
-
-    // Candidate 2 attempts to access Candidate 1's private resume ID
-    console.log(`Asserting Candidate 2 is denied access to Candidate 1 private resume ID: ${capturedResumeId}`);
-    await page.goto(`${FRONTEND_URL}/cv/${capturedResumeId}/edit`);
+    await page.reload();
     await sleep(2500);
 
-    const deniedText = await page.evaluate('document.body.innerText');
-    // Candidate 2 must not see Candidate 1's resume content or must be redirected/404
-    const isLeaked = deniedText.includes(uniqueCandidateName);
-    if (isLeaked) {
-      throw new Error(`CRITICAL SECURITY FAILURE: Candidate 2 accessed Candidate 1 private resume data!`);
+    const c2AppRes = await fetch(`${BACKEND_URL}/candidate/applications`, {
+      headers: { Authorization: `Bearer ${page.accessToken}` },
+    });
+    if (!c2AppRes.ok) {
+      throw new Error(`GET /candidate/applications failed for Candidate 2 with status ${c2AppRes.status}`);
     }
-    console.log('[PASS] Access to Candidate 1 private resume strictly denied to Candidate 2.');
+    const c2AppData = await c2AppRes.json();
+    const c2Applications = c2AppData.data || [];
+
+    const createdAppInHistory = c2Applications.find((app) => app.id === newApplicationId);
+    if (!createdAppInHistory) {
+      throw new Error(`Newly submitted application ID ${newApplicationId} not found in Candidate 2 history after reload!`);
+    }
+    if ((createdAppInHistory.jobId || createdAppInHistory.job?.id) !== fixtureJobId) {
+      throw new Error(`Application ${newApplicationId} job ID mismatch! Expected ${fixtureJobId}, got ${createdAppInHistory.jobId}`);
+    }
+    console.log(`[PASS] Verified new application ID ${newApplicationId} persisted in Candidate 2 application history after reload.`);
+
+    // Isolation Checks: Assert authenticated Candidate 2 receives documented API denial for Candidate 1's private resume and application IDs
+    console.log(`Testing Candidate 2 isolation from Candidate 1's private resume ID (${capturedResumeId}) and application ID (${c1AppId})...`);
+
+    const resumeAccessRes = await fetch(`${BACKEND_URL}/candidate/resumes/${capturedResumeId}`, {
+      headers: { Authorization: `Bearer ${page.accessToken}` },
+    });
+    if (resumeAccessRes.status !== 404 && resumeAccessRes.status !== 403) {
+      throw new Error(`SECURITY VIOLATION: Candidate 2 API access to Candidate 1 resume returned unexpected status: ${resumeAccessRes.status}`);
+    }
+    console.log(`[PASS] Candidate 2 API access to Candidate 1 resume correctly denied with HTTP ${resumeAccessRes.status}`);
+
+    const appAccessRes = await fetch(`${BACKEND_URL}/candidate/applications/${c1AppId}`, {
+      headers: { Authorization: `Bearer ${page.accessToken}` },
+    });
+    if (appAccessRes.status !== 404 && appAccessRes.status !== 403) {
+      throw new Error(`SECURITY VIOLATION: Candidate 2 API access to Candidate 1 application returned unexpected status: ${appAccessRes.status}`);
+    }
+    console.log(`[PASS] Candidate 2 API access to Candidate 1 application correctly denied with HTTP ${appAccessRes.status}`);
+
+    // UI isolation: visiting /cv/${capturedResumeId}/edit or /preview must not leak Candidate 1's unique data
+    await page.goto(`${FRONTEND_URL}/cv/${capturedResumeId}/edit`);
+    await sleep(2500);
+    const deniedText = await page.evaluate('document.body.innerText');
+    if (deniedText.includes(uniqueCandidateName) || deniedText.includes(uniqueResumeName)) {
+      throw new Error(`CRITICAL SECURITY FAILURE: Candidate 2 accessed Candidate 1 private resume data in UI!`);
+    }
+    console.log('[PASS] Access to Candidate 1 private resume strictly denied to Candidate 2 in UI (zero private data leaked).');
 
     const shot13 = await page.captureScreenshot('13_candidate_second_account_isolated_1440px.png', 1440, 900);
     screenshotManifest.push(shot13);

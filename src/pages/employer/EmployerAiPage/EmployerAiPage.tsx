@@ -71,8 +71,8 @@ export const EmployerAiPage: React.FC = () => {
   // Permissions check
   const hasAiAccess = canUseBusinessAi(active?.memberRoleNames);
 
-  // --- TAB 1: DRAFT JOB STATE ---
-  const [draftForm, setDraftForm] = useState<DraftJobRequest>({
+  // Initial form templates for clean company scoping and isolation
+  const INITIAL_DRAFT_FORM: DraftJobRequest = {
     title: "",
     department: "",
     employmentType: "FULL_TIME",
@@ -84,72 +84,115 @@ export const EmployerAiPage: React.FC = () => {
     responsibilitiesBrief: "",
     requirementsBrief: "",
     tone: "PROFESSIONAL",
-  });
+  };
+
+  const INITIAL_IMPROVE_FORM: ImproveJobRequest = {
+    jobId: undefined,
+    title: "",
+    description: "",
+    requirements: "",
+    focusArea: "ALL",
+  };
+
+  const INITIAL_SCREENING_FORM: ScreeningQuestionsRequest = {
+    jobTitle: "",
+    keySkills: [],
+    experienceYears: 2,
+    questionCount: 4,
+  };
+
+  const INITIAL_INTERVIEW_FORM: InterviewQuestionsRequest = {
+    jobTitle: "",
+    level: "MIDDLE",
+    stage: "TECHNICAL",
+    focusSkills: [],
+    customContext: "",
+  };
+
+  const INITIAL_PLAN_FORM: RecruitmentPlanRequest = {
+    jobTitle: "",
+    targetHires: 1,
+    targetTimelineDays: 30,
+    urgencyLevel: "NORMAL",
+  };
+
+  // --- TAB 1: DRAFT JOB STATE ---
+  const [draftForm, setDraftForm] = useState<DraftJobRequest>(INITIAL_DRAFT_FORM);
   const [skillsInput, setSkillsInput] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
   const [draftResult, setDraftResult] = useState<DraftJobResponse | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
 
   // --- TAB 2: IMPROVE JOB STATE ---
-  const [improveForm, setImproveForm] = useState<ImproveJobRequest>({
-    title: "",
-    description: "",
-    requirements: "",
-    focusArea: "ALL",
-  });
+  const [improveForm, setImproveForm] = useState<ImproveJobRequest>(INITIAL_IMPROVE_FORM);
   const [improveLoading, setImproveLoading] = useState(false);
   const [improveResult, setImproveResult] = useState<ImproveJobResponse | null>(null);
   const [improveError, setImproveError] = useState<string | null>(null);
 
   // --- TAB 3: SCREENING QUESTIONS STATE ---
-  const [screeningForm, setScreeningForm] = useState<ScreeningQuestionsRequest>({
-    jobTitle: "",
-    keySkills: [],
-    experienceYears: 2,
-    questionCount: 4,
-  });
+  const [screeningForm, setScreeningForm] = useState<ScreeningQuestionsRequest>(INITIAL_SCREENING_FORM);
   const [screeningSkillsInput, setScreeningSkillsInput] = useState("");
   const [screeningLoading, setScreeningLoading] = useState(false);
   const [screeningResult, setScreeningResult] = useState<ScreeningQuestionsResponse | null>(null);
   const [screeningError, setScreeningError] = useState<string | null>(null);
 
   // --- TAB 4: INTERVIEW QUESTIONS STATE ---
-  const [interviewForm, setInterviewForm] = useState<InterviewQuestionsRequest>({
-    jobTitle: "",
-    level: "MIDDLE",
-    stage: "TECHNICAL",
-    focusSkills: [],
-    customContext: "",
-  });
+  const [interviewForm, setInterviewForm] = useState<InterviewQuestionsRequest>(INITIAL_INTERVIEW_FORM);
   const [interviewSkillsInput, setInterviewSkillsInput] = useState("");
   const [interviewLoading, setInterviewLoading] = useState(false);
   const [interviewResult, setInterviewResult] = useState<InterviewQuestionsResponse | null>(null);
   const [interviewError, setInterviewError] = useState<string | null>(null);
 
   // --- TAB 5: RECRUITMENT PLAN STATE ---
-  const [planForm, setPlanForm] = useState<RecruitmentPlanRequest>({
-    jobTitle: "",
-    targetHires: 1,
-    targetTimelineDays: 30,
-    urgencyLevel: "NORMAL",
-  });
+  const [planForm, setPlanForm] = useState<RecruitmentPlanRequest>(INITIAL_PLAN_FORM);
   const [planLoading, setPlanLoading] = useState(false);
   const [planResult, setPlanResult] = useState<RecruitmentPlanResponse | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
 
-  // Reference tracking active company and in-flight request controller
-  const activeCompanyIdRef = React.useRef<string | undefined>(active?.id);
-  const abortControllerRef = React.useRef<AbortController | null>(null);
+  // Reference tracking active company and dedicated per-action request controllers
+  // to prevent shared-controller cancellation from leaving unrelated actions stuck loading.
+  type ActionKey = "probe" | "draft" | "improve" | "screening" | "interview" | "plan";
 
-  // Clear/scope Business AI state and reject late responses on company switch
+  const activeCompanyIdRef = React.useRef<string | undefined>(active?.id);
+  const actionControllersRef = React.useRef<Record<ActionKey, AbortController | null>>({
+    probe: null,
+    draft: null,
+    improve: null,
+    screening: null,
+    interview: null,
+    plan: null,
+  });
+
+  // Clear/scope Business AI state, reset form inputs, and cancel all requests on company switch
   useEffect(() => {
     activeCompanyIdRef.current = active?.id;
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
+    // Abort all in-flight requests across all actions
+    Object.values(actionControllersRef.current).forEach((ctrl) => ctrl?.abort());
+    actionControllersRef.current = {
+      probe: null,
+      draft: null,
+      improve: null,
+      screening: null,
+      interview: null,
+      plan: null,
+    };
 
+    // Reset company-specific forms and selected job to guarantee isolation
+    setDraftForm(INITIAL_DRAFT_FORM);
+    setSkillsInput("");
+
+    setImproveForm(INITIAL_IMPROVE_FORM);
+
+    setScreeningForm(INITIAL_SCREENING_FORM);
+    setScreeningSkillsInput("");
+
+    setInterviewForm(INITIAL_INTERVIEW_FORM);
+    setInterviewSkillsInput("");
+
+    setPlanForm(INITIAL_PLAN_FORM);
+
+    // Reset results, errors and loading indicators
     setDraftResult(null);
     setDraftError(null);
     setDraftLoading(false);
@@ -193,10 +236,15 @@ export const EmployerAiPage: React.FC = () => {
     }
     return () => {
       unmounted = true;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
+      Object.values(actionControllersRef.current).forEach((ctrl) => ctrl?.abort());
+      actionControllersRef.current = {
+        probe: null,
+        draft: null,
+        improve: null,
+        screening: null,
+        interview: null,
+        plan: null,
+      };
     };
   }, [active?.id]);
 
@@ -204,9 +252,9 @@ export const EmployerAiPage: React.FC = () => {
   const handleProbeBackend = async () => {
     if (!active?.id) return;
     const requestCompanyId = active.id;
-    abortControllerRef.current?.abort();
+    actionControllersRef.current.probe?.abort();
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    actionControllersRef.current.probe = controller;
 
     setProbingBackend(true);
     const endpoint = `/companies/${requestCompanyId}/ai/status`;
@@ -247,8 +295,11 @@ export const EmployerAiPage: React.FC = () => {
         timestamp: new Date().toLocaleTimeString("vi-VN"),
       });
     } finally {
-      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
-        setProbingBackend(false);
+      if (actionControllersRef.current.probe === controller) {
+        actionControllersRef.current.probe = null;
+        if (requestCompanyId === activeCompanyIdRef.current) {
+          setProbingBackend(false);
+        }
       }
     }
   };
@@ -267,9 +318,9 @@ export const EmployerAiPage: React.FC = () => {
     e.preventDefault();
     if (!draftForm.title.trim() || !active?.id) return;
     const requestCompanyId = active.id;
-    abortControllerRef.current?.abort();
+    actionControllersRef.current.draft?.abort();
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    actionControllersRef.current.draft = controller;
 
     setDraftLoading(true);
     setDraftError(null);
@@ -293,8 +344,11 @@ export const EmployerAiPage: React.FC = () => {
       setDraftResult(null);
       setDraftError((err as Error).message);
     } finally {
-      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
-        setDraftLoading(false);
+      if (actionControllersRef.current.draft === controller) {
+        actionControllersRef.current.draft = null;
+        if (requestCompanyId === activeCompanyIdRef.current) {
+          setDraftLoading(false);
+        }
       }
     }
   };
@@ -304,9 +358,9 @@ export const EmployerAiPage: React.FC = () => {
     e.preventDefault();
     if (!improveForm.title.trim() || !active?.id) return;
     const requestCompanyId = active.id;
-    abortControllerRef.current?.abort();
+    actionControllersRef.current.improve?.abort();
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    actionControllersRef.current.improve = controller;
 
     setImproveLoading(true);
     setImproveError(null);
@@ -320,8 +374,11 @@ export const EmployerAiPage: React.FC = () => {
       setImproveResult(null);
       setImproveError((err as Error).message);
     } finally {
-      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
-        setImproveLoading(false);
+      if (actionControllersRef.current.improve === controller) {
+        actionControllersRef.current.improve = null;
+        if (requestCompanyId === activeCompanyIdRef.current) {
+          setImproveLoading(false);
+        }
       }
     }
   };
@@ -331,9 +388,9 @@ export const EmployerAiPage: React.FC = () => {
     e.preventDefault();
     if (!screeningForm.jobTitle.trim() || !active?.id) return;
     const requestCompanyId = active.id;
-    abortControllerRef.current?.abort();
+    actionControllersRef.current.screening?.abort();
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    actionControllersRef.current.screening = controller;
 
     setScreeningLoading(true);
     setScreeningError(null);
@@ -357,8 +414,11 @@ export const EmployerAiPage: React.FC = () => {
       setScreeningResult(null);
       setScreeningError((err as Error).message);
     } finally {
-      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
-        setScreeningLoading(false);
+      if (actionControllersRef.current.screening === controller) {
+        actionControllersRef.current.screening = null;
+        if (requestCompanyId === activeCompanyIdRef.current) {
+          setScreeningLoading(false);
+        }
       }
     }
   };
@@ -368,9 +428,9 @@ export const EmployerAiPage: React.FC = () => {
     e.preventDefault();
     if (!interviewForm.jobTitle.trim() || !active?.id) return;
     const requestCompanyId = active.id;
-    abortControllerRef.current?.abort();
+    actionControllersRef.current.interview?.abort();
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    actionControllersRef.current.interview = controller;
 
     setInterviewLoading(true);
     setInterviewError(null);
@@ -394,8 +454,11 @@ export const EmployerAiPage: React.FC = () => {
       setInterviewResult(null);
       setInterviewError((err as Error).message);
     } finally {
-      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
-        setInterviewLoading(false);
+      if (actionControllersRef.current.interview === controller) {
+        actionControllersRef.current.interview = null;
+        if (requestCompanyId === activeCompanyIdRef.current) {
+          setInterviewLoading(false);
+        }
       }
     }
   };
@@ -405,9 +468,9 @@ export const EmployerAiPage: React.FC = () => {
     e.preventDefault();
     if (!planForm.jobTitle.trim() || !active?.id) return;
     const requestCompanyId = active.id;
-    abortControllerRef.current?.abort();
+    actionControllersRef.current.plan?.abort();
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    actionControllersRef.current.plan = controller;
 
     setPlanLoading(true);
     setPlanError(null);
@@ -421,8 +484,11 @@ export const EmployerAiPage: React.FC = () => {
       setPlanResult(null);
       setPlanError((err as Error).message);
     } finally {
-      if (requestCompanyId === activeCompanyIdRef.current && !controller.signal.aborted) {
-        setPlanLoading(false);
+      if (actionControllersRef.current.plan === controller) {
+        actionControllersRef.current.plan = null;
+        if (requestCompanyId === activeCompanyIdRef.current) {
+          setPlanLoading(false);
+        }
       }
     }
   };
@@ -964,6 +1030,7 @@ export const EmployerAiPage: React.FC = () => {
                   <select
                     id={`${idPrefix}-improve-select-job`}
                     className={styles.select}
+                    value={improveForm.jobId || ""}
                     onChange={(e) => {
                       const selected = companyJobs.find((j) => j.id === e.target.value);
                       if (selected) {
@@ -971,6 +1038,11 @@ export const EmployerAiPage: React.FC = () => {
                           ...prev,
                           jobId: selected.id,
                           title: selected.title,
+                        }));
+                      } else {
+                        setImproveForm((prev) => ({
+                          ...prev,
+                          jobId: undefined,
                         }));
                       }
                     }}

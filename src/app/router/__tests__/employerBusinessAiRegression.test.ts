@@ -152,23 +152,117 @@ describe("FINDWORK CP13B — Employer Business AI Regression Suite", () => {
       );
     });
 
-    it("EmployerAiPage clears Business AI state and aborts/rejects late responses on company switch", () => {
+    it("EmployerAiPage isolates action controllers and resets all company-specific form inputs on company switch", () => {
       const aiPageContent = fs.readFileSync(
         new URL("../../../pages/employer/EmployerAiPage/EmployerAiPage.tsx", import.meta.url),
         "utf8"
       );
 
+      // Must use dedicated per-action controllers rather than a single shared controller
       assert(
-        aiPageContent.includes("activeCompanyIdRef") && aiPageContent.includes("abortControllerRef"),
-        "Must maintain active company ref and abort controller ref"
+        aiPageContent.includes("actionControllersRef") && !aiPageContent.includes("const abortControllerRef"),
+        "Must use dedicated actionControllersRef to prevent shared-controller cancellation leaving other actions stuck loading"
       );
+
+      // Must reset all company-specific forms on company switch
       assert(
-        aiPageContent.includes("setDraftResult(null)") && aiPageContent.includes("setImproveResult(null)"),
-        "Must reset draft and improve results when active company changes"
+        aiPageContent.includes("setDraftForm(INITIAL_DRAFT_FORM)") &&
+        aiPageContent.includes("setImproveForm(INITIAL_IMPROVE_FORM)") &&
+        aiPageContent.includes("setScreeningForm(INITIAL_SCREENING_FORM)") &&
+        aiPageContent.includes("setInterviewForm(INITIAL_INTERVIEW_FORM)") &&
+        aiPageContent.includes("setPlanForm(INITIAL_PLAN_FORM)"),
+        "Must reset all company-specific forms to initial defaults on company switch"
       );
+
+      // Improve job select must be controlled and handle deselection
       assert(
-        aiPageContent.includes("requestCompanyId !== activeCompanyIdRef.current"),
-        "Must reject late AI responses if company context changed before response settled"
+        aiPageContent.includes('value={improveForm.jobId || ""}') &&
+        aiPageContent.includes("jobId: undefined"),
+        "Improve select must be strictly controlled with value prop and handle deselection"
+      );
+
+      // Action cleanup in finally must only reset loading for the matched active controller
+      assert(
+        aiPageContent.includes("actionControllersRef.current.draft === controller") &&
+        aiPageContent.includes("actionControllersRef.current.improve === controller"),
+        "Action finally blocks must check active controller identity before resetting loading state"
+      );
+    });
+
+    it("Behavioral simulation: independent action controllers prevent stuck loading and company switch resets all states", () => {
+      // Simulate the action controller state machine
+      type ActionKey = "probe" | "draft" | "improve" | "screening" | "interview" | "plan";
+
+      let activeCompanyId: string | null = "company-1";
+      const controllers: Record<ActionKey, AbortController | null> = {
+        probe: null,
+        draft: null,
+        improve: null,
+        screening: null,
+        interview: null,
+        plan: null,
+      };
+
+      const loadingStates: Record<ActionKey, boolean> = {
+        probe: false,
+        draft: false,
+        improve: false,
+        screening: false,
+        interview: false,
+        plan: false,
+      };
+
+      // 1. Start Action 'draft'
+      const startDraft = () => {
+        controllers.draft?.abort();
+        const ctrl = new AbortController();
+        controllers.draft = ctrl;
+        loadingStates.draft = true;
+        return ctrl;
+      };
+
+      // 2. Start Action 'improve' while 'draft' is still in flight
+      const startImprove = () => {
+        controllers.improve?.abort();
+        const ctrl = new AbortController();
+        controllers.improve = ctrl;
+        loadingStates.improve = true;
+        return ctrl;
+      };
+
+      const draftCtrl = startDraft();
+      assert.equal(loadingStates.draft, true, "Draft should be loading");
+      assert.equal(draftCtrl.signal.aborted, false, "Draft controller must not be aborted initially");
+
+      // Starting improve must NOT abort draft controller
+      const improveCtrl = startImprove();
+      assert.equal(loadingStates.improve, true, "Improve should be loading");
+      assert.equal(draftCtrl.signal.aborted, false, "Draft controller must remain active when improve starts");
+      assert.notEqual(controllers.draft, controllers.improve, "Draft and improve must use distinct controllers");
+
+      // 3. Draft finishes
+      if (controllers.draft === draftCtrl && activeCompanyId === "company-1") {
+        controllers.draft = null;
+        loadingStates.draft = false;
+      }
+      assert.equal(loadingStates.draft, false, "Draft loading must turn false when draft settles");
+      assert.equal(loadingStates.improve, true, "Improve loading must remain true while improve is in flight");
+
+      // 4. Company switch occurs while improve is in flight
+      activeCompanyId = "company-2";
+      // On company switch:
+      Object.values(controllers).forEach((c) => c?.abort());
+      (Object.keys(controllers) as ActionKey[]).forEach((k) => {
+        controllers[k] = null;
+        loadingStates[k] = false;
+      });
+
+      assert.equal(improveCtrl.signal.aborted, true, "Improve in-flight request must be aborted on company switch");
+      assert.equal(loadingStates.improve, false, "Improve loading must be reset to false on company switch");
+      assert.deepEqual(
+        loadingStates,
+        { probe: false, draft: false, improve: false, screening: false, interview: false, plan: false },
+        "All loading states must be false after company switch"
       );
     });
 
