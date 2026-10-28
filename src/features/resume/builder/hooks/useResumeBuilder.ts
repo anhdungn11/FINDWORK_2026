@@ -88,6 +88,8 @@ export interface ResumeBuilderInitialState {
   settings: ResumeBuilderSettings;
 }
 
+export { INITIAL_CONTENT, INITIAL_SETTINGS };
+
 export const useResumeBuilder = (initialState?: ResumeBuilderInitialState) => {
   const [resumeName, setResumeName] = useState(
     () => initialState?.resumeName ?? "CV mới",

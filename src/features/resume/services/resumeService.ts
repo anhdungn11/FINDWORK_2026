@@ -62,6 +62,19 @@ const revokePreviewLater = (previewUrl: string | undefined) => {
   }
 };
 
+const syncStoreForCurrentUser = () => {
+  const currentOwner = useAuthStore.getState().user?.id ?? null;
+  if (currentOwner !== ownerId) {
+    for (const resume of resumeStore) {
+      revokePreviewLater(resume.currentVersion?.file?.previewUrl);
+    }
+    ownerId = currentOwner;
+    resumeStore = readStoredBuilderResumes(ownerId);
+  } else if (ownerId && resumeStore.length === 0) {
+    resumeStore = readStoredBuilderResumes(ownerId);
+  }
+};
+
 useAuthStore.subscribe((state) => {
   const nextOwnerId = state.user?.id ?? null;
   if (nextOwnerId !== ownerId) {
@@ -176,6 +189,7 @@ export const resumeService = {
    * Nếu có lỗi hoặc người dùng chưa tạo CandidateProfile (404), trả về danh sách sessionStorage cách ly.
    */
   async list(): Promise<Resume[]> {
+    syncStoreForCurrentUser();
     const auth = useAuthStore.getState();
     if (auth.accessToken && auth.user?.id) {
       try {
@@ -200,6 +214,7 @@ export const resumeService = {
   },
 
   async getById(resumeId: string): Promise<Resume | null> {
+    syncStoreForCurrentUser();
     const auth = useAuthStore.getState();
     if (auth.accessToken && auth.user?.id) {
       try {
@@ -212,11 +227,19 @@ export const resumeService = {
         // Fallback xuống local store nếu không tìm thấy trên remote
       }
     }
-    const resume = resumeStore.find((item) => item.id === resumeId);
+    let resume = resumeStore.find((item) => item.id === resumeId);
+    if (!resume && auth.user?.id) {
+      const freshStored = readStoredBuilderResumes(auth.user.id);
+      resume = freshStored.find((item) => item.id === resumeId);
+      if (resume) {
+        resumeStore = freshStored;
+      }
+    }
     return resume ? clone(resume) : null;
   },
 
   async createUploadedResume({ name, file }: CreateUploadedResumeInput): Promise<Resume> {
+    syncStoreForCurrentUser();
     ensureCapacity();
     ensureValidPdf(file);
 
@@ -243,6 +266,7 @@ export const resumeService = {
     content,
     settings,
   }: CreateBuilderResumeInput): Promise<Resume> {
+    syncStoreForCurrentUser();
     ensureCapacity();
     const cleanName = ensureResumeName(name);
 
@@ -289,6 +313,7 @@ export const resumeService = {
   },
 
   async renameResume({ resumeId, name }: RenameResumeInput): Promise<Resume[]> {
+    syncStoreForCurrentUser();
     findResume(resumeId);
     const nextName = ensureResumeName(name);
     const now = new Date().toISOString();
@@ -307,6 +332,7 @@ export const resumeService = {
     resumeId,
     file,
   }: ReplaceUploadedResumeInput): Promise<Resume[]> {
+    syncStoreForCurrentUser();
     const current = findResume(resumeId);
     if (current.sourceType !== "uploaded") {
       throw new Error("Chỉ CV PDF đã tải lên mới có thể thay file.");
@@ -343,6 +369,7 @@ export const resumeService = {
     content,
     settings,
   }: UpdateBuilderResumeInput): Promise<Resume> {
+    syncStoreForCurrentUser();
     const cleanName = ensureResumeName(name);
 
     if (isLiveWritesEnabled()) {
@@ -400,6 +427,7 @@ export const resumeService = {
   },
 
   async setDefaultResume(resumeId: string): Promise<Resume[]> {
+    syncStoreForCurrentUser();
     findResume(resumeId);
     const now = new Date().toISOString();
 
@@ -414,6 +442,7 @@ export const resumeService = {
   },
 
   async deleteResume(resumeId: string): Promise<Resume[]> {
+    syncStoreForCurrentUser();
     const deletingResume = findResume(resumeId);
     const previewUrl = deletingResume.currentVersion.file?.previewUrl;
 

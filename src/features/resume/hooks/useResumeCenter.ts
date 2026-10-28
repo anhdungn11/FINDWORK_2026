@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { resumeService } from "@/features/resume/services/resumeService";
+import { useAuthStore } from "@/store/authStore";
 import type { Resume } from "@/features/resume/types/resume.types";
 import { MAX_RESUME_COUNT } from "@/features/resume/utils/resume.utils";
 
 export const useResumeCenter = () => {
+  const userId = useAuthStore((s) => s.user?.id);
+  const authStatus = useAuthStore((s) => s.status);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,7 +32,7 @@ export const useResumeCenter = () => {
 
   useEffect(() => {
     void loadResumes();
-  }, [loadResumes]);
+  }, [loadResumes, userId, authStatus]);
 
   const addResume = useCallback(async (file: File, name: string) => {
     setError("");
