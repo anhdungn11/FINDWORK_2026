@@ -1,13 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import {
+  Users,
+  Search,
+  Filter,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Lock,
+  Unlock,
+  Eye,
+  X,
+  Copy,
+  Check,
+  RefreshCw,
+} from "lucide-react";
 import { Badge, EmptyState, LoadingBlock, PageHeader, Pagination, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { adminApi, type AdminUserDto } from "@/services/api/adminApi";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
+import { useAuthStore } from "@/store/authStore";
 
-const STATUS_FILTERS = ["", "ACTIVE", "SUSPENDED", "DISABLED"];
+const STATUS_FILTERS = [
+  { value: "", label: "Tất cả trạng thái" },
+  { value: "ACTIVE", label: "Đang hoạt động (ACTIVE)" },
+  { value: "SUSPENDED", label: "Tạm khóa (SUSPENDED)" },
+  { value: "DISABLED", label: "Vô hiệu hóa (DISABLED)" },
+];
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("vi-VN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
 
 const AdminUsersPage = () => {
   const [params, setParams] = useSearchParams();
@@ -15,9 +52,13 @@ const AdminUsersPage = () => {
   const status = params.get("status") ?? "";
   const q = params.get("q") ?? "";
 
+  const currentUser = useAuthStore((s) => s.user);
+
   const [searchInput, setSearchInput] = useState(q);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUserDto | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const writes = isWorkspaceWritesEnabled();
 
@@ -29,6 +70,20 @@ const AdminUsersPage = () => {
       ),
     [page, status, q],
   );
+
+  useEffect(() => {
+    setSearchInput(q);
+  }, [q]);
+
+  // Modal Escape key support
+  useEffect(() => {
+    if (!selectedUser) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedUser(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedUser]);
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -43,15 +98,33 @@ const AdminUsersPage = () => {
     setFilter("q", searchInput.trim());
   };
 
-  const handleStatusChange = async (user: AdminUserDto, nextStatus: "ACTIVE" | "SUSPENDED") => {
-    setBusyId(user.id);
+  const handleClearFilters = () => {
+    setSearchInput("");
+    setParams(new URLSearchParams());
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedId(text);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleStatusChange = async (targetUser: AdminUserDto, nextStatus: "ACTIVE" | "SUSPENDED") => {
+    if (targetUser.id === currentUser?.id) {
+      setNotice({ tone: "error", text: "Quản trị viên không thể tự thay đổi trạng thái của chính mình." });
+      return;
+    }
+    setBusyId(targetUser.id);
     setNotice(null);
     try {
-      await adminApi.setUserStatus(user.id, nextStatus);
+      const updated = await adminApi.setUserStatus(targetUser.id, nextStatus);
       setNotice({
         tone: "ok",
-        text: `Đã cập nhật trạng thái người dùng ${user.email} thành ${nextStatus}.`,
+        text: `Đã cập nhật trạng thái người dùng “${targetUser.email}” thành ${nextStatus}.`,
       });
+      if (selectedUser?.id === targetUser.id) {
+        setSelectedUser(updated);
+      }
       users.reload();
     } catch (e) {
       setNotice({ tone: "error", text: toApiFailure(e).message });
@@ -60,16 +133,25 @@ const AdminUsersPage = () => {
     }
   };
 
-  const handleDisable = async (user: AdminUserDto) => {
-    if (!window.confirm(`Xác nhận vô hiệu hóa vĩnh viễn tài khoản ${user.email}?`)) return;
-    setBusyId(user.id);
+  const handleDisable = async (targetUser: AdminUserDto) => {
+    if (targetUser.id === currentUser?.id) {
+      setNotice({ tone: "error", text: "Quản trị viên không thể tự vô hiệu hóa tài khoản của chính mình." });
+      return;
+    }
+    if (!window.confirm(`Xác nhận vô hiệu hóa vĩnh viễn tài khoản “${targetUser.email}”? Hành động này không thể hoàn tác.`)) {
+      return;
+    }
+    setBusyId(targetUser.id);
     setNotice(null);
     try {
-      await adminApi.disableUser(user.id);
+      await adminApi.disableUser(targetUser.id);
       setNotice({
         tone: "ok",
-        text: `Đã vô hiệu hóa tài khoản ${user.email}.`,
+        text: `Đã vô hiệu hóa vĩnh viễn tài khoản “${targetUser.email}”.`,
       });
+      if (selectedUser?.id === targetUser.id) {
+        setSelectedUser({ ...selectedUser, status: "DISABLED" });
+      }
       users.reload();
     } catch (e) {
       setNotice({ tone: "error", text: toApiFailure(e).message });
@@ -81,158 +163,370 @@ const AdminUsersPage = () => {
   return (
     <>
       <PageHeader
-        title="Quản lý người dùng nền tảng"
-        subtitle="Tra cứu tài khoản, theo dõi tình trạng kích hoạt và quản lý trạng thái tài khoản."
+        title="Quản lý người dùng hệ thống"
+        subtitle="Tra cứu tài khoản, theo dõi tình trạng xác thực email và quản lý trạng thái kích hoạt / khóa tài khoản."
+        actions={
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnOutline}`}
+            onClick={users.reload}
+            disabled={users.loading}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+          >
+            <RefreshCw size={15} className={users.loading ? "spin" : ""} />
+            <span>Làm mới</span>
+          </button>
+        }
       />
 
       {notice && (
         <div
           className={`${ui.notice} ${notice.tone === "error" ? ui.noticeWarn : ""}`}
           role={notice.tone === "error" ? "alert" : "status"}
+          style={{ marginBottom: 20 }}
         >
           {notice.text}
         </div>
       )}
 
-      {/* Filter bar */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20, alignItems: "flex-end" }}>
+      {/* FILTER & SEARCH TOOLBAR */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 20,
+          background: "#ffffff",
+          padding: 16,
+          borderRadius: 10,
+          border: "1px solid var(--color-border, #e2e8f0)",
+          alignItems: "center",
+        }}
+      >
         <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: 8, flex: 1, minWidth: 260 }}>
-          <div className={ui.field} style={{ flex: 1, marginBottom: 0 }}>
-            <label className={ui.label} htmlFor="user-search">
-              Tìm theo Email
-            </label>
+          <div style={{ position: "relative", flex: 1 }}>
+            <Search
+              size={16}
+              color="#94a3b8"
+              style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+            />
             <input
-              id="user-search"
+              type="text"
               className={ui.input}
-              placeholder="Nhập tối thiểu 2 ký tự..."
+              placeholder="Tìm kiếm theo email người dùng..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
+              style={{ paddingLeft: 36 }}
             />
           </div>
-          <button type="submit" className={`${ui.btn} ${ui.btnPrimary}`} style={{ alignSelf: "flex-end" }}>
+          <button type="submit" className={`${ui.btn} ${ui.btnPrimary}`}>
             Tìm kiếm
           </button>
         </form>
 
-        <div className={ui.field} style={{ minWidth: 180, marginBottom: 0 }}>
-          <label className={ui.label} htmlFor="status-filter">
-            Trạng thái
-          </label>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Filter size={16} color="#64748b" />
           <select
-            id="status-filter"
             className={ui.select}
             value={status}
             onChange={(e) => setFilter("status", e.target.value)}
+            style={{ minWidth: 190 }}
           >
             {STATUS_FILTERS.map((s) => (
-              <option key={s} value={s}>
-                {s === "" ? "Tất cả trạng thái" : s}
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
+
+          {(q || status) && (
+            <button
+              type="button"
+              className={`${ui.btn} ${ui.btnOutline}`}
+              onClick={handleClearFilters}
+              title="Xóa bộ lọc"
+            >
+              Đặt lại
+            </button>
+          )}
         </div>
       </div>
 
+      {/* DATA TABLE */}
       {users.loading ? (
-        <LoadingBlock rows={4} label="Đang tải danh sách người dùng" />
+        <LoadingBlock rows={5} label="Đang nạp danh sách tài khoản người dùng" />
       ) : users.error ? (
         <ApiErrorState error={users.error} onRetry={users.reload} />
       ) : !users.data || users.data.data.length === 0 ? (
         <EmptyState
-          title="Không tìm thấy người dùng"
-          text={q || status ? "Không có tài khoản nào phù hợp với bộ lọc hiện tại." : "Hệ thống chưa có người dùng."}
+          title="Không tìm thấy người dùng phù hợp"
+          text={q || status ? "Không có tài khoản nào khớp với bộ lọc hiện tại. Thử xóa bộ lọc để xem toàn bộ danh sách." : "Hệ thống chưa có người dùng nào được tạo."}
+          action={
+            q || status ? (
+              <button type="button" className={`${ui.btn} ${ui.btnOutline}`} onClick={handleClearFilters}>
+                Xóa bộ lọc
+              </button>
+            ) : undefined
+          }
         />
       ) : (
         <>
           <div className={ui.tableWrap}>
             <table className={ui.table}>
-              <caption className={ui.srOnly}>Danh sách người dùng nền tảng</caption>
+              <caption className={ui.srOnly}>Danh sách người dùng hệ thống</caption>
               <thead>
                 <tr>
-                  <th scope="col">Tài khoản (Email)</th>
+                  <th scope="col">Tài khoản Email</th>
                   <th scope="col">Xác thực Email</th>
                   <th scope="col">Trạng thái</th>
-                  <th scope="col">Ngày tạo</th>
-                  <th scope="col">Thao tác</th>
+                  <th scope="col">Ngày đăng ký</th>
+                  <th scope="col" style={{ textAlign: "right" }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {users.data.data.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <strong>{u.email}</strong>
-                      <div className={ui.hint}>ID: {u.id}</div>
-                    </td>
-                    <td>
-                      {u.emailVerifiedAt ? (
-                        <Badge tone="success">Đã xác thực</Badge>
-                      ) : (
-                        <Badge tone="neutral">Chưa xác thực</Badge>
-                      )}
-                    </td>
-                    <td>
-                      <Badge
-                        tone={
-                          u.status === "ACTIVE"
-                            ? "success"
-                            : u.status === "DISABLED"
-                            ? "danger"
-                            : "warning"
-                        }
-                      >
-                        {u.status}
-                      </Badge>
-                    </td>
-                    <td>{u.createdAt ? new Date(u.createdAt).toLocaleDateString("vi-VN") : "—"}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {u.status === "ACTIVE" && (
+                {users.data.data.map((u) => {
+                  const isCurrent = u.id === currentUser?.id;
+                  const isBusy = busyId === u.id;
+                  return (
+                    <tr key={u.id}>
+                      <td>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <span style={{ fontWeight: 600, color: "#1e293b" }}>{u.email}</span>
+                          <span style={{ fontSize: "0.75rem", color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                            ID: {u.id.slice(0, 8)}…
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(u.id)}
+                              style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                              title="Sao chép ID"
+                            >
+                              {copiedId === u.id ? <Check size={12} color="#16a34a" /> : <Copy size={12} color="#94a3b8" />}
+                            </button>
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        {u.emailVerifiedAt ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#16a34a", fontSize: "0.825rem", fontWeight: 600 }}>
+                            <CheckCircle2 size={15} />
+                            <span>Đã xác thực</span>
+                          </span>
+                        ) : (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#d97706", fontSize: "0.825rem" }}>
+                            <AlertTriangle size={15} />
+                            <span>Chưa xác thực</span>
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <Badge
+                          tone={
+                            u.status === "ACTIVE"
+                              ? "success"
+                              : u.status === "SUSPENDED"
+                              ? "warning"
+                              : "danger"
+                          }
+                        >
+                          {u.status === "ACTIVE"
+                            ? "Hoạt động"
+                            : u.status === "SUSPENDED"
+                            ? "Tạm khóa"
+                            : "Vô hiệu hóa"}
+                        </Badge>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: "0.825rem", color: "#64748b" }}>
+                          {formatDate(u.createdAt)}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
                           <button
                             type="button"
-                            className={ui.btn}
-                            disabled={!writes || busyId === u.id}
-                            title={writes ? undefined : "Cổng ghi dữ liệu đang khóa"}
-                            onClick={() => handleStatusChange(u, "SUSPENDED")}
+                            className={`${ui.btn} ${ui.btnOutline}`}
+                            style={{ padding: "4px 8px", fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: 4 }}
+                            onClick={() => setSelectedUser(u)}
+                            title="Xem chi tiết người dùng"
                           >
-                            Tạm đình chỉ
+                            <Eye size={14} />
+                            <span>Chi tiết</span>
                           </button>
-                        )}
-                        {u.status === "SUSPENDED" && (
-                          <button
-                            type="button"
-                            className={`${ui.btn} ${ui.btnPrimary}`}
-                            disabled={!writes || busyId === u.id}
-                            title={writes ? undefined : "Cổng ghi dữ liệu đang khóa"}
-                            onClick={() => handleStatusChange(u, "ACTIVE")}
-                          >
-                            Kích hoạt lại
-                          </button>
-                        )}
-                        {u.status !== "DISABLED" && (
-                          <button
-                            type="button"
-                            className={ui.btn}
-                            disabled={!writes || busyId === u.id}
-                            title={writes ? undefined : "Cổng ghi dữ liệu đang khóa"}
-                            onClick={() => handleDisable(u)}
-                          >
-                            Khóa vĩnh viễn
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+
+                          {u.status !== "DISABLED" && writes && !isCurrent && (
+                            <>
+                              {u.status === "ACTIVE" ? (
+                                <button
+                                  type="button"
+                                  className={`${ui.btn} ${ui.btnOutline}`}
+                                  style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#d97706", borderColor: "#fde68a" }}
+                                  disabled={isBusy}
+                                  onClick={() => handleStatusChange(u, "SUSPENDED")}
+                                  title="Tạm khóa tài khoản này"
+                                >
+                                  <Lock size={13} style={{ marginRight: 3 }} />
+                                  <span>Khóa</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={`${ui.btn} ${ui.btnOutline}`}
+                                  style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#16a34a", borderColor: "#bbf7d0" }}
+                                  disabled={isBusy}
+                                  onClick={() => handleStatusChange(u, "ACTIVE")}
+                                  title="Mở khóa tài khoản này"
+                                >
+                                  <Unlock size={13} style={{ marginRight: 3 }} />
+                                  <span>Mở khóa</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnDanger}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem" }}
+                                disabled={isBusy}
+                                onClick={() => handleDisable(u)}
+                                title="Vô hiệu hóa tài khoản vĩnh viễn"
+                              >
+                                Vô hiệu hóa
+                              </button>
+                            </>
+                          )}
+
+                          {isCurrent && (
+                            <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontStyle: "italic" }}>
+                              (Tài khoản của bạn)
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          <Pagination
-            page={users.data.pagination.page}
-            totalPages={users.data.pagination.totalPages}
-            onChange={(p) => setFilter("page", String(p))}
-          />
+          <div style={{ marginTop: 20 }}>
+            <Pagination
+              page={users.data.pagination.page}
+              totalPages={users.data.pagination.totalPages}
+              total={users.data.pagination.total}
+              onPageChange={(p) => setFilter("page", String(p))}
+            />
+          </div>
         </>
+      )}
+
+      {/* USER DETAIL MODAL */}
+      {selectedUser && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-detail-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: 16,
+          }}
+          onClick={() => setSelectedUser(null)}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: 14,
+              maxWidth: 540,
+              width: "100%",
+              padding: 24,
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
+              position: "relative",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <div>
+                <h3 id="user-detail-title" style={{ margin: "0 0 4px", fontSize: "1.15rem", fontWeight: 700, color: "#1e293b" }}>
+                  Chi tiết tài khoản người dùng
+                </h3>
+                <span style={{ fontSize: "0.825rem", color: "#64748b" }}>
+                  Mã hệ thống: {selectedUser.id}
+                </span>
+              </div>
+              <button
+                type="button"
+                className={ui.btn}
+                style={{ padding: 6, background: "none", border: "none", cursor: "pointer" }}
+                onClick={() => setSelectedUser(null)}
+                aria-label="Đóng cửa sổ chi tiết"
+              >
+                <X size={20} color="#64748b" />
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
+              <div style={{ padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 2 }}>ĐỊA CHỈ EMAIL</div>
+                <div style={{ fontSize: "1rem", fontWeight: 700, color: "#1e293b" }}>{selectedUser.email}</div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 4 }}>TRẠNG THÁI TÀI KHOẢN</div>
+                  <Badge
+                    tone={
+                      selectedUser.status === "ACTIVE"
+                        ? "success"
+                        : selectedUser.status === "SUSPENDED"
+                        ? "warning"
+                        : "danger"
+                    }
+                  >
+                    {selectedUser.status}
+                  </Badge>
+                </div>
+
+                <div style={{ padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 4 }}>XÁC THỰC EMAIL</div>
+                  {selectedUser.emailVerifiedAt ? (
+                    <span style={{ fontSize: "0.8rem", color: "#16a34a", fontWeight: 600 }}>
+                      ✓ {formatDate(selectedUser.emailVerifiedAt)}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "0.8rem", color: "#d97706" }}>Chưa xác thực</span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 2 }}>NGÀY TẠO TÀI KHOẢN</div>
+                  <div style={{ fontSize: "0.85rem", color: "#1e293b" }}>{formatDate(selectedUser.createdAt)}</div>
+                </div>
+
+                <div style={{ padding: 12, background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 2 }}>CẬP NHẬT GẦN NHẤT</div>
+                  <div style={{ fontSize: "0.85rem", color: "#1e293b" }}>{formatDate(selectedUser.updatedAt)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className={`${ui.btn} ${ui.btnOutline}`}
+                onClick={() => setSelectedUser(null)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
