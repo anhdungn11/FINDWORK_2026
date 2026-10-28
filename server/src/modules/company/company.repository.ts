@@ -154,6 +154,15 @@ export class CompanyRepository {
         })),
       });
 
+      const now = new Date();
+      await tx.companyAiQuota.create({
+        data: {
+          companyId: company.id,
+          monthStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
+          dayStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())),
+        },
+      });
+
       const ownerMember = await tx.companyMember.create({
         data: {
           companyId: company.id,

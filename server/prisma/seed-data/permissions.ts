@@ -16,6 +16,7 @@ export const PERMISSIONS: PermissionSeed[] = [
   { code: "application.create", resource: "application", action: "create", description: "Create a job application." },
   { code: "application.view", resource: "application", action: "view", description: "View job applications." },
   { code: "application.withdraw", resource: "application", action: "withdraw", description: "Withdraw an application." },
+  { code: "ai.business.generate", resource: "ai.business", action: "generate", description: "Generate company-scoped recruiting recommendations." },
   { code: "application.review", resource: "application", action: "review", description: "Review applications." },
   { code: "application.shortlist", resource: "application", action: "shortlist", description: "Shortlist applications." },
   { code: "application.reject", resource: "application", action: "reject", description: "Reject applications." },

@@ -26,20 +26,20 @@ const EXPECTED_GRANTS: Record<string, string[]> = {
     "company.member.invite", "company.member.update", "company.member.remove",
     "company.role.view", "company.role.manage", "company.audit.view",
     "company.ownership.transfer",
-    "application.view", "application.review",
+    "application.view", "application.review", "ai.business.generate",
   ],
   ADMIN: [
     "company.view", "company.update", "company.member.view",
     "company.member.invite", "company.member.update", "company.member.remove",
     "company.role.view", "company.role.manage",
-    "application.view", "application.review",
+    "application.view", "application.review", "ai.business.generate",
   ],
   HR_MANAGER: [
     "company.view", "company.member.view", "company.member.invite",
-    "company.role.view", "application.view", "application.review",
+    "company.role.view", "application.view", "application.review", "ai.business.generate",
   ],
-  RECRUITER: ["company.view", "application.view", "application.review"],
-  HIRING_MANAGER: ["company.view"],
+  RECRUITER: ["company.view", "application.view", "application.review", "ai.business.generate"],
+  HIRING_MANAGER: ["company.view", "ai.business.generate"],
   VIEWER: ["company.view"],
 };
 
@@ -245,9 +245,9 @@ describe("Phase 4.3A Company Foundation integration", () => {
     expect(initial.body.capabilities.find((x: { code: string }) => x.code === "team.invite"))
       .toMatchObject({ isGranted: false, available: true });
     expect(initial.body.capabilities.find((x: { code: string }) => x.code === "ai.business.access"))
-      .toMatchObject({ isGranted: false, available: false });
-    await request(app.getHttpServer()).patch(`${adminPath}/ai.business.access`)
-      .set(auth(admin.accessToken)).send({ isGranted: true, reason: "Attempt to enable unavailable AI" }).expect(409);
+      .toMatchObject({ isGranted: false, available: true });
+    await request(app.getHttpServer()).patch(`${adminPath}/recruitment.analytics.view`)
+      .set(auth(admin.accessToken)).send({ isGranted: true, reason: "Attempt to enable unavailable analytics" }).expect(409);
     await request(app.getHttpServer()).post(`${API}/${companyA}/invitations`)
       .set(auth(ownerA.accessToken)).send({ email: "invite@example.test" }).expect(403);
     await request(app.getHttpServer()).patch(`${adminPath}/team.invite`)

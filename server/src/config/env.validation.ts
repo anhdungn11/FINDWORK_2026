@@ -359,5 +359,9 @@ export function validateEnvironment(
     REFRESH_TOKEN_PEPPER: refreshTokenPepper,
     ...emailDeliveryConfig(raw, nodeEnv),
     ...aiProviderConfig(raw),
+    FINDWORK_COMPANY_AI_MONTHLY_LIMIT: parsePositiveInteger(raw.FINDWORK_COMPANY_AI_MONTHLY_LIMIT,
+      "FINDWORK_COMPANY_AI_MONTHLY_LIMIT", 100, 1, 10000),
+    FINDWORK_COMPANY_AI_DAILY_LIMIT: parsePositiveInteger(raw.FINDWORK_COMPANY_AI_DAILY_LIMIT,
+      "FINDWORK_COMPANY_AI_DAILY_LIMIT", 20, 1, 1000),
   };
 }

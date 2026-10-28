@@ -1,0 +1,23 @@
+{
+  "run": "6d43a07f",
+  "companyId": "57f59fcc-8103-4f03-97b6-e2ccb000fd4c",
+  "realChrome": true,
+  "providerMocked": true,
+  "providerModel": "MOCK_PROVIDER_NO_LIVE_CREDITS",
+  "adminGrantedAndRevoked": true,
+  "employerUiGeneratedDraft": true,
+  "employerUiDeniedAfterRevoke": true,
+  "quotaAfterOneGeneration": {
+    "monthlyCreditsRemaining": 99,
+    "dailyRequestsUsed": 1
+  },
+  "auditActions": [
+    "admin.company.capability.grant",
+    "admin.company.capability.revoke"
+  ],
+  "screenshots": [
+    "cp13d-admin-ai-granted.png",
+    "cp13d-employer-ai-result.png",
+    "cp13d-employer-ai-revoked.png"
+  ]
+}

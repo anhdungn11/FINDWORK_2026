@@ -83,6 +83,28 @@ describe("OpenAI AI provider adapter", () => {
       image_url: `data:image/png;base64,${image.toString("base64")}`, detail: "low" });
   });
 
+  it("uses bounded Business AI instructions without changing Candidate defaults", async () => {
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      output: [{ type: "message", content: [{ type: "output_text", text: "{\"summary\":\"ok\"}" }] }],
+      usage: { input_tokens: 7, output_tokens: 5, total_tokens: 12 },
+    }), { status: 200 }));
+    await provider().generate([], "Draft a job", undefined,
+      { instructions: "Business AI structured output only", maxOutputTokens: 3000 });
+    const body = JSON.parse(String(fetchSpy.mock.calls[0]![1]?.body));
+    expect(body).toMatchObject({ store: false, max_output_tokens: 3000,
+      instructions: "Business AI structured output only" });
+    expect(body.input).toHaveLength(1);
+  });
+
+  it("rejects malformed provider responses without returning generated text", async () => {
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      output: [{ type: "message", content: [{ type: "output_text", text: "private text" }] }],
+    }), { status: 200 }));
+    await expect(provider().generate([], "Draft a job")).rejects.toMatchObject({
+      response: { code: "AI_PROVIDER_RESPONSE_INVALID" },
+    });
+  });
+
   it("submits WAV bytes to the transcription endpoint and returns provider text", async () => {
     const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ text: "Apply for this role" }),
       { status: 200, headers: { "Content-Type": "application/json" } }));

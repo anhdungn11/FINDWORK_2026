@@ -83,6 +83,9 @@ const PrivacyPolicyPage = () => {
                 <strong>Hỗ trợ thông minh qua AI:</strong> Trợ lý FINDWORK AI chỉ xử lý nội dung văn bản trong phiên trao đổi để gợi ý việc làm và tư vấn, không sử dụng dữ liệu mật khẩu hay thông tin nhạy cảm của bạn vào mục đích quảng cáo bên thứ ba.
               </li>
               <li>
+                <strong>AI doanh nghiệp:</strong> Khi nhân viên được cấp quyền gửi yêu cầu, nội dung biểu mẫu tuyển dụng được chuyển tới nhà cung cấp AI để tạo gợi ý. FINDWORK chỉ lưu số lượt dùng, mã tính năng, thời gian và số token; không lưu nội dung yêu cầu hoặc kết quả AI trên máy chủ. Không tự động gửi CV hay hồ sơ ứng tuyển của ứng viên.
+              </li>
+              <li>
                 <strong>Bảo vệ an ninh hệ thống:</strong> Giám sát các dấu hiệu spam, đăng tin tuyển dụng giả mạo hoặc truy cập bất thường để bảo vệ cộng đồng người dùng.
               </li>
             </ul>

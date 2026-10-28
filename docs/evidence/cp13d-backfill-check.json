@@ -1,0 +1,15 @@
+{
+  "disposableDatabaseFingerprint": "7701615713644613666",
+  "companyId": "57f59fcc-8103-4f03-97b6-e2ccb000fd4c",
+  "quotaBackfillRows": 1,
+  "internalRoles": [
+    "admin",
+    "hiring_manager",
+    "hr_manager",
+    "owner",
+    "recruiter"
+  ],
+  "aiPlatformGrantAfterReplay": false,
+  "verificationUnchanged": true,
+  "transactionRolledBack": true
+}

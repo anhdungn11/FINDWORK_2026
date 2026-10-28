@@ -27,8 +27,11 @@ export class AiProviderService {
     return { key, model, inputPrice, outputPrice };
   }
   pricing() { const { inputPrice, outputPrice } = this.settings(); return { inputPrice, outputPrice }; }
+  modelName() { return this.settings().model; }
+  isConfigured() { try { this.settings(); return true; } catch { return false; } }
 
-  async generate(history: ProviderMessage[], prompt: string, image?: { bytes: Buffer; mimeType: string }) {
+  async generate(history: ProviderMessage[], prompt: string, image?: { bytes: Buffer; mimeType: string },
+    options?: { instructions: string; maxOutputTokens: number }) {
     const { key, model } = this.settings();
     const content: Array<{ type: "input_text"; text: string } | { type: "input_image"; image_url: string; detail: "low" }> =
       [{ type: "input_text", text: prompt }];
@@ -38,8 +41,8 @@ export class AiProviderService {
       response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST", signal: AbortSignal.timeout(30_000),
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, store: false, max_output_tokens: 700,
-          instructions: "You are FINDWORK's career and recruitment assistant. Give practical, honest guidance. Do not claim access to private company, candidate, or job data. Do not request passwords, tax documents, or sensitive identity data. Reply in the user's language.",
+        body: JSON.stringify({ model, store: false, max_output_tokens: options?.maxOutputTokens ?? 700,
+          instructions: options?.instructions ?? "You are FINDWORK's career and recruitment assistant. Give practical, honest guidance. Do not claim access to private company, candidate, or job data. Do not request passwords, tax documents, or sensitive identity data. Reply in the user's language.",
           input: [...history.map((m) => ({ role: m.role, content: m.content })), { role: "user", content }] }),
       });
     } catch (error) { throw new ServiceUnavailableException({ code: error !== null && typeof error === "object" && "name" in error && (error.name === "TimeoutError" || error.name === "AbortError")

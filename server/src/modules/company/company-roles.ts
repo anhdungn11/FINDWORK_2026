@@ -16,6 +16,7 @@ export const DEFAULT_COMPANY_ROLES = [
       "company.ownership.transfer",
       "application.view",
       "application.review",
+      "ai.business.generate",
     ],
   },
   {
@@ -32,6 +33,7 @@ export const DEFAULT_COMPANY_ROLES = [
       "company.role.manage",
       "application.view",
       "application.review",
+      "ai.business.generate",
     ],
   },
   {
@@ -44,10 +46,11 @@ export const DEFAULT_COMPANY_ROLES = [
       "company.role.view",
       "application.view",
       "application.review",
+      "ai.business.generate",
     ],
   },
-  { name: "RECRUITER", isProtected: false, permissions: ["company.view", "application.view", "application.review"] },
-  { name: "HIRING_MANAGER", isProtected: false, permissions: ["company.view"] },
+  { name: "RECRUITER", isProtected: false, permissions: ["company.view", "application.view", "application.review", "ai.business.generate"] },
+  { name: "HIRING_MANAGER", isProtected: false, permissions: ["company.view", "ai.business.generate"] },
   { name: "VIEWER", isProtected: false, permissions: ["company.view"] },
 ] as const;
 

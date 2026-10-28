@@ -40,7 +40,6 @@ import {
   type EmploymentType,
   type ExperienceLevel,
   type WorkplaceType,
-  type JobCritiqueItem,
 } from "@/services/api/employerAiApi";
 import styles from "./EmployerAiPage.module.css";
 
@@ -168,12 +167,18 @@ export const EmployerAiPage: React.FC = () => {
     setProbingBackend(true);
     const endpoint = `/companies/${active.id}/ai/status`;
     try {
-      await employerAiApi.checkStatus(active.id);
+      const service = await employerAiApi.checkStatus(active.id);
+      if (service.status !== "available") {
+        setProbeResult({ checked: true, status: 503, endpoint,
+          message: service.status === "unconfigured" ? "Business AI provider is not configured on this server." : "Business AI is unavailable for this company.",
+          timestamp: new Date().toLocaleTimeString("vi-VN") });
+        return;
+      }
       setProbeResult({
         checked: true,
         status: 200,
         endpoint,
-        message: "Dịch vụ AI Doanh nghiệp đã được kết nối và hoạt động bình thường.",
+        message: "Backend AI doanh nghiệp đã được cấu hình. Trạng thái nhà cung cấp được kiểm tra khi tạo nội dung.",
         timestamp: new Date().toLocaleTimeString("vi-VN"),
       });
     } catch (err) {
@@ -222,40 +227,8 @@ export const EmployerAiPage: React.FC = () => {
       const res = await employerAiApi.draftJob(active.id, payload);
       setDraftResult(res);
     } catch (err) {
-      if (err instanceof CompanyAiNotImplementedError) {
-        setDraftError(
-          "Hạ tầng Backend AI Doanh nghiệp chưa triển khai endpoint POST /companies/:id/ai/draft-job (HTTP 404). " +
-            "Hệ thống tạo bản nháp mẫu có cấu trúc dựa trên dữ liệu bạn vừa nhập để bạn có thể sao chép hoặc chuyển sang tin tuyển dụng."
-        );
-        // Honest structural draft preview based strictly on user inputs (no hallucination)
-        setDraftResult({
-          title: payload.title,
-          summary: `Vị trí ${payload.title} làm việc tại ${active.name}${payload.location ? ` (${payload.location})` : ""}, hình thức ${payload.employmentType === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian"}, mô hình ${payload.workplaceType === "HYBRID" ? "Hybrid" : payload.workplaceType === "REMOTE" ? "Từ xa" : "Tại văn phòng"}.`,
-          responsibilities: payload.responsibilitiesBrief
-            ? payload.responsibilitiesBrief.split("\n").filter(Boolean)
-            : [
-                `Phụ trách chuyên môn vị trí ${payload.title} theo mục tiêu kinh doanh của ${active.name}.`,
-                "Phối hợp với các phòng ban liên quan để triển khai kế hoạch làm việc.",
-                "Báo cáo tiến độ và đóng góp sáng kiến cải tiến quy trình công việc.",
-              ],
-          requirements: payload.requirementsBrief
-            ? payload.requirementsBrief.split("\n").filter(Boolean)
-            : [
-                `Kinh nghiệm phù hợp với cấp bậc ${payload.experienceLevel || "tương đương"}.`,
-                skills.length > 0 ? `Kỹ năng ưu tiên: ${skills.join(", ")}.` : "Kỹ năng chuyên môn vững vàng.",
-                "Tinh thần trách nhiệm, khả năng làm việc độc lập và phối hợp nhóm tốt.",
-              ],
-          benefits: [
-            payload.salaryRange ? `Mức lương cạnh tranh: ${payload.salaryRange}` : "Mức lương thỏa thuận theo năng lực.",
-            "Chế độ bảo hiểm và phúc lợi đầy đủ theo quy định của pháp luật.",
-            `Môi trường làm việc chuyên nghiệp, phát triển sự nghiệp tại ${active.name}.`,
-          ],
-          suggestedSkills: skills.length ? skills : ["Chuyên môn", "Giao tiếp", "Quản lý thời gian"],
-          fullMarkdown: `# ${payload.title}\n\n**Doanh nghiệp:** ${active.name}\n**Địa điểm:** ${payload.location || "Theo thỏa thuận"}\n**Hình thức:** ${payload.employmentType}\n**Mức lương:** ${payload.salaryRange || "Thỏa thuận"}\n\n### 1. Mô tả công việc\n${payload.responsibilitiesBrief || "- Phụ trách công việc chuyên môn theo yêu cầu dự án."}\n\n### 2. Yêu cầu ứng viên\n${payload.requirementsBrief || "- Có kinh nghiệm liên quan đến vị trí ứng tuyển."}\n\n### 3. Quyền lợi đãi ngộ\n- Mức lương cạnh tranh và thưởng hiệu quả công việc.\n- Đầy đủ chế độ bảo hiểm theo luật lao động.`,
-        });
-      } else {
-        setDraftError((err as Error).message);
-      }
+      setDraftResult(null);
+      setDraftError((err as Error).message);
     } finally {
       setDraftLoading(false);
     }
@@ -272,41 +245,8 @@ export const EmployerAiPage: React.FC = () => {
       const res = await employerAiApi.improveJob(active.id, improveForm);
       setImproveResult(res);
     } catch (err) {
-      if (err instanceof CompanyAiNotImplementedError) {
-        setImproveError(
-          "Endpoint POST /companies/:id/ai/improve-job chưa triển khai trên backend (HTTP 404). Hiển thị danh mục tiêu chí kiểm tra chất lượng JD theo chuẩn FINDWORK."
-        );
-        const critiques: JobCritiqueItem[] = [
-          {
-            category: "clarity",
-            feedback: "Cần làm rõ tiêu chí KPI đo lường thành công trong 6 tháng đầu của vị trí.",
-            severity: "SUGGESTION",
-          },
-          {
-            category: "inclusivity",
-            feedback: "Tránh các từ ngữ có định kiến giới tính hoặc tuổi tác (ví dụ: 'ninja', 'rockstar', 'dưới 30 tuổi').",
-            severity: "RECOMMENDED",
-          },
-          {
-            category: "compliance",
-            feedback: "Đảm bảo tuân thủ quy định Bộ Luật Lao Động về điều kiện an toàn và bảo hiểm.",
-            severity: "CRITICAL",
-          },
-        ];
-        setImproveResult({
-          improvedDescription: improveForm.description
-            ? `${improveForm.description}\n\n[Gợi ý bổ sung]: Môi trường làm việc tôn trọng sự đa dạng, tạo cơ hội thăng tiến minh bạch cho mọi ứng viên.`
-            : "Vui lòng nhập mô tả công việc gốc để nhận gợi ý cải tiến chi tiết.",
-          improvedRequirements: improveForm.requirements
-            ? `${improveForm.requirements}\n- Ưu tiên ứng viên có tư duy giải quyết vấn đề và tinh thần cầu tiến.`
-            : "Vui lòng nhập yêu cầu ứng viên để phân tích tính bao hàm.",
-          critique: critiques,
-          readabilityScore: 82,
-          inclusivityScore: 90,
-        });
-      } else {
-        setImproveError((err as Error).message);
-      }
+      setImproveResult(null);
+      setImproveError((err as Error).message);
     } finally {
       setImproveLoading(false);
     }
@@ -333,49 +273,8 @@ export const EmployerAiPage: React.FC = () => {
       const res = await employerAiApi.suggestScreeningQuestions(active.id, payload);
       setScreeningResult(res);
     } catch (err) {
-      if (err instanceof CompanyAiNotImplementedError) {
-        setScreeningError(
-          "Endpoint POST /companies/:id/ai/screening-questions chưa triển khai trên backend (HTTP 404). Tạo bộ câu hỏi mẫu chuẩn hóa phù hợp với tiêu chí nhập vào."
-        );
-        setScreeningResult({
-          jobTitle: payload.jobTitle,
-          questions: [
-            {
-              question: `Bạn đã có bao nhiêu năm kinh nghiệm thực tế tại vị trí ${payload.jobTitle}?`,
-              type: "NUMBER",
-              isRequired: true,
-              idealAnswer: `>= ${payload.experienceYears || 2} năm`,
-              competencyTarget: "Kinh nghiệm chuyên môn cốt lõi",
-            },
-            {
-              question: `Bạn có thể làm việc theo mô hình yêu cầu của vị trí này tại ${active.name} không?`,
-              type: "YES_NO",
-              isRequired: true,
-              idealAnswer: "Có",
-              competencyTarget: "Sẵn sàng làm việc",
-            },
-            ...(skills.length > 0
-              ? [
-                  {
-                    question: `Bạn đánh giá mức độ thành thạo của mình đối với kỹ năng ${skills[0]} như thế nào?`,
-                    type: "SINGLE_CHOICE" as const,
-                    isRequired: false,
-                    options: ["Cơ bản (Dưới 1 năm)", "Khá (1 - 3 năm)", "Thành thạo (Trên 3 năm)", "Chuyên gia / Đã từng dẫn dắt kỹ thuật"],
-                    competencyTarget: `Độ sâu chuyên môn ${skills[0]}`,
-                  },
-                ]
-              : []),
-            {
-              question: "Dự án hoặc thành tựu nổi bật nhất bạn từng đảm nhận trong vòng 1-2 năm qua là gì?",
-              type: "TEXT",
-              isRequired: false,
-              competencyTarget: "Khả năng ứng dụng thực tế & tư duy giải quyết vấn đề",
-            },
-          ],
-        });
-      } else {
-        setScreeningError((err as Error).message);
-      }
+      setScreeningResult(null);
+      setScreeningError((err as Error).message);
     } finally {
       setScreeningLoading(false);
     }
@@ -402,46 +301,8 @@ export const EmployerAiPage: React.FC = () => {
       const res = await employerAiApi.generateInterviewQuestions(active.id, payload);
       setInterviewResult(res);
     } catch (err) {
-      if (err instanceof CompanyAiNotImplementedError) {
-        setInterviewError(
-          "Endpoint POST /companies/:id/ai/interview-questions chưa triển khai trên backend (HTTP 404). Hiển thị ngân hàng câu hỏi phỏng vấn STAR mẫu."
-        );
-        setInterviewResult({
-          jobTitle: payload.jobTitle,
-          stage: payload.stage,
-          categories: [
-            {
-              categoryName: "Năng lực chuyên môn & Kỹ thuật",
-              questions: [
-                {
-                  question: `Hãy chia sẻ về một bài toán kỹ thuật phức tạp nhất bạn từng giải quyết liên quan đến ${skills[0] || payload.jobTitle}. Bạn đã đưa ra phương án ra sao?`,
-                  purpose: "Đánh giá khả năng phân tích kiến trúc, ra quyết định kỹ thuật và kiểm soát rủi ro.",
-                  sampleEvaluationCriteria: "Ứng viên giải thích rõ nguyên nhân cốt lõi (Root Cause), các phương án cân nhắc (Trade-offs) và kết quả đo lường cụ thể.",
-                  redFlags: "Đổ lỗi cho đồng nghiệp, không nắm rõ lý do chọn giải pháp hoặc kiến thức mơ hồ.",
-                },
-                {
-                  question: "Khi tiếp nhận một hệ thống cũ (legacy) thiếu tài liệu, quy trình từng bước của bạn để làm quen và tối ưu hóa là gì?",
-                  purpose: "Đánh giá tư duy hệ thống và khả năng tự nghiên cứu, làm chủ mã nguồn.",
-                  sampleEvaluationCriteria: "Có phương pháp tiếp cận an toàn: viết test trước, phân tích luồng dữ liệu, refactor từng phần nhỏ.",
-                },
-              ],
-            },
-            {
-              categoryName: "Kỹ năng phối hợp & Văn hóa làm việc (Culture & Teamwork)",
-              questions: [
-                {
-                  question: "Kể lại một lần bạn và thành viên trong đội có quan điểm bất đồng về mặt kỹ thuật hoặc thời hạn bàn giao. Bạn đã xử lý như thế nào?",
-                  purpose: "Đánh giá kỹ năng giao tiếp, lắng nghe và tinh thần xây dựng trong tập thể.",
-                  sampleEvaluationCriteria: "Tập trung vào giải pháp chung thay vì cái tôi cá nhân, dựa trên dữ liệu thực tế để thuyết phục.",
-                  redFlags: "Né tránh xung đột hoặc áp đặt ý kiến cá nhân không có căn cứ.",
-                },
-              ],
-            },
-          ],
-        });
-      } else {
-        setInterviewError((err as Error).message);
-      }
+      setInterviewResult(null);
+      setInterviewError((err as Error).message);
     } finally {
       setInterviewLoading(false);
     }
@@ -458,56 +319,8 @@ export const EmployerAiPage: React.FC = () => {
       const res = await employerAiApi.generateRecruitmentPlan(active.id, planForm);
       setPlanResult(res);
     } catch (err) {
-      if (err instanceof CompanyAiNotImplementedError) {
-        setPlanError(
-          "Endpoint POST /companies/:id/ai/recruitment-plan chưa triển khai trên backend (HTTP 404). Tạo lộ trình kế hoạch tuyển dụng tiêu chuẩn."
-        );
-        setPlanResult({
-          jobTitle: planForm.jobTitle,
-          estimatedTimeToHire: `${planForm.targetTimelineDays || 30} ngày làm việc`,
-          phases: [
-            {
-              phaseName: "Giai đoạn 1: Chuẩn bị & Đăng tuyển (Tuần 1)",
-              timelineWeeks: "Ngày 1 - 7",
-              keyActivities: [
-                `Hoàn thiện JD chuẩn cho vị trí ${planForm.jobTitle}.`,
-                "Thống nhất tiêu chí đánh giá và bảng câu hỏi phỏng vấn giữa HR và Hiring Manager.",
-                `Đăng tin tuyển dụng trên FINDWORK và các kênh cộng đồng chuyên môn.`,
-              ],
-              recommendedSourcingChannels: ["FINDWORK Job Board", "Mạng lưới nội bộ (Employee Referral)", "LinkedIn Talent"],
-              kpiMilestones: ["Nhận tối thiểu 15-20 hồ sơ ứng tuyển sơ bộ", "Hoàn tất bộ câu hỏi sàng lọc"],
-            },
-            {
-              phaseName: "Giai đoạn 2: Sàng lọc & Phỏng vấn Vòng 1 (Tuần 2 - 3)",
-              timelineWeeks: "Ngày 8 - 21",
-              keyActivities: [
-                "Sàng lọc CV theo tiêu chí đã đặt ra (kinh nghiệm, kỹ năng chính).",
-                "Phỏng vấn sàng lọc qua điện thoại/online 15-20 phút.",
-                "Tổ chức phỏng vấn chuyên môn Vòng 1 với Hội đồng tuyển dụng.",
-              ],
-              recommendedSourcingChannels: ["Ứng viên nộp trực tiếp", "Headhunter / Talent Search"],
-              kpiMilestones: ["Chọn lọc 5-8 ứng viên xuất sắc vào Vòng phỏng vấn chuyên sâu"],
-            },
-            {
-              phaseName: "Giai đoạn 3: Phỏng vấn Vòng 2, Offer & Onboarding (Tuần 4)",
-              timelineWeeks: "Ngày 22 - 30",
-              keyActivities: [
-                "Phỏng vấn văn hóa & đàm phán mức lương đãi ngộ.",
-                "Gửi thư mời nhận việc (Offer Letter) chính thức.",
-                "Chuẩn bị kế hoạch bàn giao thiết bị và chào đón nhân sự mới.",
-              ],
-              recommendedSourcingChannels: ["Trực tiếp từ danh sách rút gọn"],
-              kpiMilestones: [`Đạt chỉ tiêu tuyển dụng: ${planForm.targetHires} nhân sự`],
-            },
-          ],
-          riskMitigationTips: [
-            "Nếu lượng CV sau 7 ngày đầu thấp hơn 5 hồ sơ, hãy rà soát lại mức lương so với thị trường hoặc mở rộng phạm vi địa điểm làm việc.",
-            "Phản hồi ứng viên trong vòng tối đa 48 giờ sau phỏng vấn để tăng tỷ lệ nhận offer thành công.",
-          ],
-        });
-      } else {
-        setPlanError((err as Error).message);
-      }
+      setPlanResult(null);
+      setPlanError((err as Error).message);
     } finally {
       setPlanLoading(false);
     }

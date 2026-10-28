@@ -290,6 +290,7 @@ model User {
   applicationStatusEdits  ApplicationStatusHistory[] @relation("ApplicationStatusActor")
   auditLogs               AuditLog[]                 @relation("AuditActor")
   aiConversations         AiConversation[]
+  companyAiGenerations    CompanyAiGenerationLog[] @relation("CompanyAiGenerationActor")
   applicationMessages     ApplicationMessage[]
 
   @@index([status])
@@ -644,6 +645,8 @@ model Company {
   interviews                Interview[]
   auditLogs                 AuditLog[]
   platformCapabilities      CompanyPlatformCapability[]
+  aiQuota                   CompanyAiQuota?
+  aiGenerations             CompanyAiGenerationLog[]
   legalProfile              CompanyLegalProfile?
   legalEvidence             CompanyLegalEvidence[]
 
@@ -669,6 +672,39 @@ model CompanyPlatformCapability {
 
   @@unique([companyId, capabilityCode])
   @@index([companyId, isGranted])
+}
+
+model CompanyAiQuota {
+  companyId    String   @id @db.Uuid
+  monthlyLimit Int      @default(10000)
+  dailyLimit   Int      @default(1000)
+  monthlyUsed  Int      @default(0)
+  dailyUsed    Int      @default(0)
+  monthStart   DateTime @db.Date
+  dayStart     DateTime @db.Date
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model CompanyAiGenerationLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  companyId    String   @db.Uuid
+  actorUserId  String   @db.Uuid
+  feature      String   @db.VarChar(50)
+  status       String   @db.VarChar(20)
+  model        String   @db.VarChar(120)
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actor   User    @relation("CompanyAiGenerationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, createdAt])
+  @@index([actorUserId, createdAt])
 }
 
 model CompanyLocation {

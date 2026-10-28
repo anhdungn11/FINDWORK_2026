@@ -12,11 +12,12 @@ export const NEW_COMPANY_STARTER_CAPABILITIES: readonly PlatformCapabilityCode[]
   "job.draft.create", "job.draft.edit", "job.close", "application.view",
 ];
 
-// No business analytics or business AI endpoint exists yet. Grants to them are
-// rejected; an admin may still revoke a legacy row safely.
+// Recruitment analytics remains unavailable. Business AI is implemented
+// with company RBAC, platform capability checks, quotas, and provider failures.
 export const IMPLEMENTED_PLATFORM_CAPABILITIES: readonly PlatformCapabilityCode[] = [
   "job.draft.create", "job.draft.edit", "job.publish", "job.close",
   "application.view", "application.pipeline.manage", "interview.schedule", "team.invite",
+  "ai.business.access",
 ];
 
 export function isPlatformCapabilityCode(code: string): code is PlatformCapabilityCode {
