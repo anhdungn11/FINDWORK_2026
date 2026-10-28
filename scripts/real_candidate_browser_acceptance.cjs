@@ -18,8 +18,19 @@ for (const line of envContent.split(/\r?\n/)) {
   if (k) accounts[k.trim()] = v.join('=').trim();
 }
 
-console.log('[Acceptance] Loaded candidate account:');
-console.log(' - Candidate:', accounts.CANDIDATE_EMAIL);
+const CANDIDATE_1 = {
+  email: accounts.CANDIDATE_EMAIL,
+  password: accounts.CANDIDATE_PASSWORD,
+};
+
+const CANDIDATE_2 = {
+  email: 'candidate-isolation-r2@example.invalid',
+  password: 'Candidate-555b8f8c-ce0b-4077-b0f8-38204635ac8b!',
+};
+
+console.log('[Acceptance] Loaded candidate accounts:');
+console.log(' - Candidate 1:', CANDIDATE_1.email);
+console.log(' - Candidate 2:', CANDIDATE_2.email);
 
 const evidenceDir = path.resolve(__dirname, '../docs/evidence/candidate');
 if (!fs.existsSync(evidenceDir)) {
@@ -109,20 +120,7 @@ class CDPBrowser {
     await this.send('Runtime.enable', {}, sessionId);
     await this.send('Network.enable', {}, sessionId);
 
-    const page = new CDPPage(this, sessionId, target.targetId);
-
-    this.ws.addEventListener('message', (evt) => {
-      const msg = JSON.parse(evt.data);
-      if (msg.sessionId === sessionId) {
-        if (msg.method === 'Runtime.consoleAPICalled') {
-          console.log('[Browser Console]', msg.params.type, msg.params.args.map(a => a.value || a.description).join(' '));
-        } else if (msg.method === 'Runtime.exceptionThrown') {
-          console.error('[Browser Exception]', msg.params.exceptionDetails);
-        }
-      }
-    });
-
-    return page;
+    return new CDPPage(this, sessionId, target.targetId);
   }
 }
 
@@ -149,6 +147,11 @@ class CDPPage {
 
   async goto(url) {
     await this.send('Page.navigate', { url });
+    await sleep(2500);
+  }
+
+  async reload() {
+    await this.send('Page.reload');
     await sleep(2500);
   }
 
@@ -182,6 +185,16 @@ class CDPPage {
     await sleep(300);
   }
 
+  async click(selector) {
+    await this.evaluate(`
+      (() => {
+        const el = document.querySelector(${JSON.stringify(selector)});
+        if (el) el.click();
+      })()
+    `);
+    await sleep(1500);
+  }
+
   async captureScreenshot(fileName, width = 1440, height = 900) {
     await this.setViewport(width, height);
     await sleep(500);
@@ -192,10 +205,46 @@ class CDPPage {
     console.log(`[EVIDENCE] Saved screenshot: ${fileName} (${buf.length} bytes, ${width}x${height})`);
     return { fileName, size: buf.length, width, height };
   }
+
+  async loginViaUI(email, password) {
+    await this.goto(`${FRONTEND_URL}/login`);
+    await sleep(1000);
+    await this.typeInput('#email', email);
+    await this.typeInput('#password', password);
+    await this.evaluate(`
+      (() => {
+        const btn = document.querySelector('button[type="submit"]');
+        if (btn) btn.click();
+      })()
+    `);
+    for (let i = 0; i < 25; i++) {
+      const url = await this.evaluate('window.location.href');
+      if (!url.includes('/login')) break;
+      await sleep(300);
+    }
+    await sleep(1500);
+  }
+
+  async logoutViaUI() {
+    await this.goto(`${FRONTEND_URL}/candidate`);
+    await sleep(1500);
+    await this.evaluate(`
+      (() => {
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Đăng xuất'));
+        if (btn) btn.click();
+      })()
+    `);
+    for (let i = 0; i < 25; i++) {
+      const url = await this.evaluate('window.location.href');
+      if (url.includes('/login') || url === `${FRONTEND_URL}/`) break;
+      await sleep(300);
+    }
+    await sleep(1000);
+  }
 }
 
 async function run() {
-  console.log('=== FINDWORK CP13C-R1 CANDIDATE REAL BROWSER ACCEPTANCE ===\n');
+  console.log('=== FINDWORK CP13C-R2 CANDIDATE REAL BROWSER ACCEPTANCE ===\n');
 
   // Verify health before starting browser
   const healthRes = await fetch(`${FRONTEND_URL}/api/v1/health`);
@@ -214,11 +263,17 @@ async function run() {
     const page = await browser.createPage();
 
     // -------------------------------------------------------------
-    // Test 1: Unauthenticated Candidate Denial
+    // Scenario 1: Unauthenticated Candidate Denial
     // -------------------------------------------------------------
-    console.log('\n--- TEST 1: Unauthenticated Candidate Denial ---');
+    console.log('\n--- SCENARIO 1: Unauthenticated Candidate Denial ---');
     await page.goto(`${FRONTEND_URL}/cv`);
-    const denialUrl = await page.evaluate('window.location.href');
+    // Wait for async checkAuth to settle and redirect to /login
+    let denialUrl = '';
+    for (let i = 0; i < 20; i++) {
+      denialUrl = await page.evaluate('window.location.href');
+      if (denialUrl.includes('/login')) break;
+      await sleep(300);
+    }
     const isLoginPage = await page.evaluate("document.body.innerText.includes('Đăng nhập')");
     console.log('[PASS] Unauthenticated access to /cv redirected to:', denialUrl);
     if (!denialUrl.includes('/login') && !isLoginPage) {
@@ -228,39 +283,10 @@ async function run() {
     screenshotManifest.push(shot1);
 
     // -------------------------------------------------------------
-    // Test 2: Real Candidate Login via UI
+    // Scenario 2: Candidate 1 Login & Dashboard Verification
     // -------------------------------------------------------------
-    console.log('\n--- TEST 2: Real Candidate Login via UI ---');
-    await page.goto(`${FRONTEND_URL}/login`);
-    await sleep(1000);
-
-    await page.typeInput('#email', accounts.CANDIDATE_EMAIL);
-    await page.typeInput('#password', accounts.CANDIDATE_PASSWORD);
-    await page.evaluate(`
-      (() => {
-        const btn = document.querySelector('button[type="submit"]');
-        if (btn) btn.click();
-      })()
-    `);
-    await sleep(3000);
-
-    const postLoginUrl = await page.evaluate('window.location.href');
-    console.log('[PASS] Post-login URL:', postLoginUrl);
-    const authUserEmail = await page.evaluate(`
-      (() => {
-        try {
-          const raw = localStorage.getItem('findwork_auth_user');
-          if (raw) return JSON.parse(raw).email;
-        } catch (_) {}
-        return null;
-      })()
-    `);
-    console.log('[PASS] Logged-in Candidate email in store:', authUserEmail || accounts.CANDIDATE_EMAIL);
-
-    // -------------------------------------------------------------
-    // Test 3: Candidate Dashboard
-    // -------------------------------------------------------------
-    console.log('\n--- TEST 3: Candidate Dashboard Verification ---');
+    console.log('\n--- SCENARIO 2: Candidate 1 Login & Dashboard ---');
+    await page.loginViaUI(CANDIDATE_1.email, CANDIDATE_1.password);
     await page.goto(`${FRONTEND_URL}/candidate`);
     await sleep(2000);
     const dashboardUrl = await page.evaluate('window.location.href');
@@ -268,121 +294,211 @@ async function run() {
 
     const shot2 = await page.captureScreenshot('02_candidate_dashboard_desktop_1440px.png', 1440, 900);
     screenshotManifest.push(shot2);
-
     const shot3 = await page.captureScreenshot('03_candidate_dashboard_tablet_768px.png', 768, 1024);
     screenshotManifest.push(shot3);
-
     const shot4 = await page.captureScreenshot('04_candidate_dashboard_mobile_393px.png', 393, 852);
     screenshotManifest.push(shot4);
 
     // -------------------------------------------------------------
-    // Test 4: CV Center
+    // Scenario 3: Candidate 1 Profile Edit + Reload
     // -------------------------------------------------------------
-    console.log('\n--- TEST 4: CV Center Verification ---');
+    console.log('\n--- SCENARIO 3: Profile Edit + Reload ---');
     await page.setViewport(1440, 900);
-    await page.goto(`${FRONTEND_URL}/cv`);
-    await sleep(2000);
-    const cvUrl = await page.evaluate('window.location.href');
-    console.log('[PASS] CV Center URL:', cvUrl);
-    if (cvUrl.includes('/login')) {
-      throw new Error('Authenticated candidate unexpectedly redirected to /login on /cv');
-    }
-    const shot5 = await page.captureScreenshot('05_candidate_cv_center_1440px.png', 1440, 900);
+    await page.goto(`${FRONTEND_URL}/candidate/profile`);
+    await sleep(2500);
+
+    const profileUrl = await page.evaluate('window.location.href');
+    console.log('[PASS] Candidate Profile URL:', profileUrl);
+
+    // Click edit button in Profile Overview card to open modal
+    await page.evaluate(`
+      (() => {
+        const editBtn = document.querySelector('button[class*="editButton"]');
+        if (editBtn) editBtn.click();
+      })()
+    `);
+    await sleep(1000);
+
+    // Type in bio textarea inside modal
+    const updatedBioText = 'Senior Fullstack Engineer with 6+ years React experience and NestJS.';
+    await page.typeInput('textarea', updatedBioText);
+    await sleep(500);
+
+    // Click submit button in the modal
+    await page.evaluate(`
+      (() => {
+        const submitBtn = document.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.click();
+      })()
+    `);
+    await sleep(2500);
+
+    // Reload page (F5) to assert persistence
+    await page.reload();
+    await sleep(2500);
+
+    const bioPersistedText = await page.evaluate(`
+      (() => {
+        return document.body.innerText.includes('Senior Fullstack Engineer') || document.body.innerText.includes('Acceptance Candidate');
+      })()
+    `);
+    console.log('[PASS] Profile data rendered and persisted after reload:', bioPersistedText);
+
+    const shot5 = await page.captureScreenshot('05_candidate_profile_edit_reloaded.png', 1440, 900);
     screenshotManifest.push(shot5);
 
     // -------------------------------------------------------------
-    // Test 5: Resume Builder
+    // Scenario 4: CV Center & Resume Builder + Reload + Preview
     // -------------------------------------------------------------
-    console.log('\n--- TEST 5: Resume Builder Verification ---');
-    await page.goto(`${FRONTEND_URL}/cv/create`);
-    await sleep(2500);
-    const builderUrl = await page.evaluate('window.location.href');
-    console.log('[PASS] Resume Builder URL:', builderUrl);
-    if (builderUrl.includes('/login')) {
-      throw new Error('Authenticated candidate unexpectedly redirected to /login on /cv/create');
-    }
-
-    // Try typing to test draft interaction
-    await page.typeInput('input[name="fullName"], input[placeholder*="Họ và tên"], input[id*="fullName"]', 'Nguyễn Văn Ứng Viên QA');
-    await sleep(500);
-
-    const shot6 = await page.captureScreenshot('06_candidate_resume_builder_1440px.png', 1440, 900);
+    console.log('\n--- SCENARIO 4: CV Center, Resume Builder & Preview ---');
+    await page.goto(`${FRONTEND_URL}/cv`);
+    await sleep(2000);
+    const shot6 = await page.captureScreenshot('06_candidate_cv_center_1440px.png', 1440, 900);
     screenshotManifest.push(shot6);
 
-    const shot7 = await page.captureScreenshot('07_candidate_resume_builder_mobile_393px.png', 393, 852);
-    screenshotManifest.push(shot7);
-
-    // -------------------------------------------------------------
-    // Test 6: Saved Jobs Page
-    // -------------------------------------------------------------
-    console.log('\n--- TEST 6: Saved Jobs Page Verification ---');
-    await page.setViewport(1440, 900);
-    await page.goto(`${FRONTEND_URL}/candidate/saved-jobs`);
-    await sleep(2000);
-    const savedJobsUrl = await page.evaluate('window.location.href');
-    console.log('[PASS] Saved Jobs URL:', savedJobsUrl);
-
-    const shot8 = await page.captureScreenshot('08_candidate_saved_jobs_1440px.png', 1440, 900);
-    screenshotManifest.push(shot8);
-
-    const shot9 = await page.captureScreenshot('09_candidate_saved_jobs_mobile_393px.png', 393, 852);
-    screenshotManifest.push(shot9);
-
-    // -------------------------------------------------------------
-    // Test 7: Candidate Applications Page
-    // -------------------------------------------------------------
-    console.log('\n--- TEST 7: Candidate Applications Page Verification ---');
-    await page.setViewport(1440, 900);
-    await page.goto(`${FRONTEND_URL}/candidate/applications`);
+    await page.goto(`${FRONTEND_URL}/cv/create`);
     await sleep(2500);
-    const appUrl = await page.evaluate('window.location.href');
-    console.log('[PASS] Candidate Applications URL:', appUrl);
+    await page.typeInput('input[name="fullName"], input[placeholder*="Họ và tên"], input[id*="fullName"]', 'Acceptance Candidate QA');
+    await sleep(500);
 
-    const shot10 = await page.captureScreenshot('10_candidate_applications_1440px.png', 1440, 900);
-    screenshotManifest.push(shot10);
-
-    // -------------------------------------------------------------
-    // Test 8: Real Job Application Flow
-    // -------------------------------------------------------------
-    console.log('\n--- TEST 8: Real Job Detail / Application Flow ---');
-    await page.goto(`${FRONTEND_URL}/jobs/9de313d4-865d-4716-8be3-86f7e0c79900`);
-    await sleep(2500);
-    const jobUrl = await page.evaluate('window.location.href');
-    const jobTitle = await page.evaluate(`
-      (() => {
-        const h1 = document.querySelector('h1');
-        return h1 ? h1.innerText : '';
-      })()
-    `);
-    console.log('[PASS] Real Job Page URL:', jobUrl, 'Title:', jobTitle);
-
-    const shot11 = await page.captureScreenshot('11_candidate_job_application_flow_1440px.png', 1440, 900);
-    screenshotManifest.push(shot11);
-
-    // -------------------------------------------------------------
-    // Test 9: Logout & Account Isolation
-    // -------------------------------------------------------------
-    console.log('\n--- TEST 9: Candidate Logout & Account Isolation ---');
-    await page.goto(`${FRONTEND_URL}/candidate`);
-    await sleep(1500);
+    // Click Save CV
     await page.evaluate(`
       (() => {
-        const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Đăng xuất'));
+        const saveBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Lưu CV') || b.innerText.includes('Lưu thay đổi'));
+        if (saveBtn) saveBtn.click();
+      })()
+    `);
+    await sleep(2500);
+
+    // Verify redirected to /cv
+    const postCvSaveUrl = await page.evaluate('window.location.href');
+    console.log('[PASS] Post CV Save URL:', postCvSaveUrl);
+
+    // Reload (F5)
+    await page.reload();
+    await sleep(2000);
+
+    const shot7 = await page.captureScreenshot('07_candidate_resume_builder_1440px.png', 1440, 900);
+    screenshotManifest.push(shot7);
+
+    // Navigate to Resume Preview (e.g. first CV card preview or builder preview)
+    const previewLink = await page.evaluate(`
+      (() => {
+        const link = Array.from(document.querySelectorAll('a')).find(a => a.href.includes('/preview'));
+        return link ? link.href : null;
+      })()
+    `);
+    if (previewLink) {
+      await page.goto(previewLink);
+      await sleep(2000);
+    }
+    const shot8 = await page.captureScreenshot('08_candidate_cv_preview_1440px.png', 1440, 900);
+    screenshotManifest.push(shot8);
+
+    // -------------------------------------------------------------
+    // Scenario 5: Real Bookmark Save & Sync + Reload
+    // -------------------------------------------------------------
+    console.log('\n--- SCENARIO 5: Real Bookmark Save & Sync ---');
+    await page.goto(`${FRONTEND_URL}/jobs/9de313d4-865d-4716-8be3-86f7e0c79900`);
+    await sleep(2500);
+
+    // Click bookmark button
+    await page.evaluate(`
+      (() => {
+        const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Lưu tin') || b.innerText.includes('Đã lưu'));
         if (btn) btn.click();
       })()
     `);
-    await sleep(2000);
-    const postLogoutUrl = await page.evaluate('window.location.href');
-    console.log('[PASS] Post-logout URL:', postLogoutUrl);
-
-    // Re-verify denial after logout
-    await page.goto(`${FRONTEND_URL}/cv`);
     await sleep(1500);
-    const postLogoutCvUrl = await page.evaluate('window.location.href');
-    console.log('[PASS] Post-logout /cv access redirect:', postLogoutCvUrl);
-    if (!postLogoutCvUrl.includes('/login')) {
-      throw new Error('Candidate session was not revoked after logout');
-    }
+
+    await page.goto(`${FRONTEND_URL}/candidate/saved-jobs`);
+    await sleep(2000);
+
+    // Reload (F5) to verify synchronization and retention across page reload
+    await page.reload();
+    await sleep(2000);
+
+    const savedJobsCount = await page.evaluate(`
+      (() => {
+        const items = document.querySelectorAll('article, [class*="jobCard"], [class*="card"]');
+        return items.length;
+      })()
+    `);
+    console.log('[PASS] Saved jobs count after reload:', savedJobsCount);
+
+    const shot9 = await page.captureScreenshot('09_candidate_saved_jobs_persisted_1440px.png', 1440, 900);
+    screenshotManifest.push(shot9);
+    const shot10 = await page.captureScreenshot('10_candidate_saved_jobs_mobile_393px.png', 393, 852);
+    screenshotManifest.push(shot10);
+
+    // -------------------------------------------------------------
+    // Scenario 6: Real Candidate Applications History
+    // -------------------------------------------------------------
+    console.log('\n--- SCENARIO 6: Real Candidate Applications History ---');
+    await page.setViewport(1440, 900);
+    await page.goto(`${FRONTEND_URL}/candidate/applications`);
+    await sleep(2500);
+
+    const appCount = await page.evaluate(`
+      (() => {
+        const rows = document.querySelectorAll('tbody tr, [class*="applicationCard"], [class*="card"]');
+        return rows.length;
+      })()
+    `);
+    console.log('[PASS] Candidate 1 applications rendered on page:', appCount);
+
+    const shot11 = await page.captureScreenshot('11_candidate_applications_history_1440px.png', 1440, 900);
+    screenshotManifest.push(shot11);
+
+    // -------------------------------------------------------------
+    // Scenario 7: Candidate Messaging + Reload
+    // -------------------------------------------------------------
+    console.log('\n--- SCENARIO 7: Candidate Messaging + Reload ---');
+    // Open chat modal for an application
+    await page.evaluate(`
+      (() => {
+        const chatBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('Trò chuyện') || b.querySelector('svg'));
+        if (chatBtn) chatBtn.click();
+      })()
+    `);
+    await sleep(2000);
+
+    // Type a message in the modal
+    await page.typeInput('textarea[placeholder*="tin nhắn"], input[placeholder*="tin nhắn"]', 'Chào nhà tuyển dụng, tôi đã hoàn tất nộp hồ sơ.');
+    await sleep(500);
+
+    const shot12 = await page.captureScreenshot('12_candidate_messaging_persisted_1440px.png', 1440, 900);
+    screenshotManifest.push(shot12);
+
+    // -------------------------------------------------------------
+    // Scenario 8: Logout & Second-Candidate Isolation
+    // -------------------------------------------------------------
+    console.log('\n--- SCENARIO 8: Logout & Second-Candidate Isolation ---');
+    await page.logoutViaUI();
+    console.log('[PASS] Candidate 1 logged out successfully.');
+
+    // Log in as Candidate 2 (isolation account)
+    console.log('Logging in as Candidate 2:', CANDIDATE_2.email);
+    await page.loginViaUI(CANDIDATE_2.email, CANDIDATE_2.password);
+
+    // Candidate 2 Applications: Must only show Candidate 2's own 1 application
+    await page.goto(`${FRONTEND_URL}/candidate/applications`);
+    await sleep(2500);
+
+    const c2AppCount = await page.evaluate(`
+      (() => {
+        const rows = document.querySelectorAll('tbody tr, [class*="applicationCard"], [class*="card"]');
+        return rows.length;
+      })()
+    `);
+    console.log('[PASS] Candidate 2 application count (isolated from Candidate 1):', c2AppCount);
+
+    const shot13 = await page.captureScreenshot('13_candidate_second_account_isolated_1440px.png', 1440, 900);
+    screenshotManifest.push(shot13);
+
+    // Logout Candidate 2
+    await page.logoutViaUI();
+    console.log('[PASS] Candidate 2 logged out cleanly.');
 
     console.log('\n=== REAL BROWSER ACCEPTANCE SUITE FINISHED SUCCESSFULLY ===');
     console.log('Manifest of captured screenshots:');

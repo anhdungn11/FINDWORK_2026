@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getReturnDestination } from "@/app/router/returnDestination";
 
@@ -125,9 +125,15 @@ const ResumeBuilderEditor = ({
   const builder = useResumeBuilder(initialState);
   const isEditing = Boolean(existingResume);
 
+  const isSavedRef = useRef(false);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Auto-save draft with immediate flush on beforeunload/pagehide/unmount so typing is never lost
   useEffect(() => {
+    if (isSavedRef.current) return;
+
     const flushDraft = () => {
+      if (isSavedRef.current) return;
       saveBuilderDraft(userId, existingResume?.id, {
         resumeName: builder.resumeName,
         templateCode: builder.templateCode,
@@ -136,19 +142,24 @@ const ResumeBuilderEditor = ({
       });
     };
 
-    const timer = setTimeout(flushDraft, 300);
+    draftTimerRef.current = setTimeout(flushDraft, 300);
     if (typeof window !== "undefined") {
       window.addEventListener("beforeunload", flushDraft);
       window.addEventListener("pagehide", flushDraft);
     }
 
     return () => {
-      clearTimeout(timer);
+      if (draftTimerRef.current) {
+        clearTimeout(draftTimerRef.current);
+        draftTimerRef.current = null;
+      }
       if (typeof window !== "undefined") {
         window.removeEventListener("beforeunload", flushDraft);
         window.removeEventListener("pagehide", flushDraft);
       }
-      flushDraft();
+      if (!isSavedRef.current) {
+        flushDraft();
+      }
     };
   }, [userId, existingResume?.id, builder.resumeName, builder.templateCode, builder.content, builder.settings]);
 
@@ -177,7 +188,14 @@ const ResumeBuilderEditor = ({
         });
       }
 
+      // Stop pending timers and suppress cleanup/unload persistence after successful save
+      isSavedRef.current = true;
+      if (draftTimerRef.current) {
+        clearTimeout(draftTimerRef.current);
+        draftTimerRef.current = null;
+      }
       clearBuilderDraft(userId, existingResume?.id);
+
       if (isCustomReturn && targetReturnUrl) {
         const separator = targetReturnUrl.includes("?") ? "&" : "?";
         navigate(`${targetReturnUrl}${separator}createdCvId=${encodeURIComponent(savedResume.id)}`);
@@ -185,6 +203,7 @@ const ResumeBuilderEditor = ({
         navigate("/cv");
       }
     } catch (error) {
+      isSavedRef.current = false;
       setSaveError(
         error instanceof Error ? error.message : "Không thể lưu CV.",
       );

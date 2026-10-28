@@ -2,9 +2,31 @@ import type { SavedJobItem } from "./types";
 import { isLiveWritesEnabled } from "../profile/config/candidateIntegrationConfig";
 import { candidateSavedJobsApi } from "../../../services/api/candidateSavedJobsApi";
 import { formatSalary } from "../../../services/api/apiTypes";
+import { useAuthStore } from "../../../store/authStore";
 
 const STORAGE_PREFIX = "findwork_saved_jobs_";
 const EVENT_NAME = "findwork:saved-jobs-changed";
+
+let activeSyncSession: { userId: string; syncId: number } | null = null;
+let syncCounter = 0;
+
+// When auth user changes, immediately invalidate any active sync session
+if (typeof window !== "undefined" || (useAuthStore && typeof useAuthStore.subscribe === "function")) {
+  try {
+    useAuthStore.subscribe((state, prevState) => {
+      if (state.user?.id !== prevState.user?.id) {
+        activeSyncSession = null;
+      }
+    });
+  } catch {
+    // Best-effort in test / non-store environments
+  }
+}
+
+export function resetSavedJobsSyncForTesting(): void {
+  activeSyncSession = null;
+  syncCounter = 0;
+}
 
 function getStorageKey(userId: string | null | undefined): string {
   const safeId = userId && typeof userId === "string" && userId.trim() ? userId.trim() : "guest";
@@ -81,13 +103,16 @@ export const savedJobsService = {
       localStorage.setItem(key, JSON.stringify(updated));
       window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { userId, jobId: item.id, action: "save" } }));
 
-      // Nếu là UUID và live writes được bật, gọi API backend
+      // Nếu là UUID và live writes được bật, gọi API backend (chỉ khi đúng user phiên hiện tại)
       if (isLiveWritesEnabled() && typeof item.id === "string") {
-        candidateSavedJobsApi.save(item.id).catch((err: { status?: number }) => {
-          if (err.status !== 409) {
-            // Không xóa local bookmark nếu gặp lỗi mạng đột xuất
-          }
-        });
+        const currentAuthUser = useAuthStore.getState().user?.id;
+        if (!currentAuthUser || currentAuthUser === userId) {
+          candidateSavedJobsApi.save(item.id).catch((err: { status?: number }) => {
+            if (err?.status !== 409) {
+              // Không xóa local bookmark nếu gặp lỗi mạng đột xuất
+            }
+          });
+        }
       }
 
       return true;
@@ -108,11 +133,14 @@ export const savedJobsService = {
       localStorage.setItem(key, JSON.stringify(updated));
       window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { userId, jobId, action: "unsave" } }));
 
-      // Nếu là UUID và live writes được bật, gọi API xóa backend
+      // Nếu là UUID và live writes được bật, gọi API xóa backend (chỉ khi đúng user phiên hiện tại)
       if (isLiveWritesEnabled() && typeof jobId === "string") {
-        candidateSavedJobsApi.remove(jobId).catch(() => {
-          // Ignore removal error
-        });
+        const currentAuthUser = useAuthStore.getState().user?.id;
+        if (!currentAuthUser || currentAuthUser === userId) {
+          candidateSavedJobsApi.remove(jobId).catch(() => {
+            // Ignore removal error
+          });
+        }
       }
 
       return true;
@@ -137,14 +165,40 @@ export const savedJobsService = {
 
   /**
    * Đồng bộ từ Backend khi live writes bật và người dùng đã xác thực.
+   * Ràng buộc phiên đồng bộ với userId khởi tạo: hủy bỏ và ngăn chặn ghi đè nếu phiên auth thay đổi.
    * Giữ lại mọi bookmark cục bộ chưa có trên server để chống mất mát dữ liệu (data loss).
    */
   async syncFromBackend(userId: string | null | undefined): Promise<void> {
     if (!userId || !isLiveWritesEnabled()) {
       return;
     }
+
+    // Không kích hoạt sync nếu user khởi tạo khác user hiện đang đăng nhập
+    const currentAuthId = useAuthStore.getState().user?.id;
+    if (currentAuthId && currentAuthId !== userId) {
+      return;
+    }
+
+    const syncId = ++syncCounter;
+    activeSyncSession = { userId, syncId };
+
+    const isStale = (): boolean => {
+      if (!activeSyncSession || activeSyncSession.userId !== userId || activeSyncSession.syncId !== syncId) {
+        return true;
+      }
+      const activeUser = useAuthStore.getState().user?.id;
+      if (activeUser && activeUser !== userId) {
+        return true;
+      }
+      return false;
+    };
+
+    if (isStale()) return;
+
     try {
       const paged = await candidateSavedJobsApi.list({ page: 1, pageSize: 100 });
+      if (isStale()) return;
+
       const remoteItems: SavedJobItem[] = paged.data.map((r) => {
         if (!r.isAvailable || !r.job) {
           return {
@@ -178,6 +232,8 @@ export const savedJobsService = {
       const preservedLocal: SavedJobItem[] = [];
 
       for (const item of currentList) {
+        if (isStale()) return;
+
         const idStr = String(item.id);
         if (remoteIdSet.has(idStr)) {
           continue; // Đã có trên remote
@@ -185,15 +241,19 @@ export const savedJobsService = {
 
         // Nếu là job thực tế (UUID) chưa có trên server, gửi request lưu lên backend
         if (!item.isMock && typeof item.id === "string") {
+          if (isStale()) return;
           try {
             await candidateSavedJobsApi.save(item.id);
           } catch {
             // Lưu thất bại hoặc mạng chập chờn: tiếp tục bảo toàn trong local để không mất bookmark
           }
+          if (isStale()) return;
         }
 
         preservedLocal.push(item);
       }
+
+      if (isStale()) return;
 
       const merged = [...remoteItems, ...preservedLocal];
       localStorage.setItem(key, JSON.stringify(merged));
