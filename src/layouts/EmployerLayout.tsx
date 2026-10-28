@@ -22,7 +22,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { canManageJobs } from "@/features/company/companyWorkspacePermissions";
 import { Badge } from "@/components/ui";
-import { FindworkAiFloatingWidget } from "@/features/ai/FindworkAiFloatingWidget";
+import { EmployerAiFloatingLauncher } from "@/features/company/EmployerAiFloatingLauncher";
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import { useI18n } from "@/i18n/i18nStore";
 import styles from "./EmployerLayout.module.css";
@@ -302,6 +302,19 @@ const EmployerLayout = () => {
                   <span>Hồ sơ ứng viên</span>
                 </NavLink>
               </li>
+              <li>
+                <NavLink
+                  to="/employer/ai"
+                  className={({ isActive }) =>
+                    `${styles.navLink} ${isActive ? styles.navLinkActive : ""}`
+                  }
+                >
+                  <span className={styles.navIcon}>
+                    <Sparkles size={18} color="var(--color-primary, #4f46e5)" />
+                  </span>
+                  <span>Trợ lý AI Doanh nghiệp</span>
+                </NavLink>
+              </li>
             </ul>
           </div>
 
@@ -393,9 +406,7 @@ const EmployerLayout = () => {
         </main>
       </div>
 
-      <FindworkAiFloatingWidget
-        contextHint={active?.name ? `Doanh nghiệp: ${active.name}` : undefined}
-      />
+      <EmployerAiFloatingLauncher companyName={active?.name} />
     </div>
   );
 };

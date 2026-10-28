@@ -57,6 +57,7 @@ const EmployerProfilePage = lazy(() => import("@/pages/employer/EmployerProfileP
 const EmployerLocationsPage = lazy(() => import("@/pages/employer/EmployerLocationsPage"));
 const EmployerMembersPage = lazy(() => import("@/pages/employer/EmployerMembersPage"));
 const EmployerApplicantsPage = lazy(() => import("@/pages/employer/EmployerApplicantsPage"));
+const EmployerAiPage = lazy(() => import("@/pages/employer/EmployerAiPage/EmployerAiPage"));
 
 const AdminDashboardPage = lazy(() => import("@/pages/admin/AdminDashboardPage"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/AdminUsersPage"));
@@ -286,6 +287,11 @@ const AppRouter = () => {
                 <Route
                   path="applicants"
                   element={<EmployerApplicantsPage />}
+                />
+
+                <Route
+                  path="ai"
+                  element={<EmployerAiPage />}
                 />
               </Route>
             </Route>
