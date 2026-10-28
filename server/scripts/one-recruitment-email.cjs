@@ -5,6 +5,7 @@ const { readFileSync } = require("node:fs");
 const path = require("node:path");
 const dotenv = require("dotenv");
 const { Client } = require("pg");
+const { validateRecruitmentApplicationUrl } = require("./recruitment-application-url.cjs");
 
 const [mode, jobId] = process.argv.slice(2);
 assert.ok(["--preview", "--send"].includes(mode) && /^[a-f0-9-]{36}$/i.test(jobId || ""),
@@ -52,10 +53,7 @@ async function main() {
     assert.equal(payload.kind, row.kind);
     assert.equal(payload.applicationId, row.applicationId);
     assert.equal(payload.interviewId, row.interviewId);
-    const applicationUrl = new URL(payload.applicationBaseUrl);
-    assert.equal(applicationUrl.protocol, "https:", "External application link must use HTTPS");
-    assert.ok(!applicationUrl.search && !applicationUrl.hash && !applicationUrl.username &&
-      !applicationUrl.password, "Application URL contains unexpected components");
+    const applicationUrl = validateRecruitmentApplicationUrl(payload.applicationBaseUrl, env.NODE_ENV);
     applicationUrl.pathname = `${applicationUrl.pathname.replace(/\/$/, "")}/${encodeURIComponent(row.applicationId)}`;
     const { renderRecruitmentNotice } = require("../dist/infrastructure/email/email-provider.service.js");
     const rendered = renderRecruitmentNotice({ to: payload.recipient, from: payload.sender,
