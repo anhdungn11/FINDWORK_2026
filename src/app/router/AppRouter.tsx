@@ -22,7 +22,7 @@ import CompaniesPage from "@/pages/public/CompaniesPage";
 import CompanyDetailPage from "@/pages/public/CompanyDetailPage";
 import HomePage from "@/pages/public/HomePage";
 import JobDetailPage from "@/pages/public/JobDetailPage/JobDetailPage";
-import JobsPage from "@/pages/public/JobsPage";
+import JobsPage from "@/pages/public/JobsPage/JobsPage";
 
 import EmployerDashboardPage, { EmployerWorkspaceOutlet } from "@/pages/employer/EmployerDashboardPage";
 import { CompanyWorkspaceProvider } from "@/features/company/CompanyWorkspaceContext";
