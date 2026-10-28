@@ -225,6 +225,10 @@ const AppRouter = () => {
                 path="applications"
                 element={<CandidateApplicationsPage />}
               />
+              <Route
+                path="applications/:applicationId"
+                element={<CandidateApplicationsPage />}
+              />
             </Route>
           </Route>
 

@@ -12,7 +12,6 @@ import {
   Camera,
   FileCheck2,
   FileText,
-  UserCheck,
   CheckCircle2,
   XCircle,
 } from "lucide-react";

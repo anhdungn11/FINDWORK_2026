@@ -295,7 +295,7 @@ describe("FINDWORK CP13C Candidate Final QA & Release Hardening Regression Suite
         listCallCount++;
         return {
           data: [],
-          meta: { page: 1, pageSize: 100, total: 0, totalPages: 0 },
+          pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 },
         };
       };
 
@@ -308,17 +308,34 @@ describe("FINDWORK CP13C Candidate Final QA & Release Hardening Regression Suite
         return {
           id: "saved-record-1",
           jobId,
-          userId: "candidate-sync-1",
           savedAt: new Date().toISOString(),
+          isAvailable: true,
           job: {
             id: jobId,
-            title: "Senior AI Product Designer",
             companyId: "comp-1",
-            status: "PUBLISHED" as const,
-            employmentType: "FULL_TIME" as const,
-            workMode: "REMOTE" as const,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            companyName: "TechCorp",
+            companySlug: "tech-corp",
+            companyLogoUrl: null,
+            locations: null,
+            categoryId: null,
+            categoryName: null,
+            title: "Senior AI Product Designer",
+            description: null,
+            employmentType: "FULL_TIME",
+            workplaceType: "REMOTE",
+            experienceMinMonths: null,
+            experienceMaxMonths: null,
+            salaryMin: null,
+            salaryMax: null,
+            currency: "VND",
+            salaryPeriod: null,
+            salaryNegotiable: false,
+            showSalary: true,
+            status: "PUBLISHED",
+            publishedAt: new Date().toISOString(),
+            applicationDeadline: null,
+            version: 1,
+            screeningQuestions: [],
           },
         };
       };
@@ -424,7 +441,7 @@ describe("FINDWORK CP13C Candidate Final QA & Release Hardening Regression Suite
           jobId,
           activeUserWhenCalled: useAuthStore.getState().user?.id,
         });
-        return { id: "dummy", jobId, userId: "unknown", savedAt: new Date().toISOString() };
+        return { id: "dummy", jobId, savedAt: new Date().toISOString(), isAvailable: true, job: null };
       };
 
       try {
@@ -509,7 +526,7 @@ describe("FINDWORK CP13C Candidate Final QA & Release Hardening Regression Suite
       });
 
       // User A creates a builder resume
-      const userACv = await resumeService.createBuilderResume({
+      await resumeService.createBuilderResume({
         name: "User A Sensitive Resume",
         templateCode: "modern",
         content: {
@@ -518,7 +535,10 @@ describe("FINDWORK CP13C Candidate Final QA & Release Hardening Regression Suite
         } as ResumeBuilderContent,
         settings: {
           fontFamily: "sans",
-          accentColor: "indigo",
+          accentColor: "navy",
+          density: "balanced",
+          showPhoto: false,
+          industryPreset: "general",
           sectionOrder: ["summary"],
           hiddenSections: [],
         },

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { publicApi, type PublicJobQuery } from "@/services/api/publicApi";
 import type { JobDto, JobCategoryDto, ProvinceDto } from "@/services/api/apiTypes";
@@ -66,8 +66,8 @@ export const JobsPage = () => {
       .catch(() => {});
 
     publicApi
-      .listProvinces({ pageSize: 100 })
-      .then((p) => setProvinces(p.data))
+      .listProvinces()
+      .then((p) => setProvinces(p))
       .catch(() => {});
   }, []);
 
@@ -168,7 +168,7 @@ export const JobsPage = () => {
   // Handler for Clear All
   const handleClearAll = () => {
     setSearchParams(
-      (prev) => {
+      () => {
         const next = new URLSearchParams();
         next.set("page", "1");
         return next;

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { getLocalizedApiError } from "../../../i18n/errorCodes.ts";
-import { useI18n } from "../../../i18n/i18nStore.ts";
+import { getLocalizedApiError } from "../../../i18n/errorCodes";
+import { useI18n } from "../../../i18n/i18nStore";
 
 describe("P0 Account Type, Routing & Floating AI Widget Regression", () => {
   it("CandidateRoute guards against Employer accounts and prevents mounting candidate workspace", () => {

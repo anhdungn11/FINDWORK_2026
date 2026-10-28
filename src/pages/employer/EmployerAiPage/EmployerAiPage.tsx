@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useId } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Sparkles,
   ShieldCheck,
@@ -10,13 +10,11 @@ import {
   Layers,
   Copy,
   Check,
-  ExternalLink,
   AlertTriangle,
   Info,
   RefreshCw,
   PlusCircle,
   Briefcase,
-  CheckCircle2,
 } from "lucide-react";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { canUseBusinessAi } from "@/features/company/companyWorkspacePermissions";
@@ -24,6 +22,8 @@ import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
 import {
   employerAiApi,
   CompanyAiNotImplementedError,
+  CompanyAiPermissionError,
+  CompanyAiQuotaExceededError,
   type DraftJobRequest,
   type DraftJobResponse,
   type ImproveJobRequest,
@@ -221,7 +221,7 @@ export const EmployerAiPage: React.FC = () => {
         .listJobs(active.id, { pageSize: 30 })
         .then((res) => {
           if (!unmounted && res.data && activeCompanyIdRef.current === active.id) {
-            setCompanyJobs(res.data.map((j) => ({ id: j.id, title: j.title, status: j.status })));
+            setCompanyJobs(res.data.map((j) => ({ id: j.id, title: j.title, status: j.status ?? "DRAFT" })));
           }
         })
         .catch(() => {
@@ -281,13 +281,25 @@ export const EmployerAiPage: React.FC = () => {
       });
     } catch (err) {
       if (requestCompanyId !== activeCompanyIdRef.current || controller.signal.aborted) return;
-      const isNotImplemented = err instanceof CompanyAiNotImplementedError;
+      const isNotImplemented =
+        err instanceof CompanyAiNotImplementedError ||
+        (err as { status?: number })?.status === 404;
+      const isForbidden =
+        err instanceof CompanyAiPermissionError ||
+        (err as { status?: number })?.status === 403;
+      const isQuota =
+        err instanceof CompanyAiQuotaExceededError ||
+        (err as { status?: number })?.status === 429;
+      const status = isNotImplemented ? 404 : isForbidden ? 403 : isQuota ? 429 : 503;
+
       setProbeResult({
         checked: true,
-        status: isNotImplemented ? 404 : 503,
+        status,
         endpoint,
         message: isNotImplemented
           ? "Tính năng AI doanh nghiệp chưa được kích hoạt trên hệ thống máy chủ (HTTP 404). Vui lòng liên hệ quản trị viên hệ thống để được hỗ trợ."
+          : isForbidden
+          ? "Tài khoản của bạn không có quyền sử dụng tính năng AI trong phạm vi Doanh nghiệp này (HTTP 403 Forbidden)."
           : (err as Error).message,
         timestamp: new Date().toLocaleTimeString("vi-VN"),
       });
@@ -577,12 +589,25 @@ export const EmployerAiPage: React.FC = () => {
             <div className={styles.diagnosticsStatus}>
               <span
                 className={styles.diagnosticsStatusDot}
-                style={{ background: probeResult.status === 200 ? "#10b981" : "#f59e0b" }}
+                style={{
+                  background:
+                    probeResult.status === 200
+                      ? "#10b981"
+                      : probeResult.status === 403
+                      ? "#ef4444"
+                      : "#f59e0b",
+                }}
                 aria-hidden="true"
               />
               <span>
                 {probeResult.status === 200
                   ? "Máy chủ Backend AI Doanh nghiệp sẵn sàng (HTTP 200 OK)"
+                  : probeResult.status === 403
+                  ? "Không có quyền truy cập AI Doanh nghiệp (HTTP 403 Forbidden)"
+                  : probeResult.status === 404
+                  ? "Chức năng AI Doanh nghiệp chưa được cài đặt (HTTP 404 Not Found)"
+                  : probeResult.status === 429
+                  ? "Vượt quá định mức AI Doanh nghiệp (HTTP 429 Too Many Requests)"
                   : `Hạ tầng Backend đang chờ triển khai (HTTP ${probeResult.status})`}
               </span>
             </div>

@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Users,
   Search,
   Filter,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Lock,
   Unlock,
@@ -261,13 +259,8 @@ const AdminUsersPage = () => {
         <EmptyState
           title="Không tìm thấy người dùng phù hợp"
           text={q || status ? "Không có tài khoản nào khớp với bộ lọc hiện tại. Thử xóa bộ lọc để xem toàn bộ danh sách." : "Hệ thống chưa có người dùng nào được tạo."}
-          action={
-            q || status ? (
-              <button type="button" className={`${ui.btn} ${ui.btnOutline}`} onClick={handleClearFilters}>
-                Xóa bộ lọc
-              </button>
-            ) : undefined
-          }
+          actionLabel={q || status ? "Xóa bộ lọc" : undefined}
+          onAction={q || status ? handleClearFilters : undefined}
         />
       ) : (
         <>
@@ -412,8 +405,7 @@ const AdminUsersPage = () => {
             <Pagination
               page={users.data.pagination.page}
               totalPages={users.data.pagination.totalPages}
-              total={users.data.pagination.total}
-              onPageChange={(p) => setFilter("page", String(p))}
+              onChange={(p: number) => setFilter("page", String(p))}
             />
           </div>
         </>

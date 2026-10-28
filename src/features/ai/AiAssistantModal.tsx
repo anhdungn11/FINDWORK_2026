@@ -5,7 +5,6 @@ import {
   Trash2,
   X,
   AlertCircle,
-  Bot,
   User,
   Maximize2,
   Minimize2,
@@ -20,7 +19,6 @@ import {
   Plus,
   MessageSquare,
   ShieldCheck,
-  Info,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import {
@@ -38,10 +36,11 @@ import {
   getStoredGuestSession,
   getOrCreateGuestSession,
   AiProviderUnavailableError,
+  AiPermissionError,
   AiRateLimitError,
   AiInputBlockedError,
 } from "./aiChatApi";
-import { encodeWav, resampleTo16kMono } from "./audioUtils";
+import { encodeWav } from "./audioUtils";
 import { useI18n } from "../../i18n/i18nStore";
 import { AiMarkdownMessage } from "./components/AiMarkdownMessage";
 import styles from "./AiAssistantModal.module.css";
@@ -62,7 +61,7 @@ interface AiAssistantModalProps {
 export const AiAssistantModal = ({
   isOpen,
   onClose,
-  contextHint,
+  contextHint: _contextHint,
   defaultPrompt,
 }: AiAssistantModalProps) => {
   const { user } = useAuthStore();
@@ -302,15 +301,10 @@ export const AiAssistantModal = ({
     try {
       let activeConvId = conversationId;
       if (!activeConvId) {
-        try {
-          const conv = await createAiConversation();
-          activeConvId = conv.id;
-          setConversationId(conv.id);
-          setConversations((prev) => [conv, ...prev]);
-        } catch {
-          // Cannot create conversation, throw to error handling
-          throw new AiProviderUnavailableError();
-        }
+        const conv = await createAiConversation();
+        activeConvId = conv.id;
+        setConversationId(conv.id);
+        setConversations((prev) => [conv, ...prev]);
       }
 
       const res = await sendAiMessage(activeConvId, content, currentImage);
@@ -337,6 +331,8 @@ export const AiAssistantModal = ({
       setMessages([...nextMessages.filter((m) => m.id !== userMsg.id), updatedUserMsg]);
 
       if (err instanceof AiProviderUnavailableError) {
+        setErrorMessage(err.message);
+      } else if (err instanceof AiPermissionError) {
         setErrorMessage(err.message);
       } else if (err instanceof AiRateLimitError) {
         setErrorMessage(err.message);

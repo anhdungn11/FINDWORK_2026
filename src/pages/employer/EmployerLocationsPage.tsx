@@ -1,12 +1,12 @@
 import { useState, useEffect, type FormEvent, useMemo } from "react";
-import { MapPin, Building, Edit3, ShieldCheck, Search, Check, AlertCircle } from "lucide-react";
+import { MapPin, Building, Edit3, ShieldCheck } from "lucide-react";
 import { Badge, Card, EmptyState, LoadingBlock, PageHeader, ConfirmationModal, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { companyWorkspaceApi, type CompanyLocationInput } from "@/services/api/companyWorkspaceApi";
 import { publicApi } from "@/services/api/publicApi";
-import type { CompanyLocationDto, ProvinceDto, WardDto } from "@/services/api/apiTypes";
+import type { CompanyLocationDto, WardDto } from "@/services/api/apiTypes";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 import { canUpdateCompany } from "@/features/company/companyWorkspacePermissions";

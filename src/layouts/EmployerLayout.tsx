@@ -14,7 +14,6 @@ import {
   LogOut,
   Menu,
   X,
-  User,
   Sparkles,
   Globe,
 } from "lucide-react";

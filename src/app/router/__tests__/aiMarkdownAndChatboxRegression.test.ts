@@ -5,7 +5,6 @@ import {
   isSafeUrl,
   parseBlocks,
   parseInlineMarkdown,
-  AiMarkdownMessage,
 } from "../../../features/ai/components/AiMarkdownMessage";
 
 test("Markdown Security: isSafeUrl allows valid web and email URLs, rejects malicious schemes", () => {

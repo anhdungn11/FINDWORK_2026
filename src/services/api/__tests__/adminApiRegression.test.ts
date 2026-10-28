@@ -5,7 +5,6 @@ import {
   normalizeAdminCompany,
   normalizeAdminCompanyDetail,
   normalizeAdminCompanyLegal,
-  normalizeAdminJob,
   normalizeAdminJobDetail,
   normalizeAdminAudit,
   adminApi,

@@ -32,6 +32,10 @@ export const getReturnDestination = (requested: unknown, defaultFallback = DEFAU
       path === "/candidate/applications" || path === "/cv" ||
       path === "/cv/create") return requested;
 
+  if (/^\/candidate\/applications\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)) {
+    return requested;
+  }
+
   if (path === "/admin" || path === "/admin/users" ||
       path === "/admin/companies" || path === "/admin/jobs" ||
       path === "/admin/system") return requested;

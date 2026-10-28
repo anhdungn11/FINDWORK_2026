@@ -8,13 +8,9 @@ import {
   ArrowRight,
   ShieldCheck,
   RefreshCw,
-  ExternalLink,
-  CheckCircle2,
   Clock,
   Ban,
-  Activity,
   Layers,
-  Sparkles,
 } from "lucide-react";
 import { Badge, Card, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";

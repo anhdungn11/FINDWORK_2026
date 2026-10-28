@@ -1,27 +1,17 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Briefcase,
   Search,
   Filter,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
   Eye,
   X,
-  Copy,
-  Check,
   RefreshCw,
   Building2,
-  Calendar,
   DollarSign,
-  MapPin,
   Clock,
-  Layers,
   Ban,
 } from "lucide-react";
 import {
-  Badge,
   EmptyState,
   JobStatusBadge,
   LoadingBlock,
@@ -287,13 +277,8 @@ const AdminJobsPage = () => {
               ? "Không có tin đăng nào phù hợp với bộ lọc hiện tại. Thử xóa bộ lọc để xem toàn bộ danh sách."
               : "Hệ thống chưa có tin tuyển dụng nào được tạo."
           }
-          action={
-            status || companyId ? (
-              <button type="button" className={`${ui.btn} ${ui.btnOutline}`} onClick={handleClearFilters}>
-                Xóa bộ lọc
-              </button>
-            ) : undefined
-          }
+          actionLabel={status || companyId ? "Xóa bộ lọc" : undefined}
+          onAction={status || companyId ? handleClearFilters : undefined}
         />
       ) : (
         <>
@@ -377,8 +362,7 @@ const AdminJobsPage = () => {
             <Pagination
               page={jobs.data.pagination.page}
               totalPages={jobs.data.pagination.totalPages}
-              total={jobs.data.pagination.total}
-              onPageChange={(p) => setFilter("page", String(p))}
+              onChange={(p: number) => setFilter("page", String(p))}
             />
           </div>
         </>

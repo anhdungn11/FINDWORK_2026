@@ -14,7 +14,7 @@ import {
 } from "@/features/resume/builder/hooks/useResumeBuilder";
 import { useAuthStore } from "@/store/authStore";
 import { resumeService } from "@/features/resume/services/resumeService";
-import type { Resume, ResumeBuilderContent, ResumeBuilderSettings, ResumeTemplateCode } from "@/features/resume/types/resume.types";
+import type { Resume } from "@/features/resume/types/resume.types";
 
 import styles from "./ResumeBuilderPage.module.css";
 

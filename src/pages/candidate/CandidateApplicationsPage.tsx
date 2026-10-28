@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   Briefcase,
   Calendar,
@@ -39,6 +39,8 @@ const STATUS_TONES: Record<ApplicationStatus, "neutral" | "info" | "warning" | "
 };
 
 const CandidateApplicationsPage = () => {
+  const { applicationId } = useParams<{ applicationId: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiFailure | null>(null);
   const [paged, setPaged] = useState<Paged<CompanyApplicationDto> | null>(null);
@@ -72,6 +74,20 @@ const CandidateApplicationsPage = () => {
   useEffect(() => {
     return fetchApplications();
   }, [fetchApplications]);
+
+  useEffect(() => {
+    if (!applicationId) return;
+    const ctrl = new AbortController();
+    candidateApplicationApi.get(applicationId, ctrl.signal)
+      .then((application) => setSelectedApp(application))
+      .catch((err: ApiFailure) => { if (!ctrl.signal.aborted) setError(err); });
+    return () => ctrl.abort();
+  }, [applicationId]);
+
+  const closeDetails = () => {
+    setSelectedApp(null);
+    if (applicationId) navigate("/candidate/applications", { replace: true });
+  };
 
   // Load interviews when an application is selected
   useEffect(() => {
@@ -236,7 +252,7 @@ const CandidateApplicationsPage = () => {
               <button
                 type="button"
                 className={styles.closeBtn}
-                onClick={() => setSelectedApp(null)}
+                onClick={closeDetails}
                 aria-label="Đóng chi tiết"
               >
                 ✕
@@ -409,7 +425,7 @@ const CandidateApplicationsPage = () => {
               <button
                 type="button"
                 className={styles.closeModalBtn}
-                onClick={() => setSelectedApp(null)}
+                onClick={closeDetails}
               >
                 Đóng
               </button>

@@ -93,6 +93,19 @@ export class AiProviderUnavailableError extends Error {
   }
 }
 
+export class AiPermissionError extends Error {
+  readonly code = "AI_FORBIDDEN";
+  readonly status = 403;
+
+  constructor(message?: string) {
+    super(
+      message ||
+        "Tài khoản không có quyền sử dụng tính năng AI này (HTTP 403 Forbidden)."
+    );
+    this.name = "AiPermissionError";
+  }
+}
+
 export class AiRateLimitError extends Error {
   readonly code: string;
   readonly status = 429;
@@ -186,8 +199,20 @@ const getAiRequestHeaders = async (): Promise<Record<string, string>> => {
  */
 export const createAiConversation = async (): Promise<AiConversation> => {
   const headers = await getAiRequestHeaders();
-  const res = await apiClient.post<AiConversation>("/ai/conversations", {}, { headers });
-  return res.data;
+  try {
+    const res = await apiClient.post<AiConversation>("/ai/conversations", {}, { headers });
+    return res.data;
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const msg = extractApiErrorMessage(err);
+    if (status === 403) {
+      throw new AiPermissionError(msg || "Tài khoản không có quyền tạo cuộc hội thoại AI (HTTP 403 Forbidden).");
+    }
+    if (status === 503) {
+      throw new AiProviderUnavailableError();
+    }
+    throw err;
+  }
 };
 
 /**
@@ -262,6 +287,11 @@ export const sendAiMessage = async (
     const code = err?.response?.data?.code;
     const msg = extractApiErrorMessage(err);
 
+    if (status === 403 || code === "AI_FORBIDDEN" || code === "FORBIDDEN") {
+      throw new AiPermissionError(
+        msg || "Tài khoản không có quyền sử dụng tính năng trò chuyện AI (HTTP 403 Forbidden)."
+      );
+    }
     if (status === 503 || code === "AI_PROVIDER_NOT_CONFIGURED" || code === "AI_PROVIDER_UNAVAILABLE") {
       throw new AiProviderUnavailableError(
         "Dịch vụ AI Provider chưa được cấu hình API Key trên máy chủ (HTTP 503). FINDWORK ghi nhận câu hỏi an toàn và sẽ xử lý khi nhà cung cấp kết nối."

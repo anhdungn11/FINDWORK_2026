@@ -13,7 +13,7 @@ import { useI18n } from "@/i18n/i18nStore";
 
 import styles from "./FeaturedJobs.module.css";
 
-const isIntegrationTestJob = (dto: { title?: string; companyName?: string }): boolean => {
+const isIntegrationTestJob = (dto: { title?: string | null; companyName?: string | null }): boolean => {
   const title = (dto.title || "").toLowerCase();
   const company = (dto.companyName || "").toLowerCase();
   return (

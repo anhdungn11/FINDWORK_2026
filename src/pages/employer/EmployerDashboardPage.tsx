@@ -6,22 +6,14 @@ import {
   Building2,
   FileCheck2,
   AlertCircle,
-  AlertTriangle,
   ArrowRight,
   Plus,
   CheckCircle2,
   Clock,
   XCircle,
   MapPin,
-  ShieldCheck,
   ShieldAlert,
   ChevronRight,
-  ExternalLink,
-  Layers,
-  Sparkles,
-  Calendar,
-  DollarSign,
-  TrendingUp,
 } from "lucide-react";
 import { Badge, Card, JobStatusBadge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
@@ -36,7 +28,6 @@ import {
   canUpdateCompany,
   formatCompanyRole,
 } from "@/features/company/companyWorkspacePermissions";
-import type { CompanyApplicationDto, JobDto } from "@/services/api/apiTypes";
 
 export const EmployerWorkspaceOutlet = () => <Outlet />;
 
@@ -169,7 +160,6 @@ const EmployerDashboardPage = () => {
   const totalJobs = jobs.data?.pagination.total ?? 0;
   const publishedCount = allJobs.filter((j) => j.status === "PUBLISHED").length;
   const draftCount = allJobs.filter((j) => j.status === "DRAFT").length;
-  const otherCount = allJobs.filter((j) => j.status !== "PUBLISHED" && j.status !== "DRAFT").length;
 
   const activeMembers = (members.data ?? []).filter((m) => m.status === "ACTIVE").length;
   const pendingInvitations = (invitations.data ?? []).filter((inv) => inv.status === "PENDING").length;
@@ -182,7 +172,6 @@ const EmployerDashboardPage = () => {
   const isVerified = active.verificationStatus === "VERIFIED";
   const isPendingVerification = active.verificationStatus === "PENDING";
   const isRejectedVerification = active.verificationStatus === "REJECTED";
-  const isUnverified = !isVerified && !isPendingVerification && !isRejectedVerification;
 
   return (
     <>
@@ -707,7 +696,7 @@ const EmployerDashboardPage = () => {
                       >
                         {j.title}
                       </strong>
-                      <JobStatusBadge status={j.status} />
+                      <JobStatusBadge status={j.status ?? "DRAFT"} />
                     </div>
                     <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
                       Hạn nộp: {formatDate(j.applicationDeadline)}

@@ -4,7 +4,8 @@ import { toApiFailure, writeBlockedFailure } from "./apiFailure";
 import {
   normalizeCompanyProfile, normalizeJob, normalizeLocation, normalizeMyCompany, normalizePaged,
   normalizeCompanyApplication, normalizeCompanyMember, normalizeCompanyInvitation,
-  normalizeScreeningQuestions, unwrapData,
+  normalizeScreeningQuestions, unwrapData, normalizeCompanyLegalData, normalizeCompanyLegalEvidence,
+  normalizeCompanyInterview,
   type CompanyLocationDto, type CompanyProfileDto, type EmploymentType, type JobDto,
   type MyCompanyDto, type Paged, type SalaryPeriod, type WorkplaceType,
   type CompanyApplicationDto, type ApplicationReviewStatus,
@@ -314,7 +315,7 @@ export const companyWorkspaceApi = {
   },
 
   getLegalData: (companyId: string, signal?: AbortSignal): Promise<CompanyLegalDataDto> =>
-    run(async () => unwrapData((await apiClient.get(`/companies/${encodeURIComponent(companyId)}/legal`, { signal })).data) as CompanyLegalDataDto),
+    run(async () => normalizeCompanyLegalData((await apiClient.get(`/companies/${encodeURIComponent(companyId)}/legal`, { signal })).data)),
 
   updateLegalProfile: (companyId: string, input: UpdateCompanyLegalInput): Promise<any> => {
     guardWrite("cập nhật thông tin pháp lý");
@@ -335,7 +336,7 @@ export const companyWorkspaceApi = {
         `/companies/${encodeURIComponent(companyId)}/legal/evidence`,
         formData,
       );
-      return unwrapData(res.data) as CompanyLegalEvidenceDto;
+      return normalizeCompanyLegalEvidence(unwrapData(res.data));
     });
   },
 
@@ -366,7 +367,7 @@ export const companyWorkspaceApi = {
         `/companies/${encodeURIComponent(companyId)}/applications/${encodeURIComponent(applicationId)}/interviews`,
         input,
       );
-      return unwrapData(res.data) as CompanyInterviewDto;
+      return normalizeCompanyInterview(res.data);
     });
   },
 
@@ -375,7 +376,16 @@ export const companyWorkspaceApi = {
     applicationId: string,
     signal?: AbortSignal,
   ): Promise<CompanyInterviewDto[]> =>
-    run(async () => items((await apiClient.get(`/companies/${encodeURIComponent(companyId)}/applications/${encodeURIComponent(applicationId)}/interviews`, { signal })).data) as CompanyInterviewDto[]),
+    run(async () =>
+      items(
+        (
+          await apiClient.get(
+            `/companies/${encodeURIComponent(companyId)}/applications/${encodeURIComponent(applicationId)}/interviews`,
+            { signal }
+          )
+        ).data
+      ).map(normalizeCompanyInterview)
+    ),
 
   cancelInterview: async (companyId: string, interviewId: string): Promise<any> => {
     guardWrite("hủy lịch phỏng vấn");

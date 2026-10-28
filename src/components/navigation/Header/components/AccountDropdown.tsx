@@ -37,7 +37,7 @@ const AccountDropdown = ({
   const isEmployerContext = location.pathname.startsWith("/employer");
   // Chỉ tài khoản có tư cách doanh nghiệp hợp lệ (GET /companies/me) mới có đích đến /employer.
   // Tài khoản thuần Ứng viên luôn hướng tới /candidate.
-  const workspaceTarget = isEmployer ? "/employer" : "/candidate";
+  const workspaceTarget = isEmployer ? (isEmployerContext ? "/employer" : "/employer") : "/candidate";
   const workspaceTitle = isEmployer
     ? t.nav.employerWorkspace
     : t.nav.candidateWorkspace;

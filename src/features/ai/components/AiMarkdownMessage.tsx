@@ -1,5 +1,7 @@
 import React, { type ReactNode } from "react";
 
+void React;
+
 interface AiMarkdownMessageProps {
   content: string;
   isUser?: boolean;

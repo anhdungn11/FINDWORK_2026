@@ -79,7 +79,7 @@ const JobDetailHero = ({
             <div className={styles.companyLogo}>
               {job.companyLogoUrl ? (
                 <img
-                  src={resolveApiUrl(job.companyLogoUrl)}
+                  src={resolveApiUrl(job.companyLogoUrl) ?? undefined}
                   alt={job.company}
                   style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }}
                   onError={(e) => {

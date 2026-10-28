@@ -41,8 +41,9 @@ export const JOB_STATUS_LABEL: Record<string, { label: string; tone: Tone }> = {
   EXPIRED: { label: "Hết hạn", tone: "danger" },
   ARCHIVED: { label: "Lưu trữ", tone: "neutral" },
 };
-export const JobStatusBadge = ({ status }: { status: string }) => {
-  const m = JOB_STATUS_LABEL[status] ?? { label: status, tone: "neutral" as Tone };
+export const JobStatusBadge = ({ status }: { status?: string | null }) => {
+  const s = status || "DRAFT";
+  const m = JOB_STATUS_LABEL[s] ?? { label: s, tone: "neutral" as Tone };
   return <Badge tone={m.tone}>{m.label}</Badge>;
 };
 

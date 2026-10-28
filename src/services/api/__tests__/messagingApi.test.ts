@@ -5,13 +5,11 @@ import { apiClient } from "../../http/apiClient";
 
 describe("P1 Candidate <-> Employer Messaging API Client", () => {
   let interceptedUrl = "";
-  let interceptedMethod = "";
   let interceptedData: any = null;
   let interceptedParams: any = null;
 
   beforeEach(() => {
     interceptedUrl = "";
-    interceptedMethod = "";
     interceptedData = null;
     interceptedParams = null;
   });

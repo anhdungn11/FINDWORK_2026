@@ -1,5 +1,4 @@
-import React from "react";
-import { Search, MapPin, Briefcase, SlidersHorizontal, X, RotateCcw } from "lucide-react";
+import { Search, SlidersHorizontal, X, RotateCcw } from "lucide-react";
 import styles from "./JobsFilterBar.module.css";
 
 export interface JobsFilterBarProps {

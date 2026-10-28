@@ -5,7 +5,7 @@ import {
   APPLICATION_STATUS_LABEL,
   type ApplicationStatus,
   type ApplicationReviewStatus,
-} from "../../../services/api/apiTypes.ts";
+} from "../../../services/api/apiTypes";
 
 describe("Final Accelerated Frontend Release Sprint P0 & P1 Regression", () => {
   it("JobsFilterBar uses exact Backend query parameter names and ONSITE workplace type", () => {
@@ -182,6 +182,8 @@ describe("Final Accelerated Frontend Release Sprint P0 & P1 Regression", () => {
       "OFFERED",
       "REJECTED",
     ];
+
+    assert.equal(expectedReviewStatuses.length, 5);
 
     for (const status of expectedStatuses) {
       assert.ok(

@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 
 import AuthShell from "@/features/auth/components/AuthShell/AuthShell";
 import { passwordResetApi } from "@/services/api/passwordResetApi";
-import { ApiFailure } from "@/services/api/apiFailure";
 
 import styles from "./ResetPasswordPage.module.css";
 

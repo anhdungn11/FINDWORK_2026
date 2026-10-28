@@ -623,9 +623,9 @@ const EmployerApplicantsPage = () => {
                 const hasBackendInterviews = appInterviews.length > 0;
                 if (!hasBackendInterviews && !activeSavedInterview) return null;
 
-                const statusBadges: Record<string, { tone: "info" | "warn" | "success" | "neutral"; label: string }> = {
+                const statusBadges: Record<string, { tone: "info" | "warning" | "success" | "neutral"; label: string }> = {
                   SCHEDULED: { tone: "info", label: "Đã lên lịch" },
-                  RESCHEDULED: { tone: "warn", label: "Đã dời lịch" },
+                  RESCHEDULED: { tone: "warning", label: "Đã dời lịch" },
                   COMPLETED: { tone: "success", label: "Đã hoàn thành" },
                   CANCELLED: { tone: "neutral", label: "Đã hủy" },
                 };

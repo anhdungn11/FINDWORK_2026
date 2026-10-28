@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { passwordResetApi } from "@/services/api/passwordResetApi";
-import { ApiFailure } from "@/services/api/apiFailure";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

@@ -261,6 +261,8 @@ export interface CompanyInterviewDto {
   status: "SCHEDULED" | "RESCHEDULED" | "COMPLETED" | "CANCELLED";
   createdAt: string;
   updatedAt: string;
+  meetingUrl?: string | null;
+  notes?: string | null;
   session?: {
     id: string;
     provider: string;
@@ -700,6 +702,68 @@ export function normalizeCompanyApplication(value: unknown): CompanyApplicationD
 export function unwrapData(value: unknown): Raw {
   const r = obj(value);
   return r.data && typeof r.data === "object" && !Array.isArray(r.data) ? obj(r.data) : r;
+}
+
+export function normalizeCompanyLegalEvidence(value: unknown): CompanyLegalEvidenceDto {
+  const r = obj(value);
+  return {
+    id: str(r.id) ?? "",
+    kind: (str(r.kind) as CompanyLegalEvidenceDto["kind"]) ?? "BUSINESS_REGISTRATION",
+    originalName: str(r.originalName) ?? "",
+    mimeType: str(r.mimeType) ?? "",
+    byteSize: num(r.byteSize) ?? num(r.sizeBytes) ?? 0,
+    sha256: str(r.sha256) ?? "",
+    createdAt: str(r.createdAt) ?? str(r.uploadedAt) ?? "",
+  };
+}
+
+export function normalizeCompanyLegalData(value: unknown): CompanyLegalDataDto {
+  const r = unwrapData(value);
+  const lp = r.legalProfile && typeof r.legalProfile === "object" ? obj(r.legalProfile) : null;
+  const rawEv = Array.isArray(r.legalEvidence) ? r.legalEvidence : [];
+  return {
+    id: str(r.id) ?? "",
+    legalName: str(r.legalName),
+    taxCode: str(r.taxCode),
+    verificationStatus: (str(r.verificationStatus) as CompanyLegalDataDto["verificationStatus"]) ?? "UNVERIFIED",
+    legalProfile: lp
+      ? {
+          registeredAddress: str(lp.registeredAddress) ?? "",
+          representativeName: str(lp.representativeName) ?? "",
+          representativeTitle: str(lp.representativeTitle),
+          contactEmail: str(lp.contactEmail) ?? "",
+          contactPhone: str(lp.contactPhone) ?? "",
+          updatedAt: str(lp.updatedAt) ?? undefined,
+        }
+      : null,
+    legalEvidence: rawEv.map(normalizeCompanyLegalEvidence),
+  };
+}
+
+export function normalizeCompanyInterview(value: unknown): CompanyInterviewDto {
+  const r = unwrapData(value);
+  const sess = r.session && typeof r.session === "object" ? obj(r.session) : null;
+  return {
+    id: str(r.id) ?? "",
+    companyId: str(r.companyId) ?? "",
+    applicationId: str(r.applicationId) ?? "",
+    scheduledAt: str(r.scheduledAt) ?? "",
+    durationMinutes: num(r.durationMinutes) ?? 30,
+    type: (str(r.type) as CompanyInterviewDto["type"]) ?? "VIDEO",
+    location: str(r.location),
+    status: (str(r.status) as CompanyInterviewDto["status"]) ?? "SCHEDULED",
+    createdAt: str(r.createdAt) ?? "",
+    updatedAt: str(r.updatedAt) ?? "",
+    meetingUrl: str(r.meetingUrl) ?? (sess ? str(sess.joinUrl) : null),
+    notes: str(r.notes),
+    session: sess
+      ? {
+          id: str(sess.id) ?? "",
+          provider: str(sess.provider) ?? "",
+          joinUrl: str(sess.joinUrl),
+        }
+      : null,
+  };
 }
 
 export function formatSalary(job: Pick<JobDto, "salaryMin" | "salaryMax" | "currency" | "salaryPeriod" | "salaryNegotiable" | "showSalary">): string {

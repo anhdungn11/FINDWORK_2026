@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Building2,
   Search,
   Filter,
   CheckCircle2,
@@ -9,19 +8,12 @@ import {
   Clock,
   Eye,
   X,
-  Copy,
-  Check,
   RefreshCw,
   FileText,
   Download,
   ExternalLink,
-  ShieldCheck,
-  ShieldAlert,
   Layers,
   MapPin,
-  Users,
-  Briefcase,
-  FileCheck2,
 } from "lucide-react";
 import { Badge, EmptyState, LoadingBlock, PageHeader, Pagination, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
@@ -483,13 +475,8 @@ const AdminCompaniesPage = () => {
               ? "Không có doanh nghiệp nào khớp với tiêu chí tìm kiếm. Thử đặt lại bộ lọc để xem toàn bộ danh sách."
               : "Hệ thống chưa có doanh nghiệp nào đăng ký."
           }
-          action={
-            q || status || verificationStatus ? (
-              <button type="button" className={`${ui.btn} ${ui.btnOutline}`} onClick={handleClearFilters}>
-                Xóa bộ lọc
-              </button>
-            ) : undefined
-          }
+          actionLabel={q || status || verificationStatus ? "Xóa bộ lọc" : undefined}
+          onAction={q || status || verificationStatus ? handleClearFilters : undefined}
         />
       ) : (
         <>
@@ -593,6 +580,136 @@ const AdminCompaniesPage = () => {
                             <span>Chi tiết & Quyền</span>
                           </button>
 
+                          {writes && (
+                            c.status === "ACTIVE" ? (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#d97706" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "SUSPENDED")}
+                                title="Tạm đình chỉ hoạt động doanh nghiệp"
+                              >
+                                Đình chỉ
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#16a34a" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "ACTIVE")}
+                                title="Kích hoạt lại doanh nghiệp"
+                              >
+                                Kích hoạt
+                              </button>
+                            )
+                          )}
+
+                          {writes && (
+                            c.status === "ACTIVE" ? (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#d97706" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "SUSPENDED")}
+                                title="Tạm đình chỉ hoạt động doanh nghiệp"
+                              >
+                                Đình chỉ
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#16a34a" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "ACTIVE")}
+                                title="Kích hoạt lại doanh nghiệp"
+                              >
+                                Kích hoạt
+                              </button>
+                            )
+                          )}
+
+                          {writes && (
+                            c.status === "ACTIVE" ? (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#d97706" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "SUSPENDED")}
+                                title="Tạm đình chỉ hoạt động doanh nghiệp"
+                              >
+                                Đình chỉ
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#16a34a" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "ACTIVE")}
+                                title="Kích hoạt lại doanh nghiệp"
+                              >
+                                Kích hoạt
+                              </button>
+                            )
+                          )}
+
+                          {writes && (
+                            c.status === "ACTIVE" ? (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#d97706" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "SUSPENDED")}
+                                title="Tạm đình chỉ hoạt động doanh nghiệp"
+                              >
+                                Đình chỉ
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#16a34a" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "ACTIVE")}
+                                title="Kích hoạt lại doanh nghiệp"
+                              >
+                                Kích hoạt
+                              </button>
+                            )
+                          )}
+
+                          {writes && (
+                            c.status === "ACTIVE" ? (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#d97706" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "SUSPENDED")}
+                                title="Tạm đình chỉ hoạt động doanh nghiệp"
+                              >
+                                Đình chỉ
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`${ui.btn} ${ui.btnOutline}`}
+                                style={{ padding: "4px 8px", fontSize: "0.8rem", color: "#16a34a" }}
+                                disabled={isBusy}
+                                onClick={() => handleStatusChange(c, "ACTIVE")}
+                                title="Kích hoạt lại doanh nghiệp"
+                              >
+                                Kích hoạt
+                              </button>
+                            )
+                          )}
+
                           {writes && isPending && (
                             <>
                               <button
@@ -635,8 +752,7 @@ const AdminCompaniesPage = () => {
             <Pagination
               page={companies.data.pagination.page}
               totalPages={companies.data.pagination.totalPages}
-              total={companies.data.pagination.total}
-              onPageChange={(p) => setFilter("page", String(p))}
+              onChange={(p: number) => setFilter("page", String(p))}
             />
           </div>
         </>

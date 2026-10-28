@@ -146,9 +146,15 @@ const EmployerJobFormPage = () => {
     setValues((prev) => ({
       ...prev,
       title: prev.title.trim() ? prev.title : (state.prefillTitle ?? prev.title),
-      description: prev.description.trim() ? prev.description : (state.prefillDescription ?? prev.description),
-      requirements: prev.requirements.trim() ? prev.requirements : (state.prefillRequirements ?? prev.requirements),
-      benefits: prev.benefits.trim() ? prev.benefits : (state.prefillBenefits ?? prev.benefits),
+      description: prev.description.trim()
+        ? prev.description
+        : [
+            state.prefillDescription,
+            state.prefillRequirements ? `\n\n### Yêu cầu ứng viên\n${state.prefillRequirements}` : "",
+            state.prefillBenefits ? `\n\n### Quyền lợi\n${state.prefillBenefits}` : "",
+          ]
+            .filter(Boolean)
+            .join("") || prev.description,
     }));
   }, [isEdit, location.state]);
 

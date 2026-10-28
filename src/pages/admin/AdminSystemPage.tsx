@@ -1,17 +1,13 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Terminal,
-  ShieldCheck,
   Search,
-  Filter,
   Eye,
   X,
   Copy,
   Check,
   RefreshCw,
   Server,
-  Layers,
   Database,
   Lock,
 } from "lucide-react";
@@ -252,8 +248,7 @@ const AdminSystemPage = () => {
               <Pagination
                 page={audits.data?.pagination.page || 1}
                 totalPages={audits.data?.pagination.totalPages || 1}
-                total={audits.data?.pagination.total || 0}
-                onPageChange={setPage}
+                onChange={setPage}
               />
             </div>
           </>
