@@ -262,12 +262,12 @@ const EmployerDashboardPage = () => {
             </div>
             <p style={{ margin: 0, fontSize: "0.825rem", color: "#64748b" }}>
               {isVerified
-                ? "Doanh nghiệp có toàn quyền công khai tin đăng và tiếp cận mạng lưới ứng viên FINDWORK."
+                ? "Hồ sơ pháp lý đã được xác minh. Quyền công khai tin tuyển dụng do Super Admin cấp riêng."
                 : isPendingVerification
                 ? "Super Admin đang thẩm định Giấy phép ĐKKD và Mã số thuế. Quá trình xét duyệt thường diễn ra trong 24 giờ."
                 : isRejectedVerification
-                ? "Vui lòng xem lại lý do từ chối và tải lên giấy tờ pháp lý hợp lệ để tiếp tục đăng tuyển."
-                : "Hoàn tất nộp Giấy chứng nhận ĐKKD và Mã số thuế để mở quyền công khai tin tuyển dụng."}
+                ? "Vui lòng xem lại lý do từ chối và tải lên giấy tờ pháp lý hợp lệ để tiếp tục xác minh doanh nghiệp."
+                : "Hoàn tất nộp Giấy chứng nhận ĐKKD và Mã số thuế để xác minh doanh nghiệp. Quyền công khai tin tuyển dụng do Super Admin cấp riêng."}
             </p>
           </div>
         </div>

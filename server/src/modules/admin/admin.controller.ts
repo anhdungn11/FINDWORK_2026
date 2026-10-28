@@ -6,6 +6,7 @@ import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
 import { PermissionGuard, type AuthorizedRequest } from "../authorization/guards/permission.guard";
 import { AdminService } from "./admin.service";
+import { SetCompanyCapabilityDto } from "./dto/set-company-capability.dto";
 import { AdminCompanyQueryDto, AdminJobQueryDto, AdminPageQueryDto, AdminUserQueryDto, SetCompanyStatusDto, SetCompanyVerificationDto, SetUserStatusDto } from "./dto/admin.dto";
 
 function requireSystem(req: AuthorizedRequest, ...codes: string[]) {
@@ -71,6 +72,23 @@ export class AdminController {
   company(@Req() req: AuthorizedRequest, @Param("companyId", ParseUUIDPipe) companyId: string) {
     requireSystem(req, "company.view");
     return this.admin.company(companyId);
+  }
+
+  @Get("companies/:companyId/capabilities")
+  @RequirePermissions("company.view")
+  capabilities(@Req() req: AuthorizedRequest, @CurrentAuth() auth: AuthenticatedPrincipal,
+    @Param("companyId", ParseUUIDPipe) companyId: string) {
+    requireSystem(req, "company.view");
+    return this.admin.capabilities(auth.userId, companyId);
+  }
+
+  @Patch("companies/:companyId/capabilities/:capabilityCode")
+  @RequirePermissions("company.verify")
+  setCapability(@Req() req: AuthorizedRequest, @CurrentAuth() auth: AuthenticatedPrincipal,
+    @Param("companyId", ParseUUIDPipe) companyId: string,
+    @Param("capabilityCode") capabilityCode: string, @Body() dto: SetCompanyCapabilityDto) {
+    requireSystem(req, "company.verify");
+    return this.admin.setCapability(auth.userId, companyId, capabilityCode, dto.isGranted, dto.reason);
   }
 
   @Patch("companies/:companyId/verification")

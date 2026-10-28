@@ -5,6 +5,7 @@ import { AccessTokenGuard } from "../auth/guards/access-token.guard";
 import { AccountTypeGuard, RequireAccountTypes } from "../auth/guards/account-type.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
+import { RequirePlatformCapability } from "../authorization/decorators/require-platform-capability.decorator";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
 import { CompanyPermissionGuard, type CompanyAuthorizedRequest } from "../authorization/guards/company-permission.guard";
 import { PermissionGuard, type AuthorizedRequest } from "../authorization/guards/permission.guard";
@@ -63,6 +64,7 @@ export class CompanyApplicationsController {
 
   @Get()
   @RequireCompanyPermissions("application.view")
+  @RequirePlatformCapability("application.view")
   list(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @Req() req: CompanyAuthorizedRequest, @Query() query: ApplicationPageQueryDto) {
     requireCompany(req, "application.view");
@@ -71,6 +73,7 @@ export class CompanyApplicationsController {
 
   @Get(":applicationId")
   @RequireCompanyPermissions("application.view")
+  @RequirePlatformCapability("application.view")
   get(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @Param("applicationId", ParseUUIDPipe) applicationId: string, @Req() req: CompanyAuthorizedRequest) {
     requireCompany(req, "application.view");
@@ -79,6 +82,7 @@ export class CompanyApplicationsController {
 
   @Patch(":applicationId/status")
   @RequireCompanyPermissions("application.review")
+  @RequirePlatformCapability("application.pipeline.manage")
   review(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @Param("applicationId", ParseUUIDPipe) applicationId: string, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Req() req: CompanyAuthorizedRequest, @Body() dto: ReviewApplicationDto) {
@@ -88,6 +92,7 @@ export class CompanyApplicationsController {
 
   @Patch(":applicationId/assignment")
   @RequireCompanyPermissions("application.review")
+  @RequirePlatformCapability("application.pipeline.manage")
   assign(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @Param("applicationId", ParseUUIDPipe) applicationId: string, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Req() req: CompanyAuthorizedRequest, @Body() dto: AssignApplicationDto) {

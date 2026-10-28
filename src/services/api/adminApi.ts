@@ -84,6 +84,25 @@ export interface AdminCompanyLegalDto {
   evidences: AdminLegalEvidenceDto[];
 }
 
+export interface AdminCapabilityDto {
+  code: string;
+  available: boolean;
+  isGranted: boolean;
+  configured: boolean;
+  grantedAt: string | null;
+  revokedAt: string | null;
+  changedByUserId: string | null;
+  reason: string | null;
+}
+
+export interface AdminCompanyCapabilitiesDto {
+  companyId: string;
+  companyName: string;
+  companyStatus: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+  verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
+  capabilities: AdminCapabilityDto[];
+}
+
 export interface AdminJobDto {
   id: string;
   companyId: string;
@@ -389,6 +408,19 @@ export const adminApi = {
 
   getLegalEvidenceDownloadUrl: (companyId: string, evidenceId: string): string =>
     `${getApiBaseUrl()}/admin/companies/${encodeURIComponent(companyId)}/legal/evidence/${encodeURIComponent(evidenceId)}`,
+
+  getCompanyCapabilities: (companyId: string, signal?: AbortSignal): Promise<AdminCompanyCapabilitiesDto> =>
+    run(async () => (await apiClient.get(`/admin/companies/${encodeURIComponent(companyId)}/capabilities`, { signal })).data as AdminCompanyCapabilitiesDto),
+
+  setCompanyCapability: (companyId: string, code: string, isGranted: boolean, reason: string): Promise<void> => {
+    guardWrite("cập nhật năng lực doanh nghiệp");
+    return run(async () => {
+      await apiClient.patch(
+        `/admin/companies/${encodeURIComponent(companyId)}/capabilities/${encodeURIComponent(code)}`,
+        { isGranted, reason },
+      );
+    });
+  },
 
   verifyCompany: (companyId: string, status: "VERIFIED" | "REJECTED", reason?: string): Promise<AdminCompanyDto> => {
     guardWrite("xét duyệt doanh nghiệp");

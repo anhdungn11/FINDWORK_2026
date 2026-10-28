@@ -8,6 +8,7 @@ import { AccessTokenGuard } from "../auth/guards/access-token.guard";
 import { AccountTypeGuard, RequireAccountTypes } from "../auth/guards/account-type.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
+import { RequirePlatformCapability } from "../authorization/decorators/require-platform-capability.decorator";
 import {
   CompanyPermissionGuard, type CompanyAuthorizedRequest,
 } from "../authorization/guards/company-permission.guard";
@@ -42,6 +43,7 @@ export class CompanyInvitationsController {
   @Post()
   @ApiOperation({ summary: "Create invitation and queue encrypted delivery when enabled" })
   @RequireCompanyPermissions("company.member.invite")
+  @RequirePlatformCapability("team.invite")
   create(
     @Param("companyId", ParseUUIDPipe) companyId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal,
@@ -55,6 +57,7 @@ export class CompanyInvitationsController {
   @Post(":invitationId/revoke")
   @ApiOperation({ summary: "Revoke pending invitation" })
   @RequireCompanyPermissions("company.member.invite")
+  @RequirePlatformCapability("team.invite")
   revoke(
     @Param("companyId", ParseUUIDPipe) companyId: string,
     @Param("invitationId", ParseUUIDPipe) invitationId: string,

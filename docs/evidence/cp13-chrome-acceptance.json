@@ -1,0 +1,19 @@
+{
+  "run": "a9e29ff2",
+  "companyId": "22f714a8-2f72-44f7-afda-a4c34eb7ace2",
+  "chrome": true,
+  "adminRole": "SUPER_ADMIN",
+  "checkboxRevoked": true,
+  "employerAfterRevoke": 403,
+  "checkboxGranted": true,
+  "employerAfterGrant": 201,
+  "auditActions": [
+    "admin.company.capability.revoke",
+    "admin.company.capability.grant"
+  ],
+  "screenshots": [
+    "cp13-admin-revoked.png",
+    "cp13-employer-denied.png",
+    "cp13-admin-granted.png"
+  ]
+}

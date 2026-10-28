@@ -14,6 +14,9 @@ import {
   REQUIRED_COMPANY_PERMISSIONS_KEY,
 } from "../decorators/require-company-permissions.decorator";
 import type { CompanyAuthorizationContext } from "../types/authorization.types";
+import { PrismaService } from "../../../infrastructure/prisma/prisma.service";
+import { REQUIRED_PLATFORM_CAPABILITY_KEY } from "../decorators/require-platform-capability.decorator";
+import type { PlatformCapabilityCode } from "../platform-capabilities";
 
 export interface CompanyAuthorizedRequest
   extends AuthenticatedRequest {
@@ -26,6 +29,7 @@ export class CompanyPermissionGuard
   constructor(
     private readonly reflector: Reflector,
     private readonly authorizationService: AuthorizationService,
+    private readonly db: PrismaService,
   ) {}
 
   async canActivate(
@@ -91,6 +95,20 @@ export class CompanyPermissionGuard
         message:
           "You do not have permission to perform this action.",
       });
+    }
+
+    const capability = this.reflector.getAllAndOverride<PlatformCapabilityCode>(
+      REQUIRED_PLATFORM_CAPABILITY_KEY, [context.getHandler(), context.getClass()],
+    );
+    if (capability) {
+      const row = await this.db.companyPlatformCapability.findUnique({
+        where: { companyId_capabilityCode: { companyId, capabilityCode: capability } },
+        select: { isGranted: true, company: { select: { status: true } } },
+      });
+      if (!row?.isGranted || row.company.status !== "ACTIVE") {
+        throw new ForbiddenException({ code: "PLATFORM_CAPABILITY_DENIED",
+          message: `Company is not permitted to use ${capability}.` });
+      }
     }
 
     request.companyAuthorization = result.context;

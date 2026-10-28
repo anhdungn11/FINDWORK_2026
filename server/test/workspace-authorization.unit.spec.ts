@@ -58,6 +58,9 @@ describe("candidate and employer workspace authorization", () => {
       }] : []),
     },
     job: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
+    companyPlatformCapability: { findUnique: jest.fn().mockResolvedValue({
+      isGranted: true, company: { status: "ACTIVE", verificationStatus: "VERIFIED" },
+    }) },
     company: { create: jest.fn() },
     candidateProfile: { create: jest.fn() },
     $transaction: jest.fn(async (callback: ((tx: typeof transaction) => Promise<unknown>) | Promise<unknown>[]) =>
@@ -214,6 +217,20 @@ describe("candidate and employer workspace authorization", () => {
       data: expect.objectContaining({ companyId, createdByMemberId: "owner-member" }),
     }));
     expect(applications.review).toHaveBeenCalledWith(companyId, jobId, applicationId, "owner", expect.any(Object));
+  });
+
+  it("denies the OWNER after a platform grant is revoked and permits the next operation after grant", async () => {
+    db.companyPlatformCapability.findUnique.mockResolvedValueOnce({
+      isGranted: false, company: { status: "ACTIVE", verificationStatus: "VERIFIED" },
+    });
+    const denied = await request(app.getHttpServer()).post(`/api/v1/companies/${companyId}/jobs`)
+      .set(bearer("owner")).send({ categoryId, title: "Job", description: "Description",
+        employmentType: "FULL_TIME", workplaceType: "ONSITE" }).expect(403);
+    expect(denied.body.code).toBe("PLATFORM_CAPABILITY_DENIED");
+    expect(transaction.job.create).not.toHaveBeenCalled();
+    await request(app.getHttpServer()).post(`/api/v1/companies/${companyId}/jobs`)
+      .set(bearer("owner")).send({ categoryId, title: "Job", description: "Description",
+        employmentType: "FULL_TIME", workplaceType: "ONSITE" }).expect(201);
   });
 
   it("rejects OWNER access to another company's resources", async () => {

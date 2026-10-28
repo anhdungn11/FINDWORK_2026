@@ -99,6 +99,11 @@ describe("Phase 4.3C.2D Company Invitations enqueue (local findwork_test ONLY)",
     recipient2 = await createUser("recipient2");
     companyA = await createCompany(owner, "a");
     companyB = await createCompany(otherOwner, "b");
+    // Invitation regression fixtures explicitly receive the platform grant.
+    await prisma.companyPlatformCapability.updateMany({
+      where: { companyId: { in: [companyA, companyB] }, capabilityCode: "team.invite" },
+      data: { isGranted: true, reason: "Test fixture approved invitation capability" },
+    });
     await grantRole(companyA, admin, "ADMIN");
     await grantRole(companyA, hr, "HR_MANAGER");
     await grantRole(companyA, viewer, "VIEWER");

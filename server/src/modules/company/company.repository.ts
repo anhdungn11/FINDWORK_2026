@@ -3,6 +3,7 @@ import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import { publicJobVisibility } from "../jobs/public-job-visibility";
 import { DEFAULT_COMPANY_PERMISSION_CODES, DEFAULT_COMPANY_ROLES } from "./company-roles";
+import { NEW_COMPANY_STARTER_CAPABILITIES, PLATFORM_CAPABILITIES } from "../authorization/platform-capabilities";
 import type { FeaturedCompanyQueryDto } from "./dto/featured-company-query.dto";
 import type { PublicCompanyQueryDto } from "./dto/public-company-query.dto";
 
@@ -142,6 +143,15 @@ export class CompanyRepository {
           verificationStatus: true,
           createdAt: true,
         },
+      });
+
+      await tx.companyPlatformCapability.createMany({
+        data: PLATFORM_CAPABILITIES.map((capabilityCode) => ({
+          companyId: company.id,
+          capabilityCode,
+          isGranted: NEW_COMPANY_STARTER_CAPABILITIES.includes(capabilityCode),
+          reason: "CP13 new-company starter policy",
+        })),
       });
 
       const ownerMember = await tx.companyMember.create({

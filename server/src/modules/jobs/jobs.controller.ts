@@ -7,6 +7,7 @@ import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
+import { RequirePlatformCapability } from "../authorization/decorators/require-platform-capability.decorator";
 import { CompanyPermissionGuard, type CompanyAuthorizedRequest } from "../authorization/guards/company-permission.guard";
 import { CompanyJobQueryDto, CreateJobDto, JobVersionDto, PublicJobQueryDto, UpdateJobDto } from "./dto/job.dto";
 import { ReplaceScreeningQuestionsDto } from "./dto/screening-question.dto";
@@ -28,6 +29,7 @@ export class CompanyJobsController {
   @Post()
   @ApiOperation({ summary: "Create a company-owned draft job" })
   @RequireCompanyPermissions("company.update")
+  @RequirePlatformCapability("job.draft.create")
   create(@Param("companyId", ParseUUIDPipe) companyId: string, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Req() req: CompanyAuthorizedRequest, @Body() dto: CreateJobDto) {
     requireCompanyScope(req, "company.update");
@@ -64,6 +66,7 @@ export class CompanyJobsController {
   @Put(":jobId/screening-questions")
   @ApiOperation({ summary: "Replace screening questions on a draft or paused owned job" })
   @RequireCompanyPermissions("company.update")
+  @RequirePlatformCapability("job.draft.edit")
   replaceQuestions(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
     @Body() dto: ReplaceScreeningQuestionsDto) {
@@ -74,6 +77,7 @@ export class CompanyJobsController {
   @Patch(":jobId")
   @ApiOperation({ summary: "Edit a draft, published, or paused job using optimistic versioning" })
   @RequireCompanyPermissions("company.update")
+  @RequirePlatformCapability("job.draft.edit")
   update(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest, @Body() dto: UpdateJobDto) {
     requireCompanyScope(req, "company.update");
@@ -83,6 +87,7 @@ export class CompanyJobsController {
   @Post(":jobId/publish") @HttpCode(200)
   @ApiOperation({ summary: "Publish a draft or paused job" })
   @RequireCompanyPermissions("company.update")
+  @RequirePlatformCapability("job.publish")
   publish(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest, @Body() dto: JobVersionDto) {
     requireCompanyScope(req, "company.update");
@@ -92,6 +97,7 @@ export class CompanyJobsController {
   @Post(":jobId/pause") @HttpCode(200)
   @ApiOperation({ summary: "Unpublish an active job" })
   @RequireCompanyPermissions("company.update")
+  @RequirePlatformCapability("job.close")
   pause(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest, @Body() dto: JobVersionDto) {
     requireCompanyScope(req, "company.update");
@@ -101,6 +107,7 @@ export class CompanyJobsController {
   @Post(":jobId/close") @HttpCode(200)
   @ApiOperation({ summary: "Close a published or paused job" })
   @RequireCompanyPermissions("company.update")
+  @RequirePlatformCapability("job.close")
   close(@Param("companyId", ParseUUIDPipe) companyId: string, @Param("jobId", ParseUUIDPipe) jobId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest, @Body() dto: JobVersionDto) {
     requireCompanyScope(req, "company.update");

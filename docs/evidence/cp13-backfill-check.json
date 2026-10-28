@@ -1,0 +1,11 @@
+{
+  "database": "disposable Docker findwork_test",
+  "systemIdentifier": "7701601434395709474",
+  "existingCompanyId": "22f714a8-2f72-44f7-afda-a4c34eb7ace2",
+  "capabilityRows": 10,
+  "granted": 8,
+  "denied": 2,
+  "unsupportedDenied": true,
+  "verificationPreserved": true,
+  "transaction": "rolled back"
+}

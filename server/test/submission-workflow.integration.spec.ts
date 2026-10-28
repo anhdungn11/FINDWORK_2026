@@ -200,6 +200,12 @@ describe("submission recruitment workflow E2E", () => {
     categoryId = category.id;
     const companyId = await company(owner.token, "primary");
     const otherCompanyId = await company(otherOwner.token, "other");
+    // This workflow exercises approved publishing and applicant pipeline access.
+    await db.companyPlatformCapability.updateMany({
+      where: { companyId: { in: [companyId, otherCompanyId] },
+        capabilityCode: { in: ["job.publish", "application.pipeline.manage"] } },
+      data: { isGranted: true, reason: "Submission workflow fixture grant" },
+    });
     const recruiterRole = await db.role.findFirstOrThrow({ where: { companyId, name: "RECRUITER" }, select: { id: true } });
     const recruiterMember = await db.companyMember.create({ data: { companyId, userId: recruiter.id, status: "ACTIVE" }, select: { id: true } });
     await db.companyMemberRole.create({ data: {

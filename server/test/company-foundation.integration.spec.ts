@@ -217,6 +217,95 @@ describe("Phase 4.3A Company Foundation integration", () => {
     })).toBe(1);
   });
 
+  it("requires Super Admin grants, company isolation and member RBAC for platform capabilities", async () => {
+    const ownerA = await createAuthenticatedUser("cap-owner-a");
+    const ownerB = await createAuthenticatedUser("cap-owner-b");
+    const viewer = await createAuthenticatedUser("cap-viewer");
+    const admin = await createAuthenticatedUser("cap-super-admin");
+    const candidate = await createAuthenticatedUser("cap-candidate");
+    await prisma.user.update({ where: { id: candidate.id }, data: { accountType: "CANDIDATE" } });
+    const companyA = (await request(app.getHttpServer()).post(API)
+      .set("Authorization", `Bearer ${ownerA.accessToken}`)
+      .send({ name: "Capability Company A", slug: slug("cap-a") }).expect(201)).body.id as string;
+    const companyB = (await request(app.getHttpServer()).post(API)
+      .set("Authorization", `Bearer ${ownerB.accessToken}`)
+      .send({ name: "Capability Company B", slug: slug("cap-b") }).expect(201)).body.id as string;
+    const superRole = await prisma.role.findUniqueOrThrow({
+      where: { systemCode: "SUPER_ADMIN" }, select: { id: true },
+    });
+    await prisma.systemUserRole.create({ data: { userId: admin.id, roleId: superRole.id } });
+    const adminPath = `/api/v1/admin/companies/${companyA}/capabilities`;
+    const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+    await request(app.getHttpServer()).get(adminPath).set(auth(candidate.accessToken)).expect(403);
+    await request(app.getHttpServer()).patch(`${adminPath}/team.invite`)
+      .set(auth(ownerA.accessToken)).send({ isGranted: true, reason: "Owner cannot self grant" }).expect(403);
+    const initial = await request(app.getHttpServer()).get(adminPath)
+      .set(auth(admin.accessToken)).expect(200);
+    expect(initial.body.capabilities).toHaveLength(10);
+    expect(initial.body.capabilities.find((x: { code: string }) => x.code === "team.invite"))
+      .toMatchObject({ isGranted: false, available: true });
+    expect(initial.body.capabilities.find((x: { code: string }) => x.code === "ai.business.access"))
+      .toMatchObject({ isGranted: false, available: false });
+    await request(app.getHttpServer()).patch(`${adminPath}/ai.business.access`)
+      .set(auth(admin.accessToken)).send({ isGranted: true, reason: "Attempt to enable unavailable AI" }).expect(409);
+    await request(app.getHttpServer()).post(`${API}/${companyA}/invitations`)
+      .set(auth(ownerA.accessToken)).send({ email: "invite@example.test" }).expect(403);
+    await request(app.getHttpServer()).patch(`${adminPath}/team.invite`)
+      .set(auth(admin.accessToken)).send({ isGranted: true, reason: "Approve company A invitations" }).expect(200);
+    await request(app.getHttpServer()).post(`${API}/${companyB}/invitations`)
+      .set(auth(ownerB.accessToken)).send({ email: "invite@example.test" }).expect(403);
+
+    const category = await prisma.jobCategory.create({ data: {
+      code: slug("cap-category"), name: "Capability test category", isActive: true,
+    } });
+    const jobs: string[] = [];
+    const createJob = (companyId: string, token: string) => request(app.getHttpServer())
+      .post(`${API}/${companyId}/jobs`).set(auth(token)).send({
+        categoryId: category.id, title: "Capability test job", description: "A valid synthetic job for company permission acceptance tests.",
+        employmentType: "FULL_TIME", workplaceType: "REMOTE",
+      });
+    try {
+      const revoked = await request(app.getHttpServer()).patch(`${adminPath}/job.draft.create`)
+        .set(auth(admin.accessToken)).send({ isGranted: false, reason: "Suspend company A draft creation" }).expect(200);
+      expect(revoked.body.isGranted).toBe(false);
+      const denied = await createJob(companyA, ownerA.accessToken).expect(403);
+      expect(denied.body.code).toBe("PLATFORM_CAPABILITY_DENIED");
+      const other = await createJob(companyB, ownerB.accessToken).expect(201);
+      jobs.push(other.body.id as string);
+      await request(app.getHttpServer()).patch(`${adminPath}/job.draft.create`)
+        .set(auth(admin.accessToken)).send({ isGranted: true, reason: "Restore company A draft creation" }).expect(200);
+      const permitted = await createJob(companyA, ownerA.accessToken).expect(201);
+      jobs.push(permitted.body.id as string);
+      const viewerRole = await prisma.role.findFirstOrThrow({
+        where: { companyId: companyA, name: "VIEWER" }, select: { id: true },
+      });
+      const viewerMember = await prisma.companyMember.create({ data: {
+        companyId: companyA, userId: viewer.id, status: "ACTIVE",
+      }, select: { id: true } });
+      await prisma.companyMemberRole.create({ data: {
+        companyId: companyA, companyMemberId: viewerMember.id,
+        roleId: viewerRole.id, assignedByUserId: ownerA.id,
+      } });
+      await createJob(companyA, viewer.accessToken).expect(403);
+      await prisma.companyPlatformCapability.delete({ where: {
+        companyId_capabilityCode: { companyId: companyA, capabilityCode: "job.draft.create" },
+      } });
+      await createJob(companyA, ownerA.accessToken).expect(403);
+      const audits = await prisma.auditLog.findMany({ where: {
+        companyId: companyA, targetType: "CompanyPlatformCapability",
+      }, orderBy: { createdAt: "asc" } });
+      expect(audits.map((x) => x.action)).toEqual([
+        "admin.company.capability.grant", "admin.company.capability.revoke",
+        "admin.company.capability.grant",
+      ]);
+      expect(audits.every((x) => x.actorUserId === admin.id)).toBe(true);
+      expect(audits.every((x) => typeof (x.afterData as { reason?: string })?.reason === "string")).toBe(true);
+    } finally {
+      await prisma.job.deleteMany({ where: { id: { in: jobs } } });
+      await prisma.jobCategory.delete({ where: { id: category.id } });
+    }
+  });
+
   it("rejects mass-assignment and invalid slugs", async () => {
     const user = await createAuthenticatedUser("validate");
     await request(app.getHttpServer())
@@ -377,6 +466,10 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .set("Authorization", `Bearer ${owner.accessToken}`)
       .send({ name: "Review Company", slug: slug("review") }).expect(201);
     const companyId = created.body.id as string;
+    await prisma.companyPlatformCapability.update({
+      where: { companyId_capabilityCode: { companyId, capabilityCode: "team.invite" } },
+      data: { isGranted: true, reason: "Test fixture approved team management" },
+    });
     await request(app.getHttpServer()).post(API)
       .set("Authorization", `Bearer ${outsider.accessToken}`)
       .send({ name: "Other Company", slug: slug("other") }).expect(201);
@@ -532,6 +625,10 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .set("Authorization", `Bearer ${original.accessToken}`)
       .send({ name: "Transfer Company", slug: slug("transfer") }).expect(201);
     const companyId = created.body.id as string;
+    await prisma.companyPlatformCapability.update({
+      where: { companyId_capabilityCode: { companyId, capabilityCode: "team.invite" } },
+      data: { isGranted: true, reason: "Test fixture approved team management" },
+    });
     const viewer = await prisma.role.findFirstOrThrow({
       where: { companyId, normalizedName: "viewer" }, select: { id: true },
     });
@@ -589,6 +686,10 @@ describe("Phase 4.3A Company Foundation integration", () => {
       .set("Authorization", `Bearer ${original.accessToken}`)
       .send({ name: "Race Company", slug: slug("ownership-race") }).expect(201);
     const companyId = created.body.id as string;
+    await prisma.companyPlatformCapability.update({
+      where: { companyId_capabilityCode: { companyId, capabilityCode: "team.invite" } },
+      data: { isGranted: true, reason: "Test fixture approved team management" },
+    });
     const viewer = await prisma.role.findFirstOrThrow({
       where: { companyId, normalizedName: "viewer" }, select: { id: true },
     });

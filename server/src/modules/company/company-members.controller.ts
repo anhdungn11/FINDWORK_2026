@@ -4,6 +4,7 @@ import { CurrentAuth } from "../auth/decorators/current-auth.decorator";
 import { AccessTokenGuard } from "../auth/guards/access-token.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
+import { RequirePlatformCapability } from "../authorization/decorators/require-platform-capability.decorator";
 import { CompanyPermissionGuard, type CompanyAuthorizedRequest } from "../authorization/guards/company-permission.guard";
 import { CompanyMembersService } from "./company-members.service";
 import { TransferCompanyOwnershipDto, UpdateCompanyMemberDto } from "./dto/update-company-member.dto";
@@ -30,6 +31,7 @@ export class CompanyMembersController {
 
   @Patch(":memberId/role")
   @RequireCompanyPermissions("company.member.update", "company.role.manage")
+  @RequirePlatformCapability("team.invite")
   updateRole(@Param("companyId", ParseUUIDPipe) companyId: string,
     @Param("memberId", ParseUUIDPipe) memberId: string, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Req() req: CompanyAuthorizedRequest, @Body() dto: UpdateCompanyMemberDto) {
@@ -41,6 +43,7 @@ export class CompanyMembersController {
   @Delete(":memberId")
   @HttpCode(200)
   @RequireCompanyPermissions("company.member.remove")
+  @RequirePlatformCapability("team.invite")
   remove(@Param("companyId", ParseUUIDPipe) companyId: string,
     @Param("memberId", ParseUUIDPipe) memberId: string, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Req() req: CompanyAuthorizedRequest) {
@@ -51,6 +54,7 @@ export class CompanyMembersController {
   @Post("ownership-transfer")
   @HttpCode(200)
   @RequireCompanyPermissions("company.ownership.transfer")
+  @RequirePlatformCapability("team.invite")
   transferOwnership(@Param("companyId", ParseUUIDPipe) companyId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
     @Body() dto: TransferCompanyOwnershipDto) {

@@ -1,4 +1,5 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { IMPLEMENTED_PLATFORM_CAPABILITIES, PLATFORM_CAPABILITIES, isPlatformCapabilityCode } from "../authorization/platform-capabilities";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../infrastructure/prisma/prisma.service";
 import type { AdminCompanyQueryDto, AdminJobQueryDto, AdminPageQueryDto, AdminUserQueryDto } from "./dto/admin.dto";
@@ -18,6 +19,71 @@ function page<T>(data: T[], total: number, query: AdminPageQueryDto) {
 @Injectable()
 export class AdminService {
   constructor(private readonly db: PrismaService) {}
+
+  private async requireSuperAdmin(actorUserId: string) {
+    const role = await this.db.systemUserRole.findFirst({
+      where: { userId: actorUserId, role: { kind: "SYSTEM", isActive: true, systemCode: "SUPER_ADMIN" } },
+      select: { roleId: true },
+    });
+    if (!role) throw new ForbiddenException({ code: "SUPER_ADMIN_REQUIRED" });
+  }
+
+  async capabilities(actorUserId: string, companyId: string) {
+    await this.requireSuperAdmin(actorUserId);
+    const company = await this.db.company.findUnique({
+      where: { id: companyId }, select: { id: true, name: true, status: true, verificationStatus: true },
+    });
+    if (!company) throw missing("COMPANY");
+    const rows = await this.db.companyPlatformCapability.findMany({
+      where: { companyId }, select: { capabilityCode: true, isGranted: true,
+        grantedAt: true, revokedAt: true, changedByUserId: true, reason: true },
+    });
+    const byCode = new Map(rows.map((row) => [row.capabilityCode, row]));
+    return { companyId, companyName: company.name, companyStatus: company.status,
+      verificationStatus: company.verificationStatus,
+      capabilities: PLATFORM_CAPABILITIES.map((code) => ({ code,
+        available: IMPLEMENTED_PLATFORM_CAPABILITIES.includes(code),
+        isGranted: byCode.get(code)?.isGranted === true,
+        configured: byCode.has(code),
+        grantedAt: byCode.get(code)?.grantedAt ?? null,
+        revokedAt: byCode.get(code)?.revokedAt ?? null,
+        changedByUserId: byCode.get(code)?.changedByUserId ?? null,
+        reason: byCode.get(code)?.reason ?? null,
+      })) };
+  }
+
+  async setCapability(actorUserId: string, companyId: string, code: string,
+    isGranted: boolean, reason: string) {
+    await this.requireSuperAdmin(actorUserId);
+    if (!isPlatformCapabilityCode(code)) throw new BadRequestException({ code: "CAPABILITY_CODE_INVALID" });
+    if (isGranted && !IMPLEMENTED_PLATFORM_CAPABILITIES.includes(code)) {
+      throw new ConflictException({ code: "CAPABILITY_NOT_IMPLEMENTED" });
+    }
+    return this.db.$transaction(async (tx) => {
+      const company = await tx.company.findUnique({ where: { id: companyId }, select: { id: true } });
+      if (!company) throw missing("COMPANY");
+      const previous = await tx.companyPlatformCapability.findUnique({
+        where: { companyId_capabilityCode: { companyId, capabilityCode: code } },
+        select: { isGranted: true },
+      });
+      if (previous?.isGranted === isGranted) throw conflict("CAPABILITY");
+      const now = new Date();
+      const row = await tx.companyPlatformCapability.upsert({
+        where: { companyId_capabilityCode: { companyId, capabilityCode: code } },
+        create: { companyId, capabilityCode: code, isGranted, changedByUserId: actorUserId,
+          reason, grantedAt: isGranted ? now : null, revokedAt: isGranted ? null : now },
+        update: { isGranted, changedByUserId: actorUserId, reason,
+          grantedAt: isGranted ? now : null, revokedAt: isGranted ? null : now },
+      });
+      await tx.auditLog.create({ data: { actorUserId, companyId,
+        action: isGranted ? "admin.company.capability.grant" : "admin.company.capability.revoke",
+        targetType: "CompanyPlatformCapability", targetId: row.id,
+        beforeData: { code, isGranted: previous?.isGranted ?? false },
+        afterData: { code, isGranted, reason },
+      } });
+      return { code, isGranted, changedByUserId: actorUserId, reason, updatedAt: row.updatedAt };
+    });
+  }
 
   async dashboard() {
     const [users, activeUsers, companies, activeCompanies, pendingCompanies, jobs, publishedJobs, applications] = await Promise.all([

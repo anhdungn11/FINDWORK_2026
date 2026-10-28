@@ -5,6 +5,7 @@ import { AccessTokenGuard } from "../auth/guards/access-token.guard";
 import { AccountTypeGuard, RequireAccountTypes } from "../auth/guards/account-type.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
+import { RequirePlatformCapability } from "../authorization/decorators/require-platform-capability.decorator";
 import { CompanyPermissionGuard, type CompanyAuthorizedRequest } from "../authorization/guards/company-permission.guard";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
 import { PermissionGuard, type AuthorizedRequest } from "../authorization/guards/permission.guard";
@@ -26,6 +27,7 @@ export class CompanyApplicationInterviewsController {
 
   @Post()
   @RequireCompanyPermissions("application.review")
+  @RequirePlatformCapability("interview.schedule")
   schedule(@Param("companyId", ParseUUIDPipe) companyId: string,
     @Param("applicationId", ParseUUIDPipe) applicationId: string,
     @CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
@@ -36,6 +38,7 @@ export class CompanyApplicationInterviewsController {
 
   @Get()
   @RequireCompanyPermissions("application.view")
+  @RequirePlatformCapability("application.view")
   list(@Param("companyId", ParseUUIDPipe) companyId: string,
     @Param("applicationId", ParseUUIDPipe) applicationId: string, @Req() req: CompanyAuthorizedRequest) {
     requireCompany(req, "application.view");
@@ -51,6 +54,7 @@ export class CompanyInterviewsController {
   constructor(private readonly interviews: InterviewService) {}
   @Patch(":interviewId/cancel") @HttpCode(200)
   @RequireCompanyPermissions("application.review")
+  @RequirePlatformCapability("interview.schedule")
   cancel(@Param("companyId", ParseUUIDPipe) companyId: string,
     @Param("interviewId", ParseUUIDPipe) id: string, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Req() req: CompanyAuthorizedRequest) {
@@ -59,6 +63,7 @@ export class CompanyInterviewsController {
   }
   @Patch(":interviewId/complete") @HttpCode(200)
   @RequireCompanyPermissions("application.review")
+  @RequirePlatformCapability("interview.schedule")
   complete(@Param("companyId", ParseUUIDPipe) companyId: string,
     @Param("interviewId", ParseUUIDPipe) id: string, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Req() req: CompanyAuthorizedRequest) {
@@ -67,6 +72,7 @@ export class CompanyInterviewsController {
   }
   @Patch(":interviewId/reschedule")
   @RequireCompanyPermissions("application.review")
+  @RequirePlatformCapability("interview.schedule")
   reschedule(@Param("companyId", ParseUUIDPipe) companyId: string,
     @Param("interviewId", ParseUUIDPipe) id: string, @CurrentAuth() auth: AuthenticatedPrincipal,
     @Req() req: CompanyAuthorizedRequest, @Body() dto: RescheduleInterviewDto) {

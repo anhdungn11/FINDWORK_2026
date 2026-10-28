@@ -19,6 +19,38 @@ describe("P0-01 Backend API Contract & HTTP Method Regression", () => {
   const invitationId = "i5555555-5555-4555-8555-555555555555";
   const applicationId = "a6666666-6666-4666-8666-666666666666";
   describe("Admin API write routes and methods", () => {
+    it("loads one company's capabilities and PATCHes the exact grant with a reason", async () => {
+      setWorkspaceWritesForTesting(true);
+      const originalGet = apiClient.get;
+      const originalPatch = apiClient.patch;
+      let getUrl = "";
+      let patchUrl = "";
+      let patchBody: unknown;
+      try {
+        apiClient.get = (async (url: string) => {
+          getUrl = url;
+          return { data: { companyId, companyName: "Test Corp", capabilities: [
+            { code: "job.publish", isGranted: false, available: true, configured: true },
+          ] } };
+        }) as never;
+        apiClient.patch = (async (url: string, body: unknown) => {
+          patchUrl = url;
+          patchBody = body;
+          return { data: {} };
+        }) as never;
+        const result = await adminApi.getCompanyCapabilities(companyId);
+        assert.equal(getUrl, `/admin/companies/${companyId}/capabilities`);
+        assert.equal(result.capabilities[0].isGranted, false);
+        await adminApi.setCompanyCapability(companyId, "job.publish", true, "Approved for test");
+        assert.equal(patchUrl, `/admin/companies/${companyId}/capabilities/job.publish`);
+        assert.deepEqual(patchBody, { isGranted: true, reason: "Approved for test" });
+      } finally {
+        apiClient.get = originalGet;
+        apiClient.patch = originalPatch;
+        setWorkspaceWritesForTesting(null);
+      }
+    });
+
     it("adminApi.verifyCompany sends PATCH /admin/companies/:id/verification with status", async () => {
       setWorkspaceWritesForTesting(true);
       const originalPatch = apiClient.patch;

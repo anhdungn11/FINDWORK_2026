@@ -643,6 +643,7 @@ model Company {
   assignments               ApplicationAssignment[]
   interviews                Interview[]
   auditLogs                 AuditLog[]
+  platformCapabilities      CompanyPlatformCapability[]
   legalProfile              CompanyLegalProfile?
   legalEvidence             CompanyLegalEvidence[]
 
@@ -650,6 +651,24 @@ model Company {
   @@index([industryId])
   @@index([verificationStatus])
   @@index([status])
+}
+
+model CompanyPlatformCapability {
+  id              String   @id @default(uuid()) @db.Uuid
+  companyId       String   @db.Uuid
+  capabilityCode  String   @db.VarChar(64)
+  isGranted       Boolean  @default(false)
+  grantedAt       DateTime? @db.Timestamptz(6)
+  revokedAt       DateTime? @db.Timestamptz(6)
+  changedByUserId String?  @db.Uuid
+  reason          String?  @db.VarChar(500)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, capabilityCode])
+  @@index([companyId, isGranted])
 }
 
 model CompanyLocation {

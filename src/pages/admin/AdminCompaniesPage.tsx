@@ -6,7 +6,6 @@ import {
   Filter,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Clock,
   Eye,
   X,
@@ -19,13 +18,10 @@ import {
   ShieldCheck,
   ShieldAlert,
   Layers,
-  Lock,
-  Unlock,
   MapPin,
   Users,
   Briefcase,
   FileCheck2,
-  Info,
 } from "lucide-react";
 import { Badge, EmptyState, LoadingBlock, PageHeader, Pagination, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
@@ -35,6 +31,7 @@ import {
   type AdminCompanyDto,
   type AdminCompanyDetailDto,
   type AdminCompanyLegalDto,
+  type AdminCompanyCapabilitiesDto,
 } from "@/services/api/adminApi";
 import { toApiFailure } from "@/services/api/apiFailure";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
@@ -60,7 +57,6 @@ interface PlatformCapabilityDef {
   name: string;
   description: string;
   category: "RECRUITMENT" | "APPLICANT" | "TEAM" | "ADVANCED";
-  defaultGranted: boolean;
 }
 
 const PLATFORM_CAPABILITIES: PlatformCapabilityDef[] = [
@@ -69,70 +65,60 @@ const PLATFORM_CAPABILITIES: PlatformCapabilityDef[] = [
     name: "Tạo bản nháp tin tuyển dụng",
     description: "Cho phép doanh nghiệp khởi tạo tin tuyển dụng ở trạng thái nháp (DRAFT).",
     category: "RECRUITMENT",
-    defaultGranted: true,
   },
   {
     code: "job.draft.edit",
     name: "Chỉnh sửa tin tuyển dụng",
     description: "Cho phép chỉnh sửa mô tả, mức lương, yêu cầu kinh nghiệm của tin nháp hoặc đang mở.",
     category: "RECRUITMENT",
-    defaultGranted: true,
   },
   {
     code: "job.publish",
     name: "Đăng công khai tin tuyển dụng",
-    description: "Quyền mở công khai tin tuyển dụng lên sàn Findwork. Yêu cầu doanh nghiệp đã xác minh pháp lý.",
+    description: "Quyền mở công khai tin tuyển dụng lên sàn Findwork. Việc cấp quyền này do Super Admin quyết định riêng với xác minh pháp lý.",
     category: "RECRUITMENT",
-    defaultGranted: false,
   },
   {
     code: "job.close",
     name: "Đóng và lưu trữ tin tuyển dụng",
     description: "Cho phép chủ động dừng hoặc đóng vĩnh viễn tin tuyển dụng khi đã đủ ứng viên.",
     category: "RECRUITMENT",
-    defaultGranted: true,
   },
   {
     code: "application.view",
     name: "Xem danh sách & hồ sơ ứng viên",
     description: "Truy cập thông tin ứng viên, câu trả lời sàng lọc và hồ sơ CV đã nộp vào các vị trí tuyển dụng.",
     category: "APPLICANT",
-    defaultGranted: true,
   },
   {
     code: "application.pipeline.manage",
     name: "Quản lý quy trình ứng viên",
     description: "Chuyển trạng thái ứng viên (Reviewing → Shortlisted → Interview → Offered → Rejected).",
     category: "APPLICANT",
-    defaultGranted: false,
   },
   {
     code: "interview.schedule",
     name: "Lên lịch & điều phối phỏng vấn",
     description: "Thiết lập lịch phỏng vấn (Trực tiếp, Điện thoại, Video Call) và gửi thông báo tới ứng viên.",
     category: "APPLICANT",
-    defaultGranted: false,
   },
   {
     code: "team.invite",
     name: "Mời & quản lý thành viên nội bộ",
     description: "Mời đồng nghiệp vào tổ chức và phân quyền vai trò nội bộ (HR Manager, Recruiter, Hiring Manager).",
     category: "TEAM",
-    defaultGranted: false,
   },
   {
     code: "recruitment.analytics.view",
     name: "Báo cáo & phân tích tuyển dụng",
     description: "Xem các chỉ số hiệu quả chuyển đổi ứng viên, thời gian tuyển dụng và hiệu suất tin đăng.",
     category: "TEAM",
-    defaultGranted: false,
   },
   {
     code: "ai.business.access",
     name: "Sử dụng trợ lý AI Doanh nghiệp",
     description: "Truy cập trợ lý Findwork AI để gợi ý câu hỏi sàng lọc, tóm tắt CV và soạn thảo mô tả công việc.",
     category: "ADVANCED",
-    defaultGranted: false,
   },
 ];
 
@@ -168,6 +154,11 @@ const AdminCompaniesPage = () => {
   const [companyDetail, setCompanyDetail] = useState<AdminCompanyDetailDto | null>(null);
   const [companyLegal, setCompanyLegal] = useState<AdminCompanyLegalDto | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [capabilities, setCapabilities] = useState<AdminCompanyCapabilitiesDto | null>(null);
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
+  const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
+  const [capabilityBusy, setCapabilityBusy] = useState<string | null>(null);
+  const [capabilityNotice, setCapabilityNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "legal" | "permissions">("overview");
 
   // Rejection Dialog State
@@ -224,6 +215,49 @@ const AdminCompaniesPage = () => {
       isMounted = false;
     };
   }, [selectedCompanyId]);
+
+  useEffect(() => {
+    if (!selectedCompanyId || activeTab !== "permissions") {
+      setCapabilities(null);
+      setCapabilitiesError(null);
+      return;
+    }
+    const controller = new AbortController();
+    setCapabilitiesLoading(true);
+    setCapabilitiesError(null);
+    adminApi.getCompanyCapabilities(selectedCompanyId, controller.signal)
+      .then((data) => { if (!controller.signal.aborted) setCapabilities(data); })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setCapabilitiesError(toApiFailure(error).message);
+      })
+      .finally(() => { if (!controller.signal.aborted) setCapabilitiesLoading(false); });
+    return () => controller.abort();
+  }, [selectedCompanyId, activeTab]);
+
+  const changeCapability = async (code: string, isGranted: boolean) => {
+    if (!selectedCompanyId) return;
+    if (!isGranted && !window.confirm(`Thu hồi quyền ${code} của doanh nghiệp này? Thao tác tiếp theo sẽ bị từ chối.`)) return;
+    const reason = window.prompt(`Nhập lý do ${isGranted ? "cấp" : "thu hồi"} quyền ${code} (ít nhất 10 ký tự):`);
+    if (reason === null) return;
+    if (reason.trim().length < 10 || reason.trim().length > 500) {
+      setCapabilitiesError("Lý do phải dài từ 10 đến 500 ký tự.");
+      return;
+    }
+    setCapabilityBusy(code);
+    setCapabilitiesError(null);
+    setCapabilityNotice(null);
+    try {
+      await adminApi.setCompanyCapability(selectedCompanyId, code, isGranted, reason.trim());
+      const refreshed = await adminApi.getCompanyCapabilities(selectedCompanyId);
+      setCapabilities(refreshed);
+      setCapabilityNotice(`${isGranted ? "Đã cấp" : "Đã thu hồi"} quyền ${code}.`);
+    } catch (error) {
+      setCapabilitiesError(toApiFailure(error).message);
+      try { setCapabilities(await adminApi.getCompanyCapabilities(selectedCompanyId)); } catch { /* preserve the original failure */ }
+    } finally {
+      setCapabilityBusy(null);
+    }
+  };
 
   // Escape key support
   useEffect(() => {
@@ -950,99 +984,56 @@ const AdminCompaniesPage = () => {
                     </div>
                   )}
 
-                  {/* TAB 3: BUSINESS PERMISSION CENTER (MISSION 3) */}
+                  {/* Platform capabilities are loaded from the server for this company. */}
                   {activeTab === "permissions" && (
                     <div style={{ display: "grid", gap: 16 }}>
-                      {/* Architecture Callout */}
-                      <div
-                        style={{
-                          padding: "16px 18px",
-                          background: "#eff6ff",
-                          border: "1px solid #bfdbfe",
-                          borderRadius: 10,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                          <ShieldCheck size={18} color="#2563eb" />
-                          <strong style={{ color: "#1e40af", fontSize: "0.95rem" }}>
-                            Kiến trúc phân quyền 2 tầng (Dual-Layer Authorization Architecture)
-                          </strong>
+                      <div style={{ padding: 16, background: "#eff6ff", borderRadius: 8, color: "#1e40af" }}>
+                        Quyền hiệu lực cần năng lực nền tảng, quyền vai trò nội bộ và trạng thái doanh nghiệp hợp lệ.
+                        Xác minh pháp lý và cấp năng lực là hai quyết định riêng.
+                      </div>
+                      {capabilitiesLoading && <div role="status">Đang tải năng lực doanh nghiệp…</div>}
+                      {capabilitiesError && (
+                        <div role="alert" style={{ color: "#b91c1c" }}>
+                          {capabilitiesError}
+                          <button type="button" className={ui.btn} onClick={() => {
+                            if (!selectedCompanyId) return;
+                            setCapabilitiesLoading(true);
+                            setCapabilitiesError(null);
+                            adminApi.getCompanyCapabilities(selectedCompanyId)
+                              .then(setCapabilities)
+                              .catch((error: unknown) => setCapabilitiesError(toApiFailure(error).message))
+                              .finally(() => setCapabilitiesLoading(false));
+                          }}>Thử lại</button>
                         </div>
-                        <p style={{ margin: 0, fontSize: "0.825rem", color: "#1e3a8a", lineHeight: 1.5 }}>
-                          Quyền thực thi của nhân viên trong doanh nghiệp phụ thuộc vào cả hai yếu tố:
-                          <br />
-                          <strong>1. Năng lực nền tảng cấp cho Doanh nghiệp</strong> (Super Admin phê duyệt bên dưới)
-                          <br />
-                          <strong>2. Vai trò nội bộ của nhân viên</strong> (Owner, Admin, HR Manager, Recruiter, Hiring Manager).
-                        </p>
-                      </div>
-
-                      {/* Contract Notice (No Fake Writes) */}
-                      <div
-                        style={{
-                          padding: "12px 16px",
-                          background: "#fffbeb",
-                          border: "1px solid #fde68a",
-                          borderRadius: 8,
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 10,
-                        }}
-                      >
-                        <AlertTriangle size={18} color="#d97706" style={{ flexShrink: 0, marginTop: 2 }} />
-                        <div style={{ fontSize: "0.825rem", color: "#92400e", lineHeight: 1.5 }}>
-                          <strong>Đặc tả kỹ thuật CP11D (Chờ Backend kích hoạt):</strong> Các ô chọn năng lực dưới đây được khóa an toàn theo chuẩn RFC CP11D. Hệ thống tuân thủ nguyên tắc <em>Zero Deception</em> — không tạo trạng thái lưu giả lập trên giao diện người dùng khi máy chủ chưa mở endpoint RESTful `/admin/companies/:id/capabilities`.
+                      )}
+                      {capabilityNotice && <div role="status" style={{ color: "#166534" }}>{capabilityNotice}</div>}
+                      {capabilities && !capabilitiesLoading && (
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {PLATFORM_CAPABILITIES.map((cap) => {
+                            const record = capabilities.capabilities.find((item) => item.code === cap.code);
+                            const granted = record?.isGranted === true;
+                            return (
+                              <label key={cap.code} style={{ display: "flex", gap: 12, padding: 14,
+                                border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff" }}>
+                                <input type="checkbox" checked={granted}
+                                  disabled={!writes || !record?.available || capabilityBusy !== null}
+                                  onChange={(event) => void changeCapability(cap.code, event.target.checked)}
+                                  aria-label={cap.name} />
+                                <span style={{ flex: 1 }}>
+                                  <strong>{cap.name}</strong> <code>{cap.code}</code>
+                                  <span style={{ float: "right" }}>
+                                    <Badge tone={!record?.available ? "neutral" : granted ? "success" : "warning"}>
+                                      {!record?.available ? "Chưa triển khai" : granted ? "Đã cấp" : "Chưa cấp"}
+                                    </Badge>
+                                  </span>
+                                  <span style={{ display: "block", color: "#64748b", fontSize: "0.825rem" }}>{cap.description}</span>
+                                  {capabilityBusy === cap.code && <span role="status">Đang lưu…</span>}
+                                </span>
+                              </label>
+                            );
+                          })}
                         </div>
-                      </div>
-
-                      {/* Capabilities Table / List */}
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {PLATFORM_CAPABILITIES.map((cap) => {
-                          const isEligible = companyDetail.verificationStatus === "VERIFIED" || cap.defaultGranted;
-                          return (
-                            <div
-                              key={cap.code}
-                              style={{
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: 12,
-                                padding: "12px 14px",
-                                background: "#ffffff",
-                                borderRadius: 8,
-                                border: "1px solid #e2e8f0",
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isEligible}
-                                disabled
-                                style={{ marginTop: 4, cursor: "not-allowed" }}
-                                aria-label={cap.name}
-                              />
-                              <div style={{ flex: 1 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                                  <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e293b" }}>
-                                    {cap.name}
-                                  </span>
-                                  <code style={{ fontSize: "0.75rem", color: "#64748b", background: "#f1f5f9", padding: "1px 5px", borderRadius: 4 }}>
-                                    {cap.code}
-                                  </code>
-                                  <span style={{ marginLeft: "auto", fontSize: "0.725rem", color: "#94a3b8", fontWeight: 600 }}>
-                                    {isEligible ? (
-                                      <Badge tone="success">ĐỦ ĐIỀU KIỆN</Badge>
-                                    ) : (
-                                      <Badge tone="neutral">YÊU CẦU XÁC MINH</Badge>
-                                    )}
-                                  </span>
-                                </div>
-                                <p style={{ margin: 0, fontSize: "0.825rem", color: "#64748b", lineHeight: 1.4 }}>
-                                  {cap.description}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      )}
                     </div>
                   )}
                 </>
