@@ -6,6 +6,7 @@ import { AccessTokenGuard } from "../auth/guards/access-token.guard";
 import { AccountTypeGuard, RequireAccountTypes } from "../auth/guards/account-type.guard";
 import type { AuthenticatedPrincipal } from "../auth/types/auth.types";
 import { RequireCompanyPermissions } from "../authorization/decorators/require-company-permissions.decorator";
+import { RequirePlatformCapability } from "../authorization/decorators/require-platform-capability.decorator";
 import { RequirePermissions } from "../authorization/decorators/require-permissions.decorator";
 import { CompanyPermissionGuard, type CompanyAuthorizedRequest } from "../authorization/guards/company-permission.guard";
 import { PermissionGuard, type AuthorizedRequest } from "../authorization/guards/permission.guard";
@@ -61,17 +62,20 @@ export class CompanyMessagingController {
   constructor(private readonly messaging: MessagingService) {}
 
   @Get() @RequireCompanyPermissions("application.view")
+  @RequirePlatformCapability("application.view")
   list(@CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
     @Param("companyId", ParseUUIDPipe) companyId: string, @Query() query: MessagingPageDto) {
     company(req, "application.view"); return this.messaging.list("COMPANY", auth.userId, query, companyId);
   }
   @Get(":applicationId/messages") @RequireCompanyPermissions("application.view")
+  @RequirePlatformCapability("application.view")
   messages(@CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
     @Param("companyId", ParseUUIDPipe) companyId: string, @Param("applicationId", ParseUUIDPipe) id: string,
     @Query() query: MessagingPageDto) {
     company(req, "application.view"); return this.messaging.messages("COMPANY", auth.userId, id, query, companyId);
   }
   @Post(":applicationId/messages") @RequireCompanyPermissions("application.review")
+  @RequirePlatformCapability("application.view")
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) @UseGuards(ThrottlerGuard)
   send(@CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
     @Param("companyId", ParseUUIDPipe) companyId: string, @Param("applicationId", ParseUUIDPipe) id: string,
@@ -79,6 +83,7 @@ export class CompanyMessagingController {
     company(req, "application.review"); return this.messaging.send("COMPANY", auth.userId, id, dto.body, companyId);
   }
   @Post(":applicationId/read") @RequireCompanyPermissions("application.view")
+  @RequirePlatformCapability("application.view")
   read(@CurrentAuth() auth: AuthenticatedPrincipal, @Req() req: CompanyAuthorizedRequest,
     @Param("companyId", ParseUUIDPipe) companyId: string, @Param("applicationId", ParseUUIDPipe) id: string) {
     company(req, "application.view"); return this.messaging.markRead("COMPANY", auth.userId, id, companyId);
