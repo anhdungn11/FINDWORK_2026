@@ -53,13 +53,35 @@ async function main() {
     assert.equal(payload.kind, row.kind);
     assert.equal(payload.applicationId, row.applicationId);
     assert.equal(payload.interviewId, row.interviewId);
+    let interview;
+    if (payload.kind === "INTERVIEW_INVITATION") {
+      const actual = (await db.query(`SELECT i."applicationId" AS "applicationId",
+        i.status::text AS status, i."scheduledAt" AS "scheduledAt",
+        i."durationMinutes" AS "durationMinutes", i.type::text AS type,
+        i.location, i."meetingUrl" AS "meetingUrl", c.name AS "companyName",
+        a."submittedAt" AS "submittedAt", p."userId" AS "candidateUserId"
+        FROM "Interview" i JOIN "Application" a ON a.id=i."applicationId"
+          AND a."companyId"=i."companyId"
+        JOIN "Company" c ON c.id=i."companyId"
+        JOIN "CandidateProfile" p ON p.id=a."candidateProfileId"
+        WHERE i.id=$1`, [row.interviewId])).rows[0];
+      assert.ok(actual && actual.applicationId === row.applicationId && actual.submittedAt,
+        "Interview application is missing or unsubmitted");
+      assert.equal(actual.candidateUserId, row.recipientUserId);
+      assert.ok(["SCHEDULED", "RESCHEDULED"].includes(actual.status), "Interview is not scheduled");
+      assert.equal(actual.scheduledAt.toISOString(), payload.scheduledAt,
+        "Interview schedule changed since enqueue");
+      interview = { companyName: actual.companyName,
+        scheduledAt: actual.scheduledAt.toISOString(), durationMinutes: actual.durationMinutes,
+        type: actual.type, location: actual.location, meetingUrl: actual.meetingUrl };
+    }
     const applicationUrl = validateRecruitmentApplicationUrl(payload.applicationBaseUrl, env.NODE_ENV);
     applicationUrl.pathname = `${applicationUrl.pathname.replace(/\/$/, "")}/${encodeURIComponent(row.applicationId)}`;
     const { renderRecruitmentNotice } = require("../dist/infrastructure/email/email-provider.service.js");
     const rendered = renderRecruitmentNotice({ to: payload.recipient, from: payload.sender,
       url: applicationUrl.toString(), jobTitle: payload.jobTitle, kind: payload.kind,
       status: payload.status || undefined, scheduledAt: payload.scheduledAt || undefined,
-      idempotencyKey: row.idempotencyKey });
+      idempotencyKey: row.idempotencyKey, interview });
     preview = { jobId, event: payload.kind, idempotencyKey: row.idempotencyKey, ...rendered };
     console.log(JSON.stringify({ mode: "PREVIEW_ONLY", ...preview }));
     await db.query("ROLLBACK");

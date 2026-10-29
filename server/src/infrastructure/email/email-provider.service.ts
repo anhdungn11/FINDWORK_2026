@@ -25,6 +25,8 @@ export type RecruitmentProviderRequest = {
   kind: "APPLICATION_CONFIRMED" | "APPLICATION_STATUS" | "INTERVIEW_INVITATION" |
     "INTERVIEW_RESCHEDULED" | "INTERVIEW_CANCELLED";
   status?: string; scheduledAt?: string; idempotencyKey: string;
+  interview?: { companyName: string; scheduledAt: string; durationMinutes: number;
+    type: "PHONE" | "VIDEO" | "ONSITE"; location?: string | null; meetingUrl?: string | null };
 };
 export class EmailProviderError extends Error {
   constructor(public readonly errorCode: string, public readonly retryable: boolean) {
@@ -37,13 +39,61 @@ function escapeHtml(input: string): string {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+const VIETNAM_TIME_ZONE = "Asia/Ho_Chi_Minh";
+
+function vietnamDateTime(value: Date): { date: string; time: string } {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+    timeZone: VIETNAM_TIME_ZONE, day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(value).map(({ type, value: part }) => [type, part]));
+  return { date: `${parts.day}/${parts.month}/${parts.year}`, time: `${parts.hour}:${parts.minute}` };
+}
+
+function renderInterviewInvitation(input: RecruitmentProviderRequest) {
+  const interview = input.interview;
+  if (!interview || !interview.companyName.trim() || !Number.isInteger(interview.durationMinutes) ||
+      interview.durationMinutes < 15 || interview.durationMinutes > 240) {
+    throw new Error("INTERVIEW_DETAILS_INVALID");
+  }
+  const start = new Date(interview.scheduledAt);
+  if (!Number.isFinite(start.getTime())) throw new Error("INTERVIEW_TIME_INVALID");
+  const end = new Date(start.getTime() + interview.durationMinutes * 60_000);
+  const from = vietnamDateTime(start);
+  const to = vietnamDateTime(end);
+  const range = from.date === to.date
+    ? `${from.time}–${to.time} ngày ${from.date}`
+    : `${from.time} ngày ${from.date} – ${to.time} ngày ${to.date}`;
+  const company = interview.companyName.replace(/\s+/g, " ").trim().slice(0, 200);
+  const title = input.jobTitle.replace(/\s+/g, " ").trim().slice(0, 200);
+  const format = interview.type === "PHONE" ? "Phỏng vấn qua điện thoại"
+    : interview.type === "VIDEO" ? "Phỏng vấn trực tuyến"
+      : interview.type === "ONSITE" ? "Phỏng vấn trực tiếp" : null;
+  if (!format) throw new Error("INTERVIEW_TYPE_INVALID");
+  const lines = [
+    `${company} — ${title}`,
+    `Thời gian: ${range}`,
+    "Múi giờ: Giờ Việt Nam (Asia/Ho_Chi_Minh, UTC+07:00)",
+    `Hình thức: ${format}`,
+  ];
+  if (interview.type === "ONSITE" && interview.location) lines.push(`Địa điểm: ${interview.location}`);
+  if (interview.type === "VIDEO" && interview.meetingUrl) lines.push(`Liên kết họp: ${interview.meetingUrl}`);
+  const link = `Xem chi tiết hồ sơ ứng tuyển: ${input.url}`;
+  return {
+    from: input.from, to: [input.to],
+    subject: `Thư mời phỏng vấn | ${company} — ${title}`,
+    text: `${lines.join("\n")}\n\n${link}`,
+    html: `${lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}` +
+      `<p><a href="${escapeHtml(input.url)}">Xem chi tiết hồ sơ ứng tuyển</a></p>`,
+  };
+}
+
 /** Shared by delivery and the restricted one-job preview. */
 export function renderRecruitmentNotice(input: RecruitmentProviderRequest) {
+  if (input.kind === "INTERVIEW_INVITATION") return renderInterviewInvitation(input);
   const title = input.jobTitle.slice(0, 200);
   const subject = input.kind === "APPLICATION_CONFIRMED" ? "FINDWORK application received"
     : input.kind === "APPLICATION_STATUS" ? "FINDWORK application status update"
-      : input.kind === "INTERVIEW_INVITATION" ? "FINDWORK interview invitation"
-        : input.kind === "INTERVIEW_RESCHEDULED" ? "FINDWORK interview rescheduled"
+      : input.kind === "INTERVIEW_RESCHEDULED" ? "FINDWORK interview rescheduled"
           : "FINDWORK interview cancelled";
   const detail = input.kind === "APPLICATION_CONFIRMED" ? `We received your application for ${title}.`
     : input.kind === "APPLICATION_STATUS" ? input.status === "INTERVIEW"
@@ -51,9 +101,7 @@ export function renderRecruitmentNotice(input: RecruitmentProviderRequest) {
       : input.status === "OFFERED"
         ? `Your application for ${title} has received an offer.`
         : `Your application for ${title} is now ${input.status}.`
-      : input.kind === "INTERVIEW_INVITATION"
-        ? `You are invited to interview for ${title} on ${input.scheduledAt}.`
-        : input.kind === "INTERVIEW_RESCHEDULED"
+      : input.kind === "INTERVIEW_RESCHEDULED"
           ? `Your interview for ${title} has been rescheduled to ${input.scheduledAt}.`
           : `Your interview for ${title} scheduled for ${input.scheduledAt} has been cancelled.`;
   return { from: input.from, to: [input.to], subject,

@@ -77,9 +77,11 @@ export class RecruitmentNotificationWorker {
       const recipient = await this.db.user.findUnique({ where: { id: job.recipientUserId },
         select: { status: true, emailNormalized: true, emailVerifiedAt: true } });
       const application = await this.db.application.findUnique({ where: { id: job.applicationId },
-        select: { status: true, submittedAt: true, candidateProfile: { select: { userId: true } } } });
+        select: { status: true, submittedAt: true, candidateProfile: { select: { userId: true } },
+          company: { select: { name: true } } } });
       const interview = job.interviewId ? await this.db.interview.findUnique({ where: { id: job.interviewId },
-        select: { applicationId: true, status: true, scheduledAt: true } }) : null;
+        select: { applicationId: true, status: true, scheduledAt: true,
+          durationMinutes: true, type: true, location: true, meetingUrl: true } }) : null;
       const eligible = recipient?.status === "ACTIVE" && recipient.emailVerifiedAt &&
         recipient.emailNormalized === value.recipient && application?.submittedAt &&
         application.candidateProfile.userId === job.recipientUserId &&
@@ -103,7 +105,12 @@ export class RecruitmentNotificationWorker {
       const sent = await this.provider.sendRecruitmentNotice({ to: value.recipient,
         from: value.sender, url: url.toString(), jobTitle: value.jobTitle,
         kind: value.kind, status: value.status ?? undefined,
-        scheduledAt: value.scheduledAt ?? undefined, idempotencyKey: job.idempotencyKey });
+        scheduledAt: value.scheduledAt ?? undefined, idempotencyKey: job.idempotencyKey,
+        interview: value.kind === "INTERVIEW_INVITATION" ? {
+          companyName: application!.company.name, scheduledAt: interview!.scheduledAt.toISOString(),
+          durationMinutes: interview!.durationMinutes, type: interview!.type,
+          location: interview!.location, meetingUrl: interview!.meetingUrl,
+        } : undefined });
       await this.db.recruitmentEmailOutbox.updateMany({ where: this.owned(job.id, owner),
         data: { status: "SENT", ...scrub, sentAt: new Date(),
           providerMessageId: sent.providerMessageId, lastErrorCode: null } });

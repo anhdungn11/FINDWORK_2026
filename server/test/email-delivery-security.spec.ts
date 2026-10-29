@@ -213,8 +213,34 @@ describe("Email delivery fail-closed crypto/config", () => {
     } finally { fetchMock.mockRestore(); }
   });
 
+  it("renders a phone invitation from real interview fields in Vietnam time and escapes HTML", async () => {
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, status: 200,
+      json: async () => ({ id: "mock-notice-id" }) } as Response);
+    try {
+      const service = new EmailProviderService({ mode: "resend", resendApiKey: "fake-only-key",
+        assertCanQueueRecruitment: () => {} } as unknown as EmailDeliverySettings);
+      await service.sendRecruitmentNotice({ to: "candidate@example.invalid", from: "sender@example.invalid",
+        url: "https://example.invalid/applications/one?a=1&b=2",
+        jobTitle: "Nhân Viên <Kinh Doanh>", kind: "INTERVIEW_INVITATION",
+        scheduledAt: "2026-10-30T02:00:00.000Z", idempotencyKey: "interview:invite:one",
+        interview: { companyName: "AnhDung & <Co>", scheduledAt: "2026-10-30T02:00:00.000Z",
+          durationMinutes: 30, type: "PHONE" } });
+      const options = fetchMock.mock.calls[0]?.[1];
+      const body = JSON.parse(String(options?.body));
+      expect(body.subject).toBe("Thư mời phỏng vấn | AnhDung & <Co> — Nhân Viên <Kinh Doanh>");
+      expect(body.text).toContain("09:00–09:30 ngày 30/10/2026");
+      expect(body.text).toContain("Giờ Việt Nam (Asia/Ho_Chi_Minh, UTC+07:00)");
+      expect(body.text).toContain("Phỏng vấn qua điện thoại");
+      expect(body.text).toContain("https://example.invalid/applications/one?a=1&b=2");
+      expect(body.html).toContain("AnhDung &amp; &lt;Co&gt;");
+      expect(body.html).toContain("Nhân Viên &lt;Kinh Doanh&gt;");
+      expect(body.html).toContain("a=1&amp;b=2");
+      expect(body.html).not.toContain("<Co>");
+      expect(options?.headers).toEqual(expect.objectContaining({ "Idempotency-Key": "interview:invite:one" }));
+    } finally { fetchMock.mockRestore(); }
+  });
+
   it.each([
-    ["INTERVIEW_INVITATION", "FINDWORK interview invitation", "You are invited to interview"],
     ["INTERVIEW_RESCHEDULED", "FINDWORK interview rescheduled", "has been rescheduled"],
     ["INTERVIEW_CANCELLED", "FINDWORK interview cancelled", "has been cancelled"],
   ] as const)("renders distinct %s mail without claiming an interview outcome", async (kind, subject, phrase) => {
