@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { describe, it } from "node:test";
 import {
   buildGuidanceChecklist,
@@ -98,7 +99,45 @@ describe("Candidate Profile Presentation Utilities", () => {
   describe("formatDateOfBirth", () => {
     it("formats ISO date string into DD/MM/YYYY reliably", () => {
       assert.equal(formatDateOfBirth("1997-08-20T00:00:00.000Z"), "20/08/1997");
+      assert.equal(formatDateOfBirth("1997-08-20"), "20/08/1997");
+      assert.equal(formatDateOfBirth("2003-11-10"), "10/11/2003");
+      assert.equal(formatDateOfBirth("20/08/1997"), "20/08/1997");
+      assert.equal(formatDateOfBirth(new Date("1997-08-20T00:00:00.000Z")), "20/08/1997");
       assert.equal(formatDateOfBirth(null), "Chưa cập nhật");
+      assert.equal(formatDateOfBirth(undefined), "Chưa cập nhật");
+      assert.equal(formatDateOfBirth(""), "Chưa cập nhật");
+      assert.equal(formatDateOfBirth("   "), "Chưa cập nhật");
+    });
+
+    it("guarantees birth dates never shift by one day across timezones", () => {
+      const timezones = [
+        "America/New_York",
+        "America/Los_Angeles",
+        "Pacific/Honolulu",
+        "UTC",
+        "Europe/London",
+        "Asia/Ho_Chi_Minh",
+        "Asia/Tokyo",
+        "Australia/Sydney"
+      ];
+
+      for (const tz of timezones) {
+        const script = `
+          import { formatDateOfBirth } from "./src/features/candidate/profile/utils/profileFormatters.ts";
+          const r1 = formatDateOfBirth("1997-08-20T00:00:00.000Z");
+          const r2 = formatDateOfBirth("1997-08-20");
+          const r3 = formatDateOfBirth(new Date("1997-08-20T00:00:00.000Z"));
+          if (r1 !== "20/08/1997" || r2 !== "20/08/1997" || r3 !== "20/08/1997") {
+            console.error("FAIL in " + process.env.TZ + ": r1=" + r1 + ", r2=" + r2 + ", r3=" + r3);
+            process.exit(1);
+          }
+        `;
+        const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], {
+          env: { ...process.env, TZ: tz },
+          encoding: "utf-8"
+        });
+        assert.equal(result.status, 0, `Failed in timezone ${tz}: ${result.stderr || result.stdout}`);
+      }
     });
   });
 });

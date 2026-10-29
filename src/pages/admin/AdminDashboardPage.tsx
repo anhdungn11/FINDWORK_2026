@@ -11,6 +11,7 @@ import {
   Clock,
   Ban,
   Layers,
+  BarChart3,
 } from "lucide-react";
 import { Badge, Card, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
@@ -57,16 +58,26 @@ const AdminDashboardPage = () => {
         title="Bảng điều khiển quản trị nền tảng"
         subtitle="Giám sát vận hành toàn hệ thống FINDWORK, phân quyền doanh nghiệp và kiểm duyệt nội dung sàn việc làm."
         actions={
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnOutline}`}
-            onClick={stats.reload}
-            disabled={stats.loading}
-            style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-          >
-            <RefreshCw size={15} className={stats.loading ? "spin" : ""} />
-            <span>Làm mới dữ liệu</span>
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <Link
+              to="/admin/reports"
+              className={`${ui.btn} ${ui.btnPrimary}`}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <BarChart3 size={15} />
+              <span>Báo cáo tiến độ & Vận hành</span>
+            </Link>
+            <button
+              type="button"
+              className={`${ui.btn} ${ui.btnOutline}`}
+              onClick={stats.reload}
+              disabled={stats.loading}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
+              <RefreshCw size={15} className={stats.loading ? "spin" : ""} />
+              <span>Làm mới dữ liệu</span>
+            </button>
+          </div>
         }
       />
 

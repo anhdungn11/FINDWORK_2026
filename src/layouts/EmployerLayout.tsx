@@ -16,6 +16,7 @@ import {
   X,
   Sparkles,
   Globe,
+  BarChart3,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
@@ -312,6 +313,19 @@ const EmployerLayout = () => {
                     <Sparkles size={18} color="var(--color-primary, #4f46e5)" />
                   </span>
                   <span>Trợ lý AI Doanh nghiệp</span>
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/employer/reports"
+                  className={({ isActive }) =>
+                    `${styles.navLink} ${isActive ? styles.navLinkActive : ""}`
+                  }
+                >
+                  <span className={styles.navIcon}>
+                    <BarChart3 size={18} />
+                  </span>
+                  <span>Báo cáo tuyển dụng</span>
                 </NavLink>
               </li>
             </ul>

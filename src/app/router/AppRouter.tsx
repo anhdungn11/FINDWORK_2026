@@ -58,12 +58,14 @@ const EmployerLocationsPage = lazy(() => import("@/pages/employer/EmployerLocati
 const EmployerMembersPage = lazy(() => import("@/pages/employer/EmployerMembersPage"));
 const EmployerApplicantsPage = lazy(() => import("@/pages/employer/EmployerApplicantsPage"));
 const EmployerAiPage = lazy(() => import("@/pages/employer/EmployerAiPage/EmployerAiPage"));
+const EmployerReportsPage = lazy(() => import("@/pages/employer/EmployerReportsPage"));
 
 const AdminDashboardPage = lazy(() => import("@/pages/admin/AdminDashboardPage"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/AdminUsersPage"));
 const AdminCompaniesPage = lazy(() => import("@/pages/admin/AdminCompaniesPage"));
 const AdminJobsPage = lazy(() => import("@/pages/admin/AdminJobsPage"));
 const AdminSystemPage = lazy(() => import("@/pages/admin/AdminSystemPage"));
+const AdminReportsPage = lazy(() => import("@/pages/admin/AdminReportsPage"));
 
 const PageFallback = () => (
   <div className="container" style={{ padding: "48px 16px" }}>
@@ -297,6 +299,11 @@ const AppRouter = () => {
                   path="ai"
                   element={<EmployerAiPage />}
                 />
+
+                <Route
+                  path="reports"
+                  element={<EmployerReportsPage />}
+                />
               </Route>
             </Route>
           </Route>
@@ -310,6 +317,11 @@ const AppRouter = () => {
               <Route
                 index
                 element={<AdminDashboardPage />}
+              />
+
+              <Route
+                path="reports"
+                element={<AdminReportsPage />}
               />
 
               <Route

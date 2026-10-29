@@ -14,6 +14,7 @@ import {
   MapPin,
   ShieldAlert,
   ChevronRight,
+  BarChart3,
 } from "lucide-react";
 import { Badge, Card, JobStatusBadge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
@@ -183,12 +184,18 @@ const EmployerDashboardPage = () => {
             : "Trung tâm quản trị hoạt động tuyển dụng, theo dõi ứng viên và quản lý nhân sự doanh nghiệp."
         }
         actions={
-          canManageJobs(active.memberRoleNames) ? (
-            <Link className={`${ui.btn} ${ui.btnPrimary}`} to="/employer/jobs/new">
-              <Plus size={16} style={{ marginRight: 6 }} />
-              <span>Đăng tin tuyển dụng mới</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <Link className={`${ui.btn} ${ui.btnOutline}`} to="/employer/reports">
+              <BarChart3 size={16} style={{ marginRight: 6 }} />
+              <span>Báo cáo tuyển dụng</span>
             </Link>
-          ) : undefined
+            {canManageJobs(active.memberRoleNames) && (
+              <Link className={`${ui.btn} ${ui.btnPrimary}`} to="/employer/jobs/new">
+                <Plus size={16} style={{ marginRight: 6 }} />
+                <span>Đăng tin tuyển dụng mới</span>
+              </Link>
+            )}
+          </div>
         }
       />
 

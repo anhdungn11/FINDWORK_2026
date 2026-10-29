@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ShieldAlert,
+  BarChart3,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import styles from "./AdminLayout.module.css";
@@ -31,6 +32,7 @@ const SECTIONS: NavSection[] = [
     title: "Tổng quan & Báo cáo",
     items: [
       { to: "/admin", label: "Tổng quan nền tảng", icon: LayoutDashboard, end: true },
+      { to: "/admin/reports", label: "Báo cáo tiến độ & Vận hành", icon: BarChart3 },
     ],
   },
   {

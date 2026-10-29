@@ -87,23 +87,36 @@ export function formatMonthYear(month?: number | null, year?: number | null): st
 /**
  * Định dạng ngày sinh (DD/MM/YYYY)
  */
-export function formatDateOfBirth(isoDate?: string | null): string {
+export function formatDateOfBirth(isoDate?: string | Date | null): string {
   if (!isoDate) return "Chưa cập nhật";
-  try {
-    const d = new Date(isoDate);
+  if (typeof isoDate === "string") {
+    const trimmed = isoDate.trim();
+    if (!trimmed) return "Chưa cập nhật";
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+      return trimmed;
+    }
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+    if (match) {
+      const [, year, month, day] = match;
+      return `${day}/${month}/${year}`;
+    }
+    const d = new Date(trimmed);
     if (isNaN(d.getTime())) return isoDate;
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const year = d.getFullYear();
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const year = d.getUTCFullYear();
     return `${day}/${month}/${year}`;
-  } catch {
-    return isoDate;
   }
+  if (isoDate instanceof Date) {
+    if (isNaN(isoDate.getTime())) return "Chưa cập nhật";
+    const day = String(isoDate.getUTCDate()).padStart(2, "0");
+    const month = String(isoDate.getUTCMonth() + 1).padStart(2, "0");
+    const year = isoDate.getUTCFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  return String(isoDate);
 }
 
-/**
- * Định dạng số tiền VND có dấu chấm phân cách
- */
 export function formatCurrencyVND(amount?: number | string | null): string {
   if (amount === null || amount === undefined || amount === "") return "0";
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
