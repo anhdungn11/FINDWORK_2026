@@ -24,18 +24,19 @@ export class PasswordResetWorker {
   constructor(private readonly db: PrismaService, private readonly settings: EmailDeliverySettings,
     private readonly crypto: EmailCryptoService, private readonly provider: EmailProviderService) {}
 
-  async processOne(): Promise<boolean> {
+  async processOne(jobId?: string): Promise<boolean> {
     if (!this.settings.passwordResetEnabled) return false;
     this.settings.assertCanQueuePasswordReset();
     this.crypto.assertReady();
-    const keys = await this.db.passwordResetOutbox.findMany({ where: {
+    const exactJob = jobId ? { id: jobId } : {};
+    const keys = await this.db.passwordResetOutbox.findMany({ where: { ...exactJob,
       status: { in: ["QUEUED", "PROCESSING"] } }, distinct: ["encryptionKeyId"],
       select: { encryptionKeyId: true } });
     for (const row of keys) this.crypto.assertKeyAvailable(row.encryptionKeyId!);
-    await this.db.passwordResetOutbox.updateMany({ where: { status: "PROCESSING",
+    await this.db.passwordResetOutbox.updateMany({ where: { ...exactJob, status: "PROCESSING",
       leaseUntil: { lt: new Date() }, attemptCount: { gte: 8 } },
       data: { status: "FAILED", ...scrub, lastErrorCode: "LEASE_EXHAUSTED" } });
-    const next = await this.db.passwordResetOutbox.findFirst({ where: { attemptCount: { lt: 8 }, OR: [
+    const next = await this.db.passwordResetOutbox.findFirst({ where: { ...exactJob, attemptCount: { lt: 8 }, OR: [
       { status: "QUEUED", nextAttemptAt: { lte: new Date() } },
       { status: "PROCESSING", leaseUntil: { lt: new Date() } },
     ] }, orderBy: [{ nextAttemptAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
