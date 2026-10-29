@@ -82,34 +82,46 @@ export default function AdminReportsPage() {
   const [report, setReport] = useState<AdminReportSummaryDto | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<ApiFailure | null>(null);
+  const activeControllerRef = useRef<AbortController | null>(null);
   const requestRevision = useRef(0);
 
-  const loadData = useCallback(async (periodToFetch: ReportPeriodKey) => {
+  const loadData = useCallback((periodToFetch: ReportPeriodKey) => {
+    activeControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
     const revision = ++requestRevision.current;
+
     setLoading(true);
     setError(null);
-    const controller = new AbortController();
 
-    try {
-      const data = await adminApi.getReportsSummary({ period: periodToFetch }, controller.signal);
-      if (revision === requestRevision.current) {
-        setReport(data);
-      }
-    } catch (err: unknown) {
-      if (revision === requestRevision.current) {
+    adminApi
+      .getReportsSummary({ period: periodToFetch }, controller.signal)
+      .then((data) => {
+        if (revision === requestRevision.current) {
+          setReport(data);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted || revision !== requestRevision.current) {
+          return;
+        }
         setError(toApiFailure(err));
-      }
-    } finally {
-      if (revision === requestRevision.current) {
-        setLoading(false);
-      }
-    }
+      })
+      .finally(() => {
+        if (revision === requestRevision.current) {
+          setLoading(false);
+        }
+      });
 
-    return () => controller.abort();
+    return controller;
   }, []);
 
   useEffect(() => {
-    loadData(period);
+    const controller = loadData(period);
+    return () => {
+      controller.abort();
+    };
   }, [period, loadData]);
 
   const periodLabel = REPORT_PERIOD_LABELS[period] ?? period;

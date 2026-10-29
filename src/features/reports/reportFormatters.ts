@@ -1,4 +1,12 @@
 import type { AdminDashboardCounts } from "../../services/api/adminApi";
+import { ApiFailure } from "../../services/api/apiFailure";
+
+export class ReportContractError extends ApiFailure {
+  constructor(message: string, details?: unknown) {
+    super("validation", 422, "REPORT_CONTRACT_ERROR", message, details);
+    this.name = "ReportContractError";
+  }
+}
 
 export type ReportPeriodKey = "7d" | "30d" | "90d" | "all" | "custom";
 
@@ -155,32 +163,102 @@ export interface CompanyRecruitmentReportDto {
   };
 }
 
-const safeNum = (val: unknown, fallback = 0): number => {
-  if (typeof val === "number" && Number.isFinite(val)) return Math.max(0, Math.floor(val));
-  if (typeof val === "string") {
-    const parsed = parseInt(val, 10);
-    if (Number.isFinite(parsed)) return Math.max(0, parsed);
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
+export function expectRecord(val: unknown, fieldPath: string): Record<string, unknown> {
+  if (!isRecord(val)) {
+    throw new ReportContractError(`Dữ liệu '${fieldPath}' không hợp lệ hoặc thiếu trong phản hồi từ máy chủ (cần dạng đối tượng).`);
   }
-  return fallback;
-};
+  return val;
+}
 
-const safeStr = (val: unknown, fallback = ""): string =>
-  typeof val === "string" ? val : fallback;
+export function expectString(val: unknown, fieldPath: string, fallback?: string): string {
+  if (typeof val === "string" && val.length > 0) return val;
+  if (fallback !== undefined) return fallback;
+  throw new ReportContractError(`Trường chuỗi '${fieldPath}' bị thiếu hoặc không hợp lệ.`);
+}
 
-export function normalizePipelineCounts(raw: unknown): NormalizedPipelineSummary {
-  const r = (raw && typeof raw === "object" ? raw : {}) as RawPipelineCurrentCounts;
-  const total = safeNum(r.totalApplications ?? r.total);
-  const draft = safeNum(r.draft ?? r.DRAFT);
-  const submitted = safeNum(r.submitted ?? r.SUBMITTED);
-  const reviewing = safeNum(r.reviewing ?? r.REVIEWING);
-  const shortlisted = safeNum(r.shortlisted ?? r.SHORTLISTED);
-  const interview = safeNum(r.interview ?? r.INTERVIEW);
-  const offered = safeNum(r.offered ?? r.OFFERED);
-  const rejected = safeNum(r.rejected ?? r.REJECTED);
-  const withdrawn = safeNum(r.withdrawn ?? r.WITHDRAWN);
+export function expectNullableString(val: unknown, fieldPath: string): string | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val === "string") return val;
+  throw new ReportContractError(`Trường '${fieldPath}' phải là chuỗi hoặc null.`);
+}
+
+export function expectNonNegativeInt(val: unknown, fieldPath: string): number {
+  if (typeof val === "number" && Number.isInteger(val) && val >= 0) {
+    return val;
+  }
+  throw new ReportContractError(
+    `Chỉ số '${fieldPath}' phải là số nguyên không âm (nhận được: ${val === null ? "null" : typeof val === "undefined" ? "undefined" : JSON.stringify(val)}). Không thể tự động thay thế bằng 0.`
+  );
+}
+
+export function expectNullableNonNegativeInt(val: unknown, fieldPath: string): number | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val === "number" && Number.isInteger(val) && val >= 0) {
+    return val;
+  }
+  throw new ReportContractError(
+    `Chỉ số '${fieldPath}' phải là số nguyên không âm hoặc null (nhận được: ${JSON.stringify(val)}).`
+  );
+}
+
+export function expectNullableBoolean(val: unknown, fieldPath: string): boolean | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val === "boolean") return val;
+  throw new ReportContractError(`Trường '${fieldPath}' phải là boolean hoặc null.`);
+}
+
+function normalizePeriod(raw: unknown, path = "period"): ReportPeriodDto {
+  const rec = expectRecord(raw, path);
+  const key = expectString(rec.key, `${path}.key`);
+  const startDate = expectNullableString(rec.startDate, `${path}.startDate`);
+  const endDate = expectString(rec.endDate, `${path}.endDate`);
+  const generatedAt = expectString(rec.generatedAt, `${path}.generatedAt`);
 
   return {
-    total: Math.max(total, draft + submitted + reviewing + shortlisted + interview + offered + rejected + withdrawn),
+    key,
+    startDate,
+    endDate,
+    generatedAt,
+  };
+}
+
+function extractStageCount(rec: Record<string, unknown>, lowerKey: string, upperKey: string, path: string): number {
+  if (lowerKey in rec && rec[lowerKey] !== undefined) {
+    return expectNonNegativeInt(rec[lowerKey], `${path}.${lowerKey}`);
+  }
+  if (upperKey in rec && rec[upperKey] !== undefined) {
+    return expectNonNegativeInt(rec[upperKey], `${path}.${upperKey}`);
+  }
+  throw new ReportContractError(`Thiếu chỉ số '${path}.${lowerKey}' (hoặc '${upperKey}') trong luồng ứng tuyển.`);
+}
+
+export function normalizePipelineCounts(raw: unknown, path = "pipeline.currentCounts"): NormalizedPipelineSummary {
+  const rec = expectRecord(raw, path);
+  let total: number;
+  if ("totalApplications" in rec && rec.totalApplications !== undefined) {
+    total = expectNonNegativeInt(rec.totalApplications, `${path}.totalApplications`);
+  } else if ("total" in rec && rec.total !== undefined) {
+    total = expectNonNegativeInt(rec.total, `${path}.total`);
+  } else {
+    throw new ReportContractError(`Thiếu chỉ số tổng số ứng viên ('${path}.totalApplications' hoặc '${path}.total').`);
+  }
+
+  const draft = extractStageCount(rec, "draft", "DRAFT", path);
+  const submitted = extractStageCount(rec, "submitted", "SUBMITTED", path);
+  const reviewing = extractStageCount(rec, "reviewing", "REVIEWING", path);
+  const shortlisted = extractStageCount(rec, "shortlisted", "SHORTLISTED", path);
+  const interview = extractStageCount(rec, "interview", "INTERVIEW", path);
+  const offered = extractStageCount(rec, "offered", "OFFERED", path);
+  const rejected = extractStageCount(rec, "rejected", "REJECTED", path);
+  const withdrawn = extractStageCount(rec, "withdrawn", "WITHDRAWN", path);
+
+  const sumOfStages = draft + submitted + reviewing + shortlisted + interview + offered + rejected + withdrawn;
+  return {
+    total: Math.max(total, sumOfStages),
     DRAFT: draft,
     SUBMITTED: submitted,
     REVIEWING: reviewing,
@@ -193,141 +271,162 @@ export function normalizePipelineCounts(raw: unknown): NormalizedPipelineSummary
 }
 
 export function normalizeAdminReport(raw: unknown): AdminReportSummaryDto {
-  const r = (raw && typeof raw === "object" ? raw : {}) as any;
-  const p = (r.period && typeof r.period === "object" ? r.period : {}) as any;
-  const snap = (r.snapshot && typeof r.snapshot === "object" ? r.snapshot : {}) as any;
-  const u = (snap.users && typeof snap.users === "object" ? snap.users : {}) as any;
-  const c = (snap.companies && typeof snap.companies === "object" ? snap.companies : {}) as any;
-  const j = (snap.jobs && typeof snap.jobs === "object" ? snap.jobs : {}) as any;
-  const a = (snap.applications && typeof snap.applications === "object" ? snap.applications : {}) as any;
-  const pe = (r.periodEvents && typeof r.periodEvents === "object" ? r.periodEvents : {}) as any;
-  const ob = (r.operationalBacklog && typeof r.operationalBacklog === "object" ? r.operationalBacklog : {}) as any;
-  const cs = (r.commercialStatus && typeof r.commercialStatus === "object" ? r.commercialStatus : {}) as any;
-  const rb = (cs.revenueAndBilling && typeof cs.revenueAndBilling === "object" ? cs.revenueAndBilling : {}) as any;
-  const ep = (cs.enterprisePartnerships && typeof cs.enterprisePartnerships === "object" ? cs.enterprisePartnerships : {}) as any;
+  const r = expectRecord(raw, "adminReport");
+  const period = normalizePeriod(r.period, "period");
+  const snap = expectRecord(r.snapshot, "snapshot");
+
+  const u = expectRecord(snap.users, "snapshot.users");
+  const users = {
+    total: expectNonNegativeInt(u.total, "snapshot.users.total"),
+    active: expectNonNegativeInt(u.active, "snapshot.users.active"),
+    suspended: expectNonNegativeInt(u.suspended, "snapshot.users.suspended"),
+    disabled: expectNonNegativeInt(u.disabled, "snapshot.users.disabled"),
+  };
+
+  const c = expectRecord(snap.companies, "snapshot.companies");
+  const companies = {
+    total: expectNonNegativeInt(c.total, "snapshot.companies.total"),
+    active: expectNonNegativeInt(c.active, "snapshot.companies.active"),
+    suspended: expectNonNegativeInt(c.suspended, "snapshot.companies.suspended"),
+    archived: expectNonNegativeInt(c.archived, "snapshot.companies.archived"),
+    verified: expectNonNegativeInt(c.verified, "snapshot.companies.verified"),
+    pendingVerification: expectNonNegativeInt(c.pendingVerification, "snapshot.companies.pendingVerification"),
+    rejectedVerification: expectNonNegativeInt(c.rejectedVerification, "snapshot.companies.rejectedVerification"),
+    unverified: expectNonNegativeInt(c.unverified, "snapshot.companies.unverified"),
+  };
+
+  const j = expectRecord(snap.jobs, "snapshot.jobs");
+  const jobs = {
+    total: expectNonNegativeInt(j.total, "snapshot.jobs.total"),
+    published: expectNonNegativeInt(j.published, "snapshot.jobs.published"),
+    draft: expectNonNegativeInt(j.draft, "snapshot.jobs.draft"),
+    paused: expectNonNegativeInt(j.paused, "snapshot.jobs.paused"),
+    closed: expectNonNegativeInt(j.closed, "snapshot.jobs.closed"),
+    expired: expectNonNegativeInt(j.expired, "snapshot.jobs.expired"),
+    archived: expectNonNegativeInt(j.archived, "snapshot.jobs.archived"),
+  };
+
+  const a = expectRecord(snap.applications, "snapshot.applications");
+  const applications = {
+    total: expectNonNegativeInt(a.total, "snapshot.applications.total"),
+  };
+
+  const pe = expectRecord(r.periodEvents, "periodEvents");
+  const periodEvents = {
+    newUsersRegistered: expectNonNegativeInt(pe.newUsersRegistered, "periodEvents.newUsersRegistered"),
+    newCompaniesRegistered: expectNonNegativeInt(pe.newCompaniesRegistered, "periodEvents.newCompaniesRegistered"),
+    companiesVerified: expectNonNegativeInt(pe.companiesVerified, "periodEvents.companiesVerified"),
+    companiesRejected: expectNonNegativeInt(pe.companiesRejected, "periodEvents.companiesRejected"),
+    jobsPosted: expectNonNegativeInt(pe.jobsPosted, "periodEvents.jobsPosted"),
+    applicationsSubmitted: expectNonNegativeInt(pe.applicationsSubmitted, "periodEvents.applicationsSubmitted"),
+    jobsClosedByAdmin: expectNonNegativeInt(pe.jobsClosedByAdmin, "periodEvents.jobsClosedByAdmin"),
+  };
+
+  const ob = expectRecord(r.operationalBacklog, "operationalBacklog");
+  const operationalBacklog = {
+    pendingVerificationQueue: expectNonNegativeInt(ob.pendingVerificationQueue, "operationalBacklog.pendingVerificationQueue"),
+    suspendedUsersQueue: expectNonNegativeInt(ob.suspendedUsersQueue, "operationalBacklog.suspendedUsersQueue"),
+    suspendedCompaniesQueue: expectNonNegativeInt(ob.suspendedCompaniesQueue, "operationalBacklog.suspendedCompaniesQueue"),
+  };
+
+  const cs = expectRecord(r.commercialStatus, "commercialStatus");
+  const rb = expectRecord(cs.revenueAndBilling, "commercialStatus.revenueAndBilling");
+  const revenueAndBilling = {
+    status: expectString(rb.status, "commercialStatus.revenueAndBilling.status", "UNAVAILABLE"),
+    monetizationActive: expectNullableBoolean(rb.monetizationActive, "commercialStatus.revenueAndBilling.monetizationActive"),
+    totalRevenueVnd: expectNullableNonNegativeInt(rb.totalRevenueVnd, "commercialStatus.revenueAndBilling.totalRevenueVnd"),
+    note: expectString(rb.note, "commercialStatus.revenueAndBilling.note", "Chưa triển khai ghi nhận doanh thu và thanh toán."),
+  };
+
+  const ep = expectRecord(cs.enterprisePartnerships, "commercialStatus.enterprisePartnerships");
+  const enterprisePartnerships = {
+    status: expectString(ep.status, "commercialStatus.enterprisePartnerships.status", "UNAVAILABLE"),
+    activePartnershipsCount: expectNullableNonNegativeInt(ep.activePartnershipsCount, "commercialStatus.enterprisePartnerships.activePartnershipsCount"),
+    note: expectString(ep.note, "commercialStatus.enterprisePartnerships.note", "Chưa triển khai ghi nhận chương trình đối tác."),
+  };
 
   return {
-    period: {
-      key: safeStr(p.key, "30d"),
-      startDate: p.startDate ? safeStr(p.startDate) : null,
-      endDate: safeStr(p.endDate, new Date().toISOString()),
-      generatedAt: safeStr(p.generatedAt, new Date().toISOString()),
-    },
+    period,
     snapshot: {
-      users: {
-        total: safeNum(u.total),
-        active: safeNum(u.active),
-        suspended: safeNum(u.suspended),
-        disabled: safeNum(u.disabled),
-      },
-      companies: {
-        total: safeNum(c.total),
-        active: safeNum(c.active),
-        suspended: safeNum(c.suspended),
-        archived: safeNum(c.archived),
-        verified: safeNum(c.verified),
-        pendingVerification: safeNum(c.pendingVerification),
-        rejectedVerification: safeNum(c.rejectedVerification),
-        unverified: safeNum(c.unverified),
-      },
-      jobs: {
-        total: safeNum(j.total),
-        published: safeNum(j.published),
-        draft: safeNum(j.draft),
-        paused: safeNum(j.paused),
-        closed: safeNum(j.closed),
-        expired: safeNum(j.expired),
-        archived: safeNum(j.archived),
-      },
-      applications: {
-        total: safeNum(a.total),
-      },
+      users,
+      companies,
+      jobs,
+      applications,
     },
-    periodEvents: {
-      newUsersRegistered: safeNum(pe.newUsersRegistered),
-      newCompaniesRegistered: safeNum(pe.newCompaniesRegistered),
-      companiesVerified: safeNum(pe.companiesVerified),
-      companiesRejected: safeNum(pe.companiesRejected),
-      jobsPosted: safeNum(pe.jobsPosted),
-      applicationsSubmitted: safeNum(pe.applicationsSubmitted),
-      jobsClosedByAdmin: safeNum(pe.jobsClosedByAdmin),
-    },
-    operationalBacklog: {
-      pendingVerificationQueue: safeNum(ob.pendingVerificationQueue),
-      suspendedUsersQueue: safeNum(ob.suspendedUsersQueue),
-      suspendedCompaniesQueue: safeNum(ob.suspendedCompaniesQueue),
-    },
+    periodEvents,
+    operationalBacklog,
     commercialStatus: {
-      revenueAndBilling: {
-        status: safeStr(rb.status, "UNAVAILABLE"),
-        monetizationActive: rb.monetizationActive === true ? true : null,
-        totalRevenueVnd: typeof rb.totalRevenueVnd === "number" ? rb.totalRevenueVnd : null,
-        note: safeStr(rb.note, "Chưa triển khai ghi nhận doanh thu và thanh toán."),
-      },
-      enterprisePartnerships: {
-        status: safeStr(ep.status, "UNAVAILABLE"),
-        activePartnershipsCount: typeof ep.activePartnershipsCount === "number" ? ep.activePartnershipsCount : null,
-        note: safeStr(ep.note, "Chưa triển khai ghi nhận chương trình đối tác."),
-      },
+      revenueAndBilling,
+      enterprisePartnerships,
     },
   };
 }
 
 export function normalizeCompanyRecruitmentReport(raw: unknown): CompanyRecruitmentReportDto {
-  const r = (raw && typeof raw === "object" ? raw : {}) as any;
-  const p = (r.period && typeof r.period === "object" ? r.period : {}) as any;
-  const jf = (r.jobFilter && typeof r.jobFilter === "object" ? r.jobFilter : {}) as any;
-  const js = (r.jobsSummary && typeof r.jobsSummary === "object" ? r.jobsSummary : {}) as any;
-  const pipe = (r.pipeline && typeof r.pipeline === "object" ? r.pipeline : {}) as any;
-  const hires = (pipe.hires && typeof pipe.hires === "object" ? pipe.hires : {}) as any;
-  const int = (r.interviewsSummary && typeof r.interviewsSummary === "object" ? r.interviewsSummary : {}) as any;
-  const cp = (r.commercialPackage && typeof r.commercialPackage === "object" ? r.commercialPackage : {}) as any;
+  const r = expectRecord(raw, "recruitmentReport");
+  const companyId = expectString(r.companyId, "companyId");
+  const companyName = expectString(r.companyName, "companyName", "Doanh nghiệp");
+  const period = normalizePeriod(r.period, "period");
+
+  const jf = expectRecord(r.jobFilter, "jobFilter");
+  const jobFilter = {
+    jobId: expectNullableString(jf.jobId, "jobFilter.jobId"),
+    title: expectString(jf.title, "jobFilter.title", "Tất cả tin tuyển dụng"),
+  };
+
+  const js = expectRecord(r.jobsSummary, "jobsSummary");
+  const jobsSummary = {
+    total: expectNonNegativeInt(js.total, "jobsSummary.total"),
+    published: expectNonNegativeInt(js.published, "jobsSummary.published"),
+    draft: expectNonNegativeInt(js.draft, "jobsSummary.draft"),
+    paused: expectNonNegativeInt(js.paused, "jobsSummary.paused"),
+    closed: expectNonNegativeInt(js.closed, "jobsSummary.closed"),
+    expired: expectNonNegativeInt(js.expired, "jobsSummary.expired"),
+    archived: expectNonNegativeInt(js.archived, "jobsSummary.archived"),
+  };
+
+  const pipe = expectRecord(r.pipeline, "pipeline");
+  const currentCounts = normalizePipelineCounts(pipe.currentCounts, "pipeline.currentCounts");
+  const periodSubmissions = expectNonNegativeInt(pipe.periodSubmissions, "pipeline.periodSubmissions");
+
+  const hires = expectRecord(pipe.hires, "pipeline.hires");
+  const hiresObj = {
+    status: expectString(hires.status, "pipeline.hires.status", "UNAVAILABLE"),
+    count: expectNullableNonNegativeInt(hires.count, "pipeline.hires.count"),
+    note: expectString(hires.note, "pipeline.hires.note", "Chưa ghi nhận kết quả tuyển dụng (Lời mời nhận việc chưa phải kết quả tuyển)."),
+  };
+
+  const int = expectRecord(r.interviewsSummary, "interviewsSummary");
+  const interviewsSummary = {
+    total: expectNonNegativeInt(int.total, "interviewsSummary.total"),
+    scheduled: expectNonNegativeInt(int.scheduled, "interviewsSummary.scheduled"),
+    rescheduled: expectNonNegativeInt(int.rescheduled, "interviewsSummary.rescheduled"),
+    completed: expectNonNegativeInt(int.completed, "interviewsSummary.completed"),
+    cancelled: expectNonNegativeInt(int.cancelled, "interviewsSummary.cancelled"),
+  };
+
+  const cp = expectRecord(r.commercialPackage, "commercialPackage");
+  const commercialPackage = {
+    status: expectString(cp.status, "commercialPackage.status", "UNAVAILABLE"),
+    tier: expectNullableString(cp.tier, "commercialPackage.tier"),
+    activeJobsLimit: expectNullableNonNegativeInt(cp.activeJobsLimit, "commercialPackage.activeJobsLimit"),
+    paymentActive: expectNullableBoolean(cp.paymentActive, "commercialPackage.paymentActive"),
+    note: expectString(cp.note, "commercialPackage.note", "Chưa triển khai gói dịch vụ thu phí hoặc hạn mức đăng tin."),
+  };
 
   return {
-    companyId: safeStr(r.companyId),
-    companyName: safeStr(r.companyName, "Doanh nghiệp"),
-    period: {
-      key: safeStr(p.key, "30d"),
-      startDate: p.startDate ? safeStr(p.startDate) : null,
-      endDate: safeStr(p.endDate, new Date().toISOString()),
-      generatedAt: safeStr(p.generatedAt, new Date().toISOString()),
-    },
-    jobFilter: {
-      jobId: jf.jobId ? safeStr(jf.jobId) : null,
-      title: safeStr(jf.title, "Tất cả tin tuyển dụng"),
-    },
-    jobsSummary: {
-      total: safeNum(js.total),
-      published: safeNum(js.published),
-      draft: safeNum(js.draft),
-      paused: safeNum(js.paused),
-      closed: safeNum(js.closed),
-      expired: safeNum(js.expired),
-      archived: safeNum(js.archived),
-    },
+    companyId,
+    companyName,
+    period,
+    jobFilter,
+    jobsSummary,
     pipeline: {
-      currentCounts: normalizePipelineCounts(pipe.currentCounts),
-      periodSubmissions: safeNum(pipe.periodSubmissions),
-      hires: {
-        status: safeStr(hires.status, "UNAVAILABLE"),
-        count: typeof hires.count === "number" ? hires.count : null,
-        note: safeStr(hires.note, "Chưa ghi nhận kết quả tuyển dụng (Lời mời nhận việc chưa phải kết quả tuyển)."),
-      },
+      currentCounts,
+      periodSubmissions,
+      hires: hiresObj,
     },
-    interviewsSummary: {
-      total: safeNum(int.total),
-      scheduled: safeNum(int.scheduled),
-      rescheduled: safeNum(int.rescheduled),
-      completed: safeNum(int.completed),
-      cancelled: safeNum(int.cancelled),
-    },
-    commercialPackage: {
-      status: safeStr(cp.status, "UNAVAILABLE"),
-      tier: cp.tier ? safeStr(cp.tier) : null,
-      activeJobsLimit: typeof cp.activeJobsLimit === "number" ? cp.activeJobsLimit : null,
-      paymentActive: cp.paymentActive === true ? true : null,
-      note: safeStr(cp.note, "Chưa triển khai gói dịch vụ thu phí hoặc hạn mức đăng tin."),
-    },
+    interviewsSummary,
+    commercialPackage,
   };
 }
 
@@ -340,10 +439,63 @@ export function buildAdminReportCsv(report: AdminReportSummaryDto | AdminDashboa
   const periodKey = full?.period.key ?? "all";
   const periodLabel = REPORT_PERIOD_LABELS[periodKey as ReportPeriodKey] ?? periodKey;
 
-  const users = "users" in d && typeof d.users === "object" ? d.users : { total: (d as any).users ?? 0, active: (d as any).activeUsers ?? 0, suspended: 0, disabled: 0 };
-  const companies = "companies" in d && typeof d.companies === "object" ? d.companies : { total: (d as any).companies ?? 0, active: (d as any).activeCompanies ?? 0, pendingVerification: (d as any).pendingCompanies ?? 0, suspended: 0, archived: 0, verified: 0, rejectedVerification: 0, unverified: 0 };
-  const jobs = "jobs" in d && typeof d.jobs === "object" ? d.jobs : { total: (d as any).jobs ?? 0, published: (d as any).publishedJobs ?? 0, draft: 0, paused: 0, closed: 0, expired: 0, archived: 0 };
-  const applications = "applications" in d && typeof d.applications === "object" ? (d.applications as any).total ?? 0 : (d as any).applications ?? 0;
+  const users =
+    "users" in d && typeof d.users === "object" && d.users !== null
+      ? (d.users as { total: number; active: number; suspended: number; disabled: number })
+      : {
+          total: "users" in d && typeof d.users === "number" ? d.users : 0,
+          active: "activeUsers" in d && typeof d.activeUsers === "number" ? d.activeUsers : 0,
+          suspended: 0,
+          disabled: 0,
+        };
+  const companies =
+    "companies" in d && typeof d.companies === "object" && d.companies !== null
+      ? (d.companies as {
+          total: number;
+          active: number;
+          suspended: number;
+          archived: number;
+          verified: number;
+          pendingVerification: number;
+          rejectedVerification: number;
+          unverified: number;
+        })
+      : {
+          total: "companies" in d && typeof d.companies === "number" ? d.companies : 0,
+          active: "activeCompanies" in d && typeof d.activeCompanies === "number" ? d.activeCompanies : 0,
+          pendingVerification: "pendingCompanies" in d && typeof d.pendingCompanies === "number" ? d.pendingCompanies : 0,
+          suspended: 0,
+          archived: 0,
+          verified: 0,
+          rejectedVerification: 0,
+          unverified: 0,
+        };
+  const jobs =
+    "jobs" in d && typeof d.jobs === "object" && d.jobs !== null
+      ? (d.jobs as {
+          total: number;
+          published: number;
+          draft: number;
+          paused: number;
+          closed: number;
+          expired: number;
+          archived: number;
+        })
+      : {
+          total: "jobs" in d && typeof d.jobs === "number" ? d.jobs : 0,
+          published: "publishedJobs" in d && typeof d.publishedJobs === "number" ? d.publishedJobs : 0,
+          draft: 0,
+          paused: 0,
+          closed: 0,
+          expired: 0,
+          archived: 0,
+        };
+  const applications =
+    "applications" in d && typeof d.applications === "object" && d.applications !== null
+      ? (d.applications as { total: number }).total ?? 0
+      : typeof (d as { applications?: number }).applications === "number"
+      ? (d as { applications: number }).applications
+      : 0;
 
   const rows = [
     ["BÁO CÁO TIẾN ĐỘ & VẬN HÀNH NỀN TẢNG FINDWORK", ""],
@@ -450,8 +602,8 @@ export type EmployerReportParam =
       selectedJobId?: string | null;
       selectedJobTitle?: string;
       jobCounts: { total: number; published: number; draft: number; paused: number; closed: number; expired?: number; archived?: number };
-      pipeline?: any;
-      interviews?: any;
+      pipeline?: unknown;
+      interviews?: unknown;
     };
 
 export function buildEmployerReportCsv(report: EmployerReportParam): string {

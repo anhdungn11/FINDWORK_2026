@@ -88,10 +88,12 @@ export default function EmployerReportsPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<ApiFailure | null>(null);
 
+  const activeControllerRef = useRef<AbortController | null>(null);
   const requestRevision = useRef(0);
 
-  // 1. Immediately reset state on active company change to prevent cross-company stale data/export
+  // 1. Immediately reset state and abort in-flight requests on active company change to prevent cross-company stale data/export
   useEffect(() => {
+    activeControllerRef.current?.abort();
     setLoadedCompanyId(null);
     setReport(null);
     setJobsList([]);
@@ -123,10 +125,14 @@ export default function EmployerReportsPage() {
 
   // 3. Fetch recruitment report when activeCompanyId, selectedPeriod, or selectedJobId changes
   const loadReport = useCallback(
-    async (periodToFetch: ReportPeriodKey, jobIdToFetch: string) => {
+    (periodToFetch: ReportPeriodKey, jobIdToFetch: string) => {
+      activeControllerRef.current?.abort();
+
       if (!activeCompanyId) {
         setLoading(false);
-        return;
+        setReport(null);
+        setLoadedCompanyId(null);
+        return null;
       }
 
       if (!canReviewApplications(active?.memberRoleNames)) {
@@ -139,47 +145,58 @@ export default function EmployerReportsPage() {
           )
         );
         setLoading(false);
-        return;
+        setReport(null);
+        setLoadedCompanyId(null);
+        return null;
       }
 
+      const controller = new AbortController();
+      activeControllerRef.current = controller;
       const revision = ++requestRevision.current;
+      const targetCompanyId = activeCompanyId;
+
       setLoading(true);
       setError(null);
-      const controller = new AbortController();
 
-      try {
-        const data = await companyWorkspaceApi.getRecruitmentReport(
-          activeCompanyId,
+      companyWorkspaceApi
+        .getRecruitmentReport(
+          targetCompanyId,
           {
             period: periodToFetch,
             jobId: jobIdToFetch !== "ALL" ? jobIdToFetch : undefined,
           },
           controller.signal
-        );
-
-        if (revision === requestRevision.current) {
-          setReport(data);
-          setLoadedCompanyId(activeCompanyId);
-          setError(null);
-        }
-      } catch (err: unknown) {
-        if (revision === requestRevision.current) {
+        )
+        .then((data) => {
+          if (revision === requestRevision.current && targetCompanyId === activeCompanyId) {
+            setReport(data);
+            setLoadedCompanyId(targetCompanyId);
+            setError(null);
+          }
+        })
+        .catch((err: unknown) => {
+          if (controller.signal.aborted || revision !== requestRevision.current) {
+            return;
+          }
           const apiFailure = toApiFailure(err);
           setError(apiFailure);
-        }
-      } finally {
-        if (revision === requestRevision.current) {
-          setLoading(false);
-        }
-      }
+        })
+        .finally(() => {
+          if (revision === requestRevision.current) {
+            setLoading(false);
+          }
+        });
 
-      return () => controller.abort();
+      return controller;
     },
     [activeCompanyId, active?.memberRoleNames]
   );
 
   useEffect(() => {
-    loadReport(selectedPeriod, selectedJobId);
+    const controller = loadReport(selectedPeriod, selectedJobId);
+    return () => {
+      controller?.abort();
+    };
   }, [loadReport, selectedPeriod, selectedJobId]);
 
   const isDataReadyForExport = Boolean(report && loadedCompanyId === activeCompanyId && !loading && !error);
