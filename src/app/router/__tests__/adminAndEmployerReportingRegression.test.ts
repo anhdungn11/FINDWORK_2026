@@ -12,8 +12,15 @@ import {
   normalizeAdminReport,
   normalizeCompanyRecruitmentReport,
   ReportContractError,
+  type CompanyRecruitmentReportDto,
+  type AdminReportSummaryDto,
+  type ReportPeriodKey,
 } from "../../../features/reports/reportFormatters";
 import { ApiFailure, toApiFailure } from "../../../services/api/apiFailure";
+import {
+  EmployerReportLoader,
+  AdminReportLoader,
+} from "../../../features/reports/reportLoaders";
 
 import { formatDateOfBirth } from "../../../features/candidate/profile/utils/profileFormatters";
 
@@ -143,20 +150,22 @@ describe("Admin & Employer Reporting and DOB Timezone Regression Suite", () => {
 
     it("verifies EmployerReportsPage resets state on company change, prevents stale cross-company export, and does not swallow errors", () => {
       const empReportsSrc = readFileSync(resolve("src/pages/employer/EmployerReportsPage.tsx"), "utf8");
+      const reportLoadersSrc = readFileSync(resolve("src/features/reports/reportLoaders.ts"), "utf8");
 
-      // Verify immediate state reset on company change
-      assert.ok(empReportsSrc.includes("setLoadedCompanyId(null)"), "Must reset loaded company id on switch");
-      assert.ok(empReportsSrc.includes("setReport(null)"), "Must reset report on switch");
+      // Verify useEmployerReport hook usage and state reset on company change
+      assert.ok(empReportsSrc.includes("useEmployerReport"), "EmployerReportsPage must use production useEmployerReport hook");
+      assert.ok(reportLoadersSrc.includes("handleCompanyChange"), "Production loader must handle company change");
+      assert.ok(reportLoadersSrc.includes("report: null") && reportLoadersSrc.includes("loadedCompanyId: null"), "Must reset report and loadedCompanyId on company change");
 
       // Verify abort controller usage for stale request cancellation
-      assert.ok(empReportsSrc.includes("controller.abort()"), "Must abort in-flight requests when company changes");
+      assert.ok(empReportsSrc.includes("controller?.abort()"), "Must abort in-flight requests when dependencies change");
 
       // Verify export guard checking loaded company id matches active company id
       assert.ok(empReportsSrc.includes("loadedCompanyId === activeCompanyId"), "Export must require loadedCompanyId === activeCompanyId");
       assert.ok(empReportsSrc.includes("disabled={!isDataReadyForExport}"), "Export buttons must be disabled when company data is not ready");
 
       // Verify no swallowing 403 Forbidden into 0
-      assert.ok(empReportsSrc.includes("canReviewApplications") || empReportsSrc.includes("403"), "Must handle 403 Forbidden without swallowing into zero");
+      assert.ok(reportLoadersSrc.includes("canReviewApplications") && reportLoadersSrc.includes("403"), "Production loader must handle 403 Forbidden without swallowing into zero");
 
       // Verify no slice(0, 20) slicing of interviews
       assert.ok(!empReportsSrc.includes("slice(0, 20)"), "Must not slice interviews to 20");
@@ -706,116 +715,277 @@ describe("Admin & Employer Reporting and DOB Timezone Regression Suite", () => {
   });
 
   describe("Task 2E: Asynchronous Request Scope & Race Protection", () => {
-    interface MockReportResponse {
-      companyId: string;
-      period: string;
-    }
-
-    it("cancels in-flight requests and ignores out-of-order deferred responses", async () => {
-      let activeController: AbortController | null = null;
-      let requestRevision = 0;
-      let renderedReport: MockReportResponse | null = null;
-      let renderedCompanyId: string | null = null;
-      let renderedError: ApiFailure | null = null;
-
-      const executeReportRequest = (
-        companyId: string,
-        period: string,
-        delayMs: number,
-        mockResponse: MockReportResponse
-      ): Promise<void> => {
-        activeController?.abort();
-        const controller = new AbortController();
-        activeController = controller;
-        const revision = ++requestRevision;
-        const targetCompanyId = companyId;
-
-        return new Promise<void>((resolve) => {
-          setTimeout(() => {
-            if (controller.signal.aborted || revision !== requestRevision || targetCompanyId !== companyId) {
-              // Stale or cancelled response — must be ignored!
-              resolve();
-              return;
-            }
-            renderedReport = { ...mockResponse, period };
-            renderedCompanyId = targetCompanyId;
-            renderedError = null;
-            resolve();
-          }, delayMs);
-        });
-      };
-
-      // 1. User starts Request 1 for Company A (slow network: 80ms)
-      const req1 = executeReportRequest("comp-AAA", "7d", 80, { companyId: "comp-AAA", period: "7d" });
-
-      // 2. User quickly switches to Company B (fast network: 20ms)
-      const req2 = executeReportRequest("comp-BBB", "30d", 20, { companyId: "comp-BBB", period: "30d" });
-
-      await Promise.all([req1, req2]);
-
-      // Verify that Company B's fast response won and Company A's delayed response did NOT overwrite it
-      assert.equal(renderedCompanyId, "comp-BBB");
-      assert.ok(renderedReport !== null);
-      assert.equal((renderedReport as MockReportResponse).companyId, "comp-BBB");
-      assert.equal((renderedReport as MockReportResponse).period, "30d");
-      assert.equal(renderedError, null);
+    const createMockEmployerReport = (companyId: string, periodKey: ReportPeriodKey): CompanyRecruitmentReportDto => ({
+      companyId,
+      companyName: `Doanh nghiệp ${companyId}`,
+      period: {
+        key: periodKey,
+        startDate: "2026-09-29T00:00:00.000Z",
+        endDate: "2026-10-29T00:00:00.000Z",
+        generatedAt: "2026-10-29T10:00:00.000Z",
+      },
+      jobFilter: { jobId: null, title: "Tất cả tin tuyển dụng" },
+      jobsSummary: { total: 2, published: 1, draft: 0, paused: 0, closed: 1, expired: 0, archived: 0 },
+      pipeline: {
+        currentCounts: { total: 1, DRAFT: 0, SUBMITTED: 0, REVIEWING: 0, SHORTLISTED: 0, INTERVIEW: 0, OFFERED: 1, REJECTED: 0, WITHDRAWN: 0 },
+        periodSubmissions: 1,
+        hires: { status: "UNAVAILABLE", count: null, note: "No hire outcome is recorded." },
+      },
+      interviewsSummary: { total: 1, scheduled: 1, rescheduled: 0, completed: 0, cancelled: 0 },
+      commercialPackage: { status: "UNAVAILABLE", tier: null, activeJobsLimit: null, paymentActive: null, note: "Unimplemented." },
     });
 
-    it("resets state immediately on company switch so export and display cannot leak previous company data", () => {
-      let activeCompanyId: string | null = "comp-111";
-      let loadedCompanyId: string | null = "comp-111";
-      let report: { companyId: string; name: string } | null = { companyId: "comp-111", name: "Company One" };
-      let loading = false;
-      const error: ApiFailure | null = null;
-
-      const isDataReadyForExport = () => Boolean(report && loadedCompanyId === activeCompanyId && !loading && !error);
-      assert.equal(isDataReadyForExport(), true, "Initially ready for export");
-
-      // User switches activeCompanyId to comp-222: effect immediately fires
-      activeCompanyId = "comp-222";
-      // Effect 1 immediately resets:
-      loadedCompanyId = null;
-      report = null;
-      loading = true;
-
-      assert.equal(isDataReadyForExport(), false, "Immediately blocked from export on company switch");
-      assert.equal(report, null);
-      assert.equal(loadedCompanyId, null);
+    const createMockAdminReport = (periodKey: ReportPeriodKey): AdminReportSummaryDto => ({
+      period: {
+        key: periodKey,
+        startDate: "2026-09-29T00:00:00.000Z",
+        endDate: "2026-10-29T00:00:00.000Z",
+        generatedAt: "2026-10-29T10:00:00.000Z",
+      },
+      snapshot: {
+        users: { total: 57, active: 55, suspended: 0, disabled: 2 },
+        companies: { total: 22, active: 22, suspended: 0, archived: 0, verified: 3, pendingVerification: 5, rejectedVerification: 1, unverified: 13 },
+        jobs: { total: 7, published: 5, draft: 0, paused: 0, closed: 2, expired: 0, archived: 0 },
+        applications: { total: 6 },
+      },
+      periodEvents: {
+        newUsersRegistered: 57,
+        newCompaniesRegistered: 22,
+        companiesVerified: 3,
+        companiesRejected: 2,
+        jobsPosted: 7,
+        applicationsSubmitted: 6,
+        jobsClosedByAdmin: 1,
+      },
+      operationalBacklog: {
+        pendingVerificationQueue: 5,
+        suspendedUsersQueue: 0,
+        suspendedCompaniesQueue: 0,
+      },
+      commercialStatus: {
+        revenueAndBilling: { status: "UNAVAILABLE", monetizationActive: null, totalRevenueVnd: null, note: "Unimplemented." },
+        enterprisePartnerships: { status: "UNAVAILABLE", activePartnershipsCount: null, note: "Unimplemented." },
+      },
     });
 
-    it("suppresses error state when a request is cancelled intentionally", async () => {
-      let stateError: ApiFailure | null = null;
-      let activeController: AbortController | null = null;
-      let requestRevision = 0;
+    it("production EmployerReportLoader: cancels in-flight requests and ignores out-of-order deferred responses", async () => {
+      let currentCompanyId: string | undefined = "comp-AAA";
+      let currentRoles: string[] | undefined = ["OWNER"];
 
-      const startRequest = (delayMs: number): { promise: Promise<void>; controller: AbortController } => {
-        activeController?.abort();
-        const controller = new AbortController();
-        activeController = controller;
-        const revision = ++requestRevision;
+      const deferredPromises: Promise<void>[] = [];
 
-        const promise = new Promise<void>((resolve) => {
-          setTimeout(() => {
-            if (controller.signal.aborted || revision !== requestRevision) {
-              // Intentionally cancelled: do not set error state!
-              resolve();
-              return;
-            }
-            stateError = new ApiFailure("network", 0, "NETWORK_ERROR", "Failed");
-            resolve();
-          }, delayMs);
-        });
+      const loader = new EmployerReportLoader({
+        getCompanyId: () => currentCompanyId,
+        getMemberRoleNames: () => currentRoles,
+        onStateChange: () => {},
+        fetchReport: (_cId, params, signal) => {
+          const delayMs = params.period === "7d" ? 80 : 20;
+          return new Promise<CompanyRecruitmentReportDto>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              if (signal.aborted) {
+                reject(new Error("CanceledError"));
+              } else {
+                resolve(createMockEmployerReport(currentCompanyId!, params.period));
+              }
+            }, delayMs);
+            deferredPromises.push(new Promise((res) => setTimeout(res, delayMs + 10)));
+            signal.addEventListener("abort", () => clearTimeout(timer));
+          });
+        },
+      });
 
-        return { promise, controller };
-      };
+      // 1. User starts Request 1 for 7d (slow network: 80ms)
+      loader.loadReport("7d", "ALL");
 
-      const { promise, controller } = startRequest(50);
-      // Immediately abort
-      controller.abort();
+      // 2. User quickly switches to 30d (fast network: 20ms)
+      loader.loadReport("30d", "ALL");
 
-      await promise;
+      await Promise.all(deferredPromises);
 
-      assert.equal(stateError, null, "Cancelled request must never set error state");
+      // Verify that 30d (fast) won and 7d (slow) was ignored
+      const state = loader.getState();
+      assert.equal(state.loadedCompanyId, "comp-AAA");
+      assert.ok(state.report !== null);
+      assert.equal(state.report?.period.key, "30d");
+      assert.equal(state.error, null);
+      assert.equal(state.loading, false);
+    });
+
+    it("production EmployerReportLoader: resets state and aborts in-flight request when company changes", async () => {
+      let currentCompanyId: string | undefined = "comp-111";
+      const currentRoles: string[] | undefined = ["OWNER"];
+      const deferredPromises: Promise<void>[] = [];
+
+      const loader = new EmployerReportLoader({
+        getCompanyId: () => currentCompanyId,
+        getMemberRoleNames: () => currentRoles,
+        onStateChange: () => {},
+        fetchReport: (cId, params, signal) => {
+          const delayMs = cId === "comp-111" ? 80 : 20;
+          return new Promise<CompanyRecruitmentReportDto>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              if (signal.aborted) {
+                reject(new Error("CanceledError"));
+              } else {
+                resolve(createMockEmployerReport(cId, params.period));
+              }
+            }, delayMs);
+            deferredPromises.push(new Promise((res) => setTimeout(res, delayMs + 10)));
+            signal.addEventListener("abort", () => clearTimeout(timer));
+          });
+        },
+      });
+
+      // Start slow request for comp-111
+      const c1 = loader.loadReport("30d", "ALL");
+      assert.equal(c1?.signal.aborted, false);
+
+      // User switches company to comp-222
+      currentCompanyId = "comp-222";
+      loader.handleCompanyChange();
+
+      // State is immediately cleared so previous company cannot be exported
+      assert.equal(loader.getState().report, null);
+      assert.equal(loader.getState().loadedCompanyId, null);
+      assert.equal(c1?.signal.aborted, true, "comp-111 controller was aborted");
+
+      // Load for comp-222
+      loader.loadReport("30d", "ALL");
+
+      await Promise.all(deferredPromises);
+
+      const state = loader.getState();
+      assert.equal(state.loadedCompanyId, "comp-222");
+      assert.equal(state.report?.companyId, "comp-222");
+      assert.equal(state.error, null);
+    });
+
+    it("production EmployerReportLoader: handles permission loss while request is in-flight and sets 403 Forbidden", async () => {
+      const currentCompanyId: string | undefined = "comp-111";
+      let currentRoles: string[] | undefined = ["OWNER"];
+      const deferredPromises: Promise<void>[] = [];
+
+      const loader = new EmployerReportLoader({
+        getCompanyId: () => currentCompanyId,
+        getMemberRoleNames: () => currentRoles,
+        onStateChange: () => {},
+        fetchReport: (cId, params, signal) => {
+          return new Promise<CompanyRecruitmentReportDto>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              if (signal.aborted) {
+                reject(new Error("CanceledError"));
+              } else {
+                resolve(createMockEmployerReport(cId, params.period));
+              }
+            }, 60);
+            deferredPromises.push(new Promise((res) => setTimeout(res, 70)));
+            signal.addEventListener("abort", () => clearTimeout(timer));
+          });
+        },
+      });
+
+      // Start request
+      const c1 = loader.loadReport("30d", "ALL");
+      assert.equal(c1?.signal.aborted, false);
+
+      // User's member role is revoked mid-flight
+      currentRoles = ["CANDIDATE"]; // Not allowed to review applications
+      loader.handlePermissionChange();
+
+      // In-flight request was aborted and forbidden error set immediately
+      assert.equal(c1?.signal.aborted, true);
+      const state = loader.getState();
+      assert.equal(state.report, null);
+      assert.equal(state.loadedCompanyId, null);
+      assert.equal(state.loading, false);
+      assert.equal(state.error?.kind, "forbidden");
+      assert.equal(state.error?.status, 403);
+
+      await Promise.all(deferredPromises);
+
+      // After delayed promise finishes, 403 state is preserved, not overwritten by delayed data
+      assert.equal(loader.getState().report, null);
+      assert.equal(loader.getState().error?.status, 403);
+    });
+
+    it("production EmployerReportLoader: unmount after clicking Refresh aborts in-flight request and suppresses errors", async () => {
+      const currentCompanyId: string | undefined = "comp-111";
+      const currentRoles: string[] | undefined = ["OWNER"];
+      let fetchFinished = false;
+
+      const loader = new EmployerReportLoader({
+        getCompanyId: () => currentCompanyId,
+        getMemberRoleNames: () => currentRoles,
+        onStateChange: () => {},
+        fetchReport: (_cId, _params, signal) => {
+          return new Promise<CompanyRecruitmentReportDto>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              fetchFinished = true;
+              if (signal.aborted) {
+                reject(new Error("CanceledError"));
+              } else {
+                resolve(createMockEmployerReport("comp-111", "30d"));
+              }
+            }, 50);
+            signal.addEventListener("abort", () => clearTimeout(timer));
+          });
+        },
+      });
+
+      // User clicks Refresh
+      const controller = loader.loadReport("30d", "ALL");
+      assert.equal(controller?.signal.aborted, false);
+
+      // Component immediately unmounts
+      loader.unmount();
+      assert.equal(controller?.signal.aborted, true);
+
+      // Wait past the delay
+      await new Promise((res) => setTimeout(res, 80));
+
+      assert.ok(fetchFinished || controller?.signal.aborted);
+      assert.equal(loader.getState().error, null, "Cancelled request must never set error state");
+    });
+
+    it("production AdminReportLoader: cancels in-flight requests, ignores out-of-order responses, and handles unmount after Refresh", async () => {
+      const deferredPromises: Promise<void>[] = [];
+
+      const adminLoader = new AdminReportLoader({
+        onStateChange: () => {},
+        fetchReport: (params, signal) => {
+          const delayMs = params.period === "7d" ? 80 : 20;
+          return new Promise<AdminReportSummaryDto>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              if (signal.aborted) {
+                reject(new Error("CanceledError"));
+              } else {
+                resolve(createMockAdminReport(params.period));
+              }
+            }, delayMs);
+            deferredPromises.push(new Promise((res) => setTimeout(res, delayMs + 10)));
+            signal.addEventListener("abort", () => clearTimeout(timer));
+          });
+        },
+      });
+
+      // 1. User starts 7d (slow)
+      adminLoader.loadData("7d");
+
+      // 2. User quickly switches to 30d (fast)
+      adminLoader.loadData("30d");
+
+      await Promise.all(deferredPromises);
+
+      // 30d won
+      assert.equal(adminLoader.getState().report?.period.key, "30d");
+      assert.equal(adminLoader.getState().error, null);
+
+      // 3. User clicks Refresh, then unmounts
+      const refreshController = adminLoader.loadData("30d");
+      assert.equal(refreshController.signal.aborted, false);
+
+      adminLoader.unmount();
+      assert.equal(refreshController.signal.aborted, true);
     });
   });
 });

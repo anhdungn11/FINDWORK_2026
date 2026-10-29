@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
   Calendar,
   Download,
@@ -11,8 +11,6 @@ import { Badge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
-import { toApiFailure, ApiFailure } from "@/services/api/apiFailure";
-import { canReviewApplications } from "@/features/company/companyWorkspacePermissions";
 import type { JobDto } from "@/services/api/apiTypes";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 import {
@@ -22,6 +20,7 @@ import {
   buildEmployerReportCsv,
   buildEmployerReportJson,
 } from "@/features/reports/reportFormatters";
+import { useEmployerReport } from "@/features/reports/reportLoaders";
 
 export function exportEmployerReportToCsv(report: CompanyRecruitmentReportDto): void {
   const csvContent = buildEmployerReportCsv(report);
@@ -83,23 +82,15 @@ export default function EmployerReportsPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>("ALL");
   const [jobsList, setJobsList] = useState<JobDto[]>([]);
 
-  const [report, setReport] = useState<CompanyRecruitmentReportDto | null>(null);
-  const [loadedCompanyId, setLoadedCompanyId] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<ApiFailure | null>(null);
+  const { report, loadedCompanyId, loading, error, loadReport } = useEmployerReport(
+    activeCompanyId,
+    active?.memberRoleNames
+  );
 
-  const activeControllerRef = useRef<AbortController | null>(null);
-  const requestRevision = useRef(0);
-
-  // 1. Immediately reset state and abort in-flight requests on active company change to prevent cross-company stale data/export
+  // 1. Reset jobs list and filter when active company changes
   useEffect(() => {
-    activeControllerRef.current?.abort();
-    setLoadedCompanyId(null);
-    setReport(null);
     setJobsList([]);
     setSelectedJobId("ALL");
-    setError(null);
-    setLoading(true);
   }, [activeCompanyId]);
 
   // 2. Fetch jobs list for filter dropdown when active company changes
@@ -124,74 +115,6 @@ export default function EmployerReportsPage() {
   }, [activeCompanyId]);
 
   // 3. Fetch recruitment report when activeCompanyId, selectedPeriod, or selectedJobId changes
-  const loadReport = useCallback(
-    (periodToFetch: ReportPeriodKey, jobIdToFetch: string) => {
-      activeControllerRef.current?.abort();
-
-      if (!activeCompanyId) {
-        setLoading(false);
-        setReport(null);
-        setLoadedCompanyId(null);
-        return null;
-      }
-
-      if (!canReviewApplications(active?.memberRoleNames)) {
-        setError(
-          new ApiFailure(
-            "forbidden",
-            403,
-            "FORBIDDEN",
-            "Tài khoản của bạn không có quyền xem báo cáo ứng tuyển hoặc năng lực chưa được cấp."
-          )
-        );
-        setLoading(false);
-        setReport(null);
-        setLoadedCompanyId(null);
-        return null;
-      }
-
-      const controller = new AbortController();
-      activeControllerRef.current = controller;
-      const revision = ++requestRevision.current;
-      const targetCompanyId = activeCompanyId;
-
-      setLoading(true);
-      setError(null);
-
-      companyWorkspaceApi
-        .getRecruitmentReport(
-          targetCompanyId,
-          {
-            period: periodToFetch,
-            jobId: jobIdToFetch !== "ALL" ? jobIdToFetch : undefined,
-          },
-          controller.signal
-        )
-        .then((data) => {
-          if (revision === requestRevision.current && targetCompanyId === activeCompanyId) {
-            setReport(data);
-            setLoadedCompanyId(targetCompanyId);
-            setError(null);
-          }
-        })
-        .catch((err: unknown) => {
-          if (controller.signal.aborted || revision !== requestRevision.current) {
-            return;
-          }
-          const apiFailure = toApiFailure(err);
-          setError(apiFailure);
-        })
-        .finally(() => {
-          if (revision === requestRevision.current) {
-            setLoading(false);
-          }
-        });
-
-      return controller;
-    },
-    [activeCompanyId, active?.memberRoleNames]
-  );
-
   useEffect(() => {
     const controller = loadReport(selectedPeriod, selectedJobId);
     return () => {

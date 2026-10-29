@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Users,
@@ -16,9 +16,7 @@ import {
 } from "lucide-react";
 import { Badge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
-import { adminApi } from "@/services/api/adminApi";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
-import { toApiFailure, type ApiFailure } from "@/services/api/apiFailure";
 import {
   type AdminReportSummaryDto,
   type ReportPeriodKey,
@@ -26,6 +24,7 @@ import {
   buildAdminReportCsv,
   buildAdminReportJson,
 } from "@/features/reports/reportFormatters";
+import { useAdminReport } from "@/features/reports/reportLoaders";
 
 export function exportAdminReportToCsv(data: AdminReportSummaryDto): void {
   const csvContent = buildAdminReportCsv(data);
@@ -79,43 +78,7 @@ const WritesNotice = () =>
 
 export default function AdminReportsPage() {
   const [period, setPeriod] = useState<ReportPeriodKey>("30d");
-  const [report, setReport] = useState<AdminReportSummaryDto | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<ApiFailure | null>(null);
-  const activeControllerRef = useRef<AbortController | null>(null);
-  const requestRevision = useRef(0);
-
-  const loadData = useCallback((periodToFetch: ReportPeriodKey) => {
-    activeControllerRef.current?.abort();
-    const controller = new AbortController();
-    activeControllerRef.current = controller;
-    const revision = ++requestRevision.current;
-
-    setLoading(true);
-    setError(null);
-
-    adminApi
-      .getReportsSummary({ period: periodToFetch }, controller.signal)
-      .then((data) => {
-        if (revision === requestRevision.current) {
-          setReport(data);
-          setError(null);
-        }
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted || revision !== requestRevision.current) {
-          return;
-        }
-        setError(toApiFailure(err));
-      })
-      .finally(() => {
-        if (revision === requestRevision.current) {
-          setLoading(false);
-        }
-      });
-
-    return controller;
-  }, []);
+  const { report, loading, error, loadData } = useAdminReport();
 
   useEffect(() => {
     const controller = loadData(period);
