@@ -12,6 +12,7 @@ export interface AuthUser {
   role?: string;
   status?: string;
   accountType?: AccountType;
+  emailVerified?: boolean;
 }
 
 interface LoginResponse {
@@ -177,3 +178,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return promise;
   },
 }));
+
+if (typeof window !== "undefined" && import.meta.env?.DEV) {
+  (window as unknown as { __FINDWORK_AUTH_STORE__?: unknown }).__FINDWORK_AUTH_STORE__ = useAuthStore;
+}

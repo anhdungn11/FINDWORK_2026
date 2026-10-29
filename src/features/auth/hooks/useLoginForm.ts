@@ -33,11 +33,11 @@ export const useLoginForm = () => {
     setIsSubmitting(true);
     try {
       const user = await login({ email: normalizedEmail, password });
-      const requestedPath = (location.state as { from?: unknown } | null)?.from;
+      const requestedPath = (location.state as { from?: unknown } | null)?.from ?? new URLSearchParams(location.search).get("returnTo");
       const isEmployer = location.pathname.startsWith("/employer");
       const admin = isAdminRole(user.role);
       const fallback = admin ? "/admin" : isEmployer ? "/employer" : "/candidate";
-      const rolePath = admin && (typeof requestedPath !== "string" || !requestedPath.startsWith("/admin"))
+      const rolePath = admin && (typeof requestedPath !== "string" || (!requestedPath.startsWith("/admin") && requestedPath !== "/verify-email"))
         ? undefined : requestedPath;
       const destination = getReturnDestination(rolePath, fallback);
       navigate(destination, { replace: true });

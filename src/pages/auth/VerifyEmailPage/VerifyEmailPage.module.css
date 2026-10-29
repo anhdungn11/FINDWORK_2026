@@ -37,6 +37,12 @@
   border: 1px solid #fee4e2;
 }
 
+.infoIcon {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border: 1px solid #dbe3ff;
+}
+
 .loadingIcon {
   background: var(--color-primary-soft);
 
