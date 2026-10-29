@@ -1,22 +1,12 @@
 import type { AdminDashboardCounts } from "../../services/api/adminApi";
-import type { CompanyInterviewDto, JobDto } from "../../services/api/apiTypes";
 
-export type AdminReportingPeriod = "all" | "7d" | "30d" | "90d";
-export type EmployerReportingPeriod = "all" | "7d" | "30d" | "90d";
-
-export const ADMIN_PERIOD_LABELS: Record<AdminReportingPeriod, string> = {
-  all: "Toàn bộ thời gian (Tất cả)",
-  "7d": "7 ngày gần nhất",
-  "30d": "30 ngày gần nhất",
-  "90d": "90 ngày gần nhất",
-};
-
-export const EMPLOYER_PERIOD_LABELS: Record<EmployerReportingPeriod, string> = {
-  all: "Toàn bộ thời gian (Tất cả)",
-  "7d": "7 ngày gần nhất",
-  "30d": "30 ngày gần nhất",
-  "90d": "90 ngày gần nhất",
-};
+export interface EmployerJobCountsSummary {
+  total: number;
+  published: number;
+  draft: number;
+  paused: number;
+  closed: number;
+}
 
 export interface PipelineSummary {
   SUBMITTED: number;
@@ -35,9 +25,8 @@ export interface InterviewSummary {
   cancelled: number;
 }
 
-export function buildAdminReportCsv(data: AdminDashboardCounts, period: AdminReportingPeriod): string {
+export function buildAdminReportCsv(data: AdminDashboardCounts): string {
   const generatedAt = new Date().toISOString();
-  const periodLabel = ADMIN_PERIOD_LABELS[period];
   const inactiveUsers = Math.max(0, data.users - data.activeUsers);
   const inactiveCompanies = Math.max(0, data.companies - data.activeCompanies);
   const nonPublishedJobs = Math.max(0, data.jobs - data.publishedJobs);
@@ -45,7 +34,7 @@ export function buildAdminReportCsv(data: AdminDashboardCounts, period: AdminRep
   const rows = [
     ["BÁO CÁO TIẾN ĐỘ & VẬN HÀNH NỀN TẢNG FINDWORK", ""],
     ["Thời gian xuất báo cáo", generatedAt],
-    ["Chu kỳ báo cáo đã chọn", periodLabel],
+    ["Phạm vi dữ liệu", "Hiện trạng tích lũy toàn sàn (All-Time Snapshot)"],
     ["", ""],
     ["PHÂN MỤC", "CHỈ SỐ HIỆN TRẠNG (REAL DATA)"],
     ["Tổng số tài khoản người dùng", data.users.toString()],
@@ -72,14 +61,11 @@ export function buildAdminReportCsv(data: AdminDashboardCounts, period: AdminRep
   return "\uFEFF" + rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\r\n");
 }
 
-export function buildAdminReportJson(data: AdminDashboardCounts, period: AdminReportingPeriod): object {
+export function buildAdminReportJson(data: AdminDashboardCounts): object {
   return {
     reportType: "FINDWORK_ADMIN_PROGRESS_REPORT",
     generatedAt: new Date().toISOString(),
-    period: {
-      key: period,
-      label: ADMIN_PERIOD_LABELS[period],
-    },
+    scope: "PLATFORM_ALL_TIME_SNAPSHOT",
     snapshot: {
       users: {
         total: data.users,
@@ -121,41 +107,51 @@ export function buildAdminReportJson(data: AdminDashboardCounts, period: AdminRe
 
 export function buildEmployerReportCsv(params: {
   companyName: string;
-  period: EmployerReportingPeriod;
   selectedJobTitle: string;
-  jobCounts: { total: number; published: number; draft: number; paused: number; closed: number };
-  pipeline: PipelineSummary;
-  interviews: InterviewSummary;
+  jobCounts: EmployerJobCountsSummary;
+  pipeline: PipelineSummary | null;
+  interviews: InterviewSummary | null;
 }): string {
   const generatedAt = new Date().toISOString();
   const rows = [
     ["BÁO CÁO TIẾN ĐỘ TUYỂN DỤNG DOANH NGHIỆP - FINDWORK", ""],
     ["Doanh nghiệp", params.companyName],
     ["Thời gian xuất báo cáo", generatedAt],
-    ["Chu kỳ báo cáo đã chọn", EMPLOYER_PERIOD_LABELS[params.period]],
     ["Phạm vi tin tuyển dụng", params.selectedJobTitle],
     ["", ""],
-    ["CHỈ SỐ TIN TUYỂN DỤNG", "SỐ LƯỢNG"],
+    ["CHỈ SỐ TIN TUYỂN DỤNG (XÁC THỰC TỪ MÁY CHỦ)", "SỐ LƯỢNG"],
     ["Tổng số tin tuyển dụng của công ty", params.jobCounts.total.toString()],
     ["Tin đang công khai (PUBLISHED)", params.jobCounts.published.toString()],
     ["Tin nháp (DRAFT)", params.jobCounts.draft.toString()],
     ["Tin tạm dừng (PAUSED)", params.jobCounts.paused.toString()],
     ["Tin đã đóng (CLOSED)", params.jobCounts.closed.toString()],
     ["", ""],
-    ["LUỒNG HỒ SƠ ỨNG VIÊN (PIPELINE)", "SỐ LƯỢNG THỰC TẾ"],
-    ["Tổng lượt hồ sơ tiếp nhận", params.pipeline.total.toString()],
-    ["Hồ sơ mới nộp (SUBMITTED)", params.pipeline.SUBMITTED.toString()],
-    ["Đang xem xét & đánh giá (REVIEWING)", params.pipeline.REVIEWING.toString()],
-    ["Đã qua vòng lọc (SHORTLISTED)", params.pipeline.SHORTLISTED.toString()],
-    ["Vòng phỏng vấn (INTERVIEW)", params.pipeline.INTERVIEW.toString()],
-    ["Đã gửi đề nghị nhận việc (OFFERED)", params.pipeline.OFFERED.toString()],
-    ["Không phù hợp / Từ chối (REJECTED)", params.pipeline.REJECTED.toString()],
+    ["LUỒNG HỒ SƠ ỨNG VIÊN (PIPELINE)", "TRẠNG THÁI"],
+    ...(params.pipeline
+      ? [
+          ["Tổng lượt hồ sơ tiếp nhận", params.pipeline.total.toString()],
+          ["Hồ sơ mới nộp (SUBMITTED)", params.pipeline.SUBMITTED.toString()],
+          ["Đang xem xét & đánh giá (REVIEWING)", params.pipeline.REVIEWING.toString()],
+          ["Đã qua vòng lọc (SHORTLISTED)", params.pipeline.SHORTLISTED.toString()],
+          ["Vòng phỏng vấn (INTERVIEW)", params.pipeline.INTERVIEW.toString()],
+          ["Đã gửi đề nghị nhận việc (OFFERED)", params.pipeline.OFFERED.toString()],
+          ["Không phù hợp / Từ chối (REJECTED)", params.pipeline.REJECTED.toString()],
+        ]
+      : [
+          ["Tổng hợp luồng hồ sơ", "Chưa khả dụng — Đang chờ API tổng hợp báo cáo"],
+        ]),
     ["", ""],
-    ["LỊCH PHỎNG VẤN ỨNG VIÊN", "SỐ LƯỢNG"],
-    ["Tổng số lịch phỏng vấn đã thiết lập", params.interviews.total.toString()],
-    ["Lịch phỏng vấn sắp tới (SCHEDULED)", params.interviews.scheduled.toString()],
-    ["Phỏng vấn đã hoàn thành (COMPLETED)", params.interviews.completed.toString()],
-    ["Lịch phỏng vấn đã hủy (CANCELLED)", params.interviews.cancelled.toString()],
+    ["LỊCH PHỎNG VẤN ỨNG VIÊN", "TRẠNG THÁI"],
+    ...(params.interviews
+      ? [
+          ["Tổng số lịch phỏng vấn đã thiết lập", params.interviews.total.toString()],
+          ["Lịch phỏng vấn sắp tới (SCHEDULED)", params.interviews.scheduled.toString()],
+          ["Phỏng vấn đã hoàn thành (COMPLETED)", params.interviews.completed.toString()],
+          ["Lịch phỏng vấn đã hủy (CANCELLED)", params.interviews.cancelled.toString()],
+        ]
+      : [
+          ["Tổng hợp lịch phỏng vấn", "Chưa khả dụng — Đang chờ API tổng hợp báo cáo"],
+        ]),
     ["", ""],
     ["GÓI DỊCH VỤ DOANH NGHIỆP", "TRẠNG THÁI"],
     ["Gói sử dụng", "Gói tiêu chuẩn FINDWORK (Miễn phí)"],
@@ -168,12 +164,11 @@ export function buildEmployerReportCsv(params: {
 export function buildEmployerReportJson(params: {
   companyId: string;
   companyName: string;
-  period: EmployerReportingPeriod;
   selectedJobId: string | null;
   selectedJobTitle: string;
-  jobCounts: { total: number; published: number; draft: number; paused: number; closed: number };
-  pipeline: PipelineSummary;
-  interviews: InterviewSummary;
+  jobCounts: EmployerJobCountsSummary;
+  pipeline: PipelineSummary | null;
+  interviews: InterviewSummary | null;
 }): object {
   return {
     reportType: "FINDWORK_EMPLOYER_RECRUITMENT_REPORT",
@@ -183,18 +178,14 @@ export function buildEmployerReportJson(params: {
       name: params.companyName,
     },
     filter: {
-      period: {
-        key: params.period,
-        label: EMPLOYER_PERIOD_LABELS[params.period],
-      },
       job: {
         id: params.selectedJobId,
         title: params.selectedJobTitle,
       },
     },
     jobSummary: params.jobCounts,
-    applicationPipeline: params.pipeline,
-    interviewsSummary: params.interviews,
+    applicationPipeline: params.pipeline ?? { status: "UNAVAILABLE_ON_SERVER" },
+    interviewsSummary: params.interviews ?? { status: "UNAVAILABLE_ON_SERVER" },
     commercialTier: {
       tierName: "FREE_STANDARD",
       billingActive: false,

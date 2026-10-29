@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Users,
@@ -9,48 +8,40 @@ import {
   ArrowRight,
   ShieldCheck,
   RefreshCw,
-  Clock,
   Download,
-  Calendar,
-  Layers,
-  CheckCircle2,
   CreditCard,
   Handshake,
 } from "lucide-react";
-import { Badge, Card, LoadingBlock, PageHeader, ui } from "@/components/ui";
+import { Badge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { adminApi, type AdminDashboardCounts } from "@/services/api/adminApi";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 import {
-  type AdminReportingPeriod,
-  ADMIN_PERIOD_LABELS,
   buildAdminReportCsv,
   buildAdminReportJson,
 } from "@/features/reports/reportFormatters";
 
-export type ReportingPeriod = AdminReportingPeriod;
-
-export function exportAdminReportToCsv(data: AdminDashboardCounts, period: ReportingPeriod): void {
-  const csvContent = buildAdminReportCsv(data, period);
+export function exportAdminReportToCsv(data: AdminDashboardCounts): void {
+  const csvContent = buildAdminReportCsv(data);
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `FINDWORK_Admin_Report_${period}_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `FINDWORK_Admin_Snapshot_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-export function exportAdminReportToJson(data: AdminDashboardCounts, period: ReportingPeriod): void {
-  const payload = buildAdminReportJson(data, period);
+export function exportAdminReportToJson(data: AdminDashboardCounts): void {
+  const payload = buildAdminReportJson(data);
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `FINDWORK_Admin_Report_${period}_${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `FINDWORK_Admin_Snapshot_${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -82,12 +73,11 @@ const WritesNotice = () =>
   );
 
 export default function AdminReportsPage() {
-  const [period, setPeriod] = useState<ReportingPeriod>("30d");
   const stats = useAsyncData((signal) => adminApi.getDashboard(signal), []);
 
   const d = stats.data;
   const inactiveUsers = d ? Math.max(0, d.users - d.activeUsers) : 0;
-  const inactiveCompanies = d ? Math.max(0, data => 0, d.companies - d.activeCompanies) : 0;
+  const inactiveCompanies = d ? Math.max(0, d.companies - d.activeCompanies) : 0;
   const nonPublishedJobs = d ? Math.max(0, d.jobs - d.publishedJobs) : 0;
 
   return (
@@ -97,28 +87,6 @@ export default function AdminReportsPage() {
         subtitle="Giám sát hiện trạng tổng thể nền tảng FINDWORK, thống kê khối lượng vận hành và theo dõi hàng đợi xử lý."
         actions={
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-surface, #fff)", border: "1px solid var(--color-border, #cbd5e1)", borderRadius: 8, padding: "4px 8px" }}>
-              <Calendar size={16} color="#64748b" />
-              <select
-                aria-label="Chọn chu kỳ báo cáo"
-                value={period}
-                onChange={(e) => setPeriod(e.target.value as ReportingPeriod)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  outline: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <option value="all">Toàn bộ thời gian (Tất cả)</option>
-                <option value="7d">7 ngày gần nhất</option>
-                <option value="30d">30 ngày gần nhất</option>
-                <option value="90d">90 ngày gần nhất</option>
-              </select>
-            </div>
-
             <button
               type="button"
               className={`${ui.btn} ${ui.btnOutline}`}
@@ -136,7 +104,7 @@ export default function AdminReportsPage() {
                 <button
                   type="button"
                   className={`${ui.btn} ${ui.btnOutline}`}
-                  onClick={() => exportAdminReportToCsv(d, period)}
+                  onClick={() => exportAdminReportToCsv(d)}
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   <Download size={15} />
@@ -146,7 +114,7 @@ export default function AdminReportsPage() {
                 <button
                   type="button"
                   className={`${ui.btn} ${ui.btnOutline}`}
-                  onClick={() => exportAdminReportToJson(d, period)}
+                  onClick={() => exportAdminReportToJson(d)}
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   <Download size={15} />
@@ -160,7 +128,7 @@ export default function AdminReportsPage() {
 
       <WritesNotice />
 
-      {/* PERIOD CLARIFICATION BANNER */}
+      {/* SNAPSHOT SCOPE CLARIFICATION BANNER */}
       <div
         style={{
           background: "var(--color-surface, #fff)",
@@ -177,16 +145,14 @@ export default function AdminReportsPage() {
       >
         <div>
           <span style={{ fontSize: "0.875rem", color: "#475569" }}>
-            Chu kỳ được chọn: <strong style={{ color: "#0f172a" }}>{ADMIN_PERIOD_LABELS[period]}</strong>.
-            Các khối thống kê dưới đây phân tách rõ ràng giữa <strong>Số liệu hiện trạng tích lũy (Current-State Snapshot)</strong> và <strong>Hàng đợi vận hành quản trị</strong>.
+            Phạm vi hiển thị: <strong style={{ color: "#0f172a" }}>Hiện trạng tích lũy toàn hệ thống (All-Time Snapshot)</strong>.
+            Các khối thống kê dưới đây phân tách rõ ràng giữa <strong>Số liệu hiện trạng thời gian thực</strong> và <strong>Hàng đợi vận hành quản trị</strong>.
           </span>
-          {period !== "all" && (
-            <div style={{ fontSize: "0.8125rem", color: "#64748b", marginTop: 4 }}>
-              * Ghi chú: Chỉ số phân tích biến động theo ngày (delta events) đang trong lộ trình tích hợp backend theo hợp đồng REPORTING_API_CONTRACT.md.
-            </div>
-          )}
+          <div style={{ fontSize: "0.8125rem", color: "#64748b", marginTop: 4 }}>
+            * Báo cáo phân tích sự kiện theo chu kỳ (Period Events) đang được chuẩn bị và sẽ kích hoạt khi có API tổng hợp theo khoảng thời gian.
+          </div>
         </div>
-        <Badge variant="info">Dữ liệu thực từ máy chủ</Badge>
+        <Badge tone="info">Dữ liệu thực từ máy chủ</Badge>
       </div>
 
       {/* METRICS CONTENT */}
@@ -378,7 +344,7 @@ export default function AdminReportsPage() {
                     <ShieldCheck size={20} color={d.pendingCompanies > 0 ? "#ea580c" : "#16a34a"} />
                     <span style={{ fontWeight: 600, color: "#0f172a" }}>Doanh nghiệp chờ xét duyệt pháp lý</span>
                   </div>
-                  <Badge variant={d.pendingCompanies > 0 ? "warning" : "success"}>
+                  <Badge tone={d.pendingCompanies > 0 ? "warning" : "success"}>
                     {d.pendingCompanies} đơn vị
                   </Badge>
                 </div>
@@ -411,7 +377,7 @@ export default function AdminReportsPage() {
                     <Users size={20} color={inactiveUsers > 0 ? "#d97706" : "#16a34a"} />
                     <span style={{ fontWeight: 600, color: "#0f172a" }}>Tài khoản người dùng cần rà soát</span>
                   </div>
-                  <Badge variant={inactiveUsers > 0 ? "warning" : "neutral"}>
+                  <Badge tone={inactiveUsers > 0 ? "warning" : "neutral"}>
                     {inactiveUsers} tài khoản
                   </Badge>
                 </div>
