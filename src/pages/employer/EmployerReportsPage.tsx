@@ -1,340 +1,222 @@
-import { useEffect, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Calendar,
   Download,
   RefreshCw,
-  ArrowRight,
   Filter,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  Package,
+  AlertTriangle,
+  Building2,
 } from "lucide-react";
 import { Badge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
 import { useCompanyWorkspace } from "@/features/company/CompanyWorkspaceContext";
 import { companyWorkspaceApi } from "@/services/api/companyWorkspaceApi";
-import { apiClient } from "@/services/http/apiClient";
-import { toApiFailure, type ApiFailure } from "@/services/api/apiFailure";
+import { toApiFailure, ApiFailure } from "@/services/api/apiFailure";
 import { canReviewApplications } from "@/features/company/companyWorkspacePermissions";
 import type { JobDto } from "@/services/api/apiTypes";
+import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
 import {
-  type EmployerJobCountsSummary,
-  type PipelineSummary,
-  type InterviewSummary,
+  type CompanyRecruitmentReportDto,
+  type ReportPeriodKey,
+  REPORT_PERIOD_LABELS,
   buildEmployerReportCsv,
   buildEmployerReportJson,
 } from "@/features/reports/reportFormatters";
 
-export function exportEmployerReportToCsv(params: {
-  companyName: string;
-  selectedJobTitle: string;
-  jobCounts: EmployerJobCountsSummary;
-  pipeline: PipelineSummary | null;
-  interviews: InterviewSummary | null;
-}): void {
-  const csvContent = buildEmployerReportCsv(params);
+export function exportEmployerReportToCsv(report: CompanyRecruitmentReportDto): void {
+  const csvContent = buildEmployerReportCsv(report);
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `FINDWORK_Employer_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+  const safeName = (report.companyName || "Employer").replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, "_");
+  link.download = `FINDWORK_${safeName}_Bao_cao_tuyen_dung_${report.period.key}_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-export function exportEmployerReportToJson(params: {
-  companyId: string;
-  companyName: string;
-  selectedJobId: string | null;
-  selectedJobTitle: string;
-  jobCounts: EmployerJobCountsSummary;
-  pipeline: PipelineSummary | null;
-  interviews: InterviewSummary | null;
-}): void {
-  const payload = buildEmployerReportJson(params);
+export function exportEmployerReportToJson(report: CompanyRecruitmentReportDto): void {
+  const payload = buildEmployerReportJson(report);
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `FINDWORK_Employer_Report_${new Date().toISOString().slice(0, 10)}.json`;
+  const safeName = (report.companyName || "Employer").replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]/g, "_");
+  link.download = `FINDWORK_${safeName}_Bao_cao_tuyen_dung_${report.period.key}_${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
+const WritesNotice = () =>
+  isWorkspaceWritesEnabled() ? null : (
+    <div
+      className={`${ui.notice} ${ui.noticeWarn}`}
+      role="note"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "14px 18px",
+        borderRadius: 10,
+        marginBottom: 24,
+      }}
+    >
+      <AlertTriangle size={20} color="#d97706" style={{ flexShrink: 0 }} />
+      <div>
+        <strong style={{ color: "#92400e" }}>Chế độ bảo vệ dữ liệu (Safe Read-Only Mode):</strong>{" "}
+        <span style={{ color: "#78350f" }}>
+          Hệ thống đang hoạt động ở chế độ giám sát và trích xuất báo cáo an toàn. Các thao tác ghi dữ liệu doanh nghiệp tạm khóa.
+        </span>
+      </div>
+    </div>
+  );
+
 export default function EmployerReportsPage() {
   const { active } = useCompanyWorkspace();
-
-  // Company tracking to prevent stale state / cross-company exports
-  const [loadedCompanyId, setLoadedCompanyId] = useState<string | null>(null);
-
-  const [selectedJobId, setSelectedJobId] = useState<string>("ALL");
-  const [jobs, setJobs] = useState<JobDto[]>([]);
-  const [jobCounts, setJobCounts] = useState<EmployerJobCountsSummary | null>(null);
-  const [jobsLoading, setJobsLoading] = useState(true);
-  const [jobsError, setJobsError] = useState<ApiFailure | null>(null);
-
-  const [pipeline, setPipeline] = useState<PipelineSummary | null>(null);
-  const [interviews, setInterviews] = useState<InterviewSummary | null>(null);
-  const [aggregateAvailable, setAggregateAvailable] = useState(false);
-  const [metricsLoading, setMetricsLoading] = useState(false);
-  const [metricsError, setMetricsError] = useState<ApiFailure | null>(null);
-
   const activeCompanyId = active?.id;
 
-  // Reset and load data when active company changes
-  useEffect(() => {
-    // 1. Immediately clear previous-company state
-    setLoadedCompanyId(null);
-    setJobs([]);
-    setJobCounts(null);
-    setPipeline(null);
-    setInterviews(null);
-    setSelectedJobId("ALL");
-    setAggregateAvailable(false);
-    setJobsError(null);
-    setMetricsError(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriodKey>("30d");
+  const [selectedJobId, setSelectedJobId] = useState<string>("ALL");
+  const [jobsList, setJobsList] = useState<JobDto[]>([]);
 
-    if (!activeCompanyId) {
-      setJobsLoading(false);
-      setMetricsLoading(false);
-      return;
-    }
+  const [report, setReport] = useState<CompanyRecruitmentReportDto | null>(null);
+  const [loadedCompanyId, setLoadedCompanyId] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<ApiFailure | null>(null);
+
+  const requestRevision = useRef(0);
+
+  // 1. Immediately reset state on active company change to prevent cross-company stale data/export
+  useEffect(() => {
+    setLoadedCompanyId(null);
+    setReport(null);
+    setJobsList([]);
+    setSelectedJobId("ALL");
+    setError(null);
+    setLoading(true);
+  }, [activeCompanyId]);
+
+  // 2. Fetch jobs list for filter dropdown when active company changes
+  useEffect(() => {
+    if (!activeCompanyId) return;
 
     const controller = new AbortController();
-    const signal = controller.signal;
-
-    const loadCompanyData = async () => {
-      setJobsLoading(true);
-      setJobsError(null);
-
-      try {
-        // Fetch verified total counts using database pagination totals for all statuses
-        const [totalRes, pubRes, draftRes, pausedRes, closedRes, listRes] = await Promise.all([
-          companyWorkspaceApi.listJobs(activeCompanyId, { pageSize: 1 }, signal),
-          companyWorkspaceApi.listJobs(activeCompanyId, { status: "PUBLISHED", pageSize: 1 }, signal),
-          companyWorkspaceApi.listJobs(activeCompanyId, { status: "DRAFT", pageSize: 1 }, signal),
-          companyWorkspaceApi.listJobs(activeCompanyId, { status: "PAUSED", pageSize: 1 }, signal),
-          companyWorkspaceApi.listJobs(activeCompanyId, { status: "CLOSED", pageSize: 1 }, signal),
-          companyWorkspaceApi.listJobs(activeCompanyId, { pageSize: 100 }, signal),
-        ]);
-
-        if (signal.aborted) return;
-
-        setJobCounts({
-          total: totalRes.pagination.total,
-          published: pubRes.pagination.total,
-          draft: draftRes.pagination.total,
-          paused: pausedRes.pagination.total,
-          closed: closedRes.pagination.total,
-        });
-
-        setJobs(listRes.data || []);
-        setLoadedCompanyId(activeCompanyId);
-      } catch (err) {
-        if (signal.aborted) return;
-        setJobsError(toApiFailure(err));
-      } finally {
-        if (!signal.aborted) {
-          setJobsLoading(false);
+    companyWorkspaceApi
+      .listJobs(activeCompanyId, { pageSize: 100 }, controller.signal)
+      .then((res) => {
+        if (!controller.signal.aborted) {
+          setJobsList(res.data || []);
         }
-      }
-    };
-
-    loadCompanyData();
+      })
+      .catch(() => {
+        // Silently catch job list error; report endpoint is the primary authority
+      });
 
     return () => {
       controller.abort();
     };
   }, [activeCompanyId]);
 
-  // Load aggregates when loadedCompanyId, selectedJobId, or role permissions change
-  useEffect(() => {
-    if (!activeCompanyId || loadedCompanyId !== activeCompanyId) return;
+  // 3. Fetch recruitment report when activeCompanyId, selectedPeriod, or selectedJobId changes
+  const loadReport = useCallback(
+    async (periodToFetch: ReportPeriodKey, jobIdToFetch: string) => {
+      if (!activeCompanyId) {
+        setLoading(false);
+        return;
+      }
 
-    if (!canReviewApplications(active.memberRoleNames)) {
-      setPipeline(null);
-      setInterviews(null);
-      setAggregateAvailable(false);
-      return;
-    }
+      if (!canReviewApplications(active?.memberRoleNames)) {
+        setError(
+          new ApiFailure(
+            "forbidden",
+            403,
+            "FORBIDDEN",
+            "Tài khoản của bạn không có quyền xem báo cáo ứng tuyển hoặc năng lực chưa được cấp."
+          )
+        );
+        setLoading(false);
+        return;
+      }
 
-    const controller = new AbortController();
-    const signal = controller.signal;
-
-    const loadAggregates = async () => {
-      setMetricsLoading(true);
-      setMetricsError(null);
+      const revision = ++requestRevision.current;
+      setLoading(true);
+      setError(null);
+      const controller = new AbortController();
 
       try {
-        const queryParams = selectedJobId !== "ALL" ? `?jobId=${encodeURIComponent(selectedJobId)}` : "";
-        const res = await apiClient.get(
-          `/companies/${encodeURIComponent(activeCompanyId)}/reports/recruitment${queryParams}`,
-          { signal }
+        const data = await companyWorkspaceApi.getRecruitmentReport(
+          activeCompanyId,
+          {
+            period: periodToFetch,
+            jobId: jobIdToFetch !== "ALL" ? jobIdToFetch : undefined,
+          },
+          controller.signal
         );
 
-        if (signal.aborted) return;
-
-        if (res.data?.pipeline?.currentCounts) {
-          setPipeline(res.data.pipeline.currentCounts);
-          setInterviews(res.data.interviewsSummary ?? null);
-          setAggregateAvailable(true);
-        } else {
-          setAggregateAvailable(false);
+        if (revision === requestRevision.current) {
+          setReport(data);
+          setLoadedCompanyId(activeCompanyId);
+          setError(null);
         }
       } catch (err: unknown) {
-        if (signal.aborted) return;
-        const apiFailure = toApiFailure(err);
-
-        // If the error is 403 Forbidden, do NOT swallow: record permission failure
-        if (apiFailure.status === 403) {
-          setMetricsError(apiFailure);
-          setAggregateAvailable(false);
-        } else if (apiFailure.status === 404 || apiFailure.status === 501) {
-          // Aggregate endpoint not yet implemented on the server
-          setAggregateAvailable(false);
-          setMetricsError(null);
-        } else {
-          setMetricsError(apiFailure);
+        if (revision === requestRevision.current) {
+          const apiFailure = toApiFailure(err);
+          setError(apiFailure);
         }
       } finally {
-        if (!signal.aborted) {
-          setMetricsLoading(false);
+        if (revision === requestRevision.current) {
+          setLoading(false);
         }
       }
-    };
 
-    loadAggregates();
+      return () => controller.abort();
+    },
+    [activeCompanyId, active?.memberRoleNames]
+  );
 
-    return () => {
-      controller.abort();
-    };
-  }, [activeCompanyId, loadedCompanyId, selectedJobId, active.memberRoleNames]);
+  useEffect(() => {
+    loadReport(selectedPeriod, selectedJobId);
+  }, [loadReport, selectedPeriod, selectedJobId]);
 
-  const selectedJobTitle = useMemo(() => {
-    if (selectedJobId === "ALL") return "Tất cả tin tuyển dụng";
-    const found = jobs.find((j) => j.id === selectedJobId);
-    return found ? found.title : "Tin tuyển dụng đã chọn";
-  }, [selectedJobId, jobs]);
+  const isDataReadyForExport = Boolean(report && loadedCompanyId === activeCompanyId && !loading && !error);
 
-  const handleRefresh = () => {
-    if (!activeCompanyId) return;
-    setLoadedCompanyId(null);
-    setJobCounts(null);
-    setJobsLoading(true);
-
-    companyWorkspaceApi
-      .listJobs(activeCompanyId, { pageSize: 1 })
-      .then(async (totalRes) => {
-        const [pubRes, draftRes, pausedRes, closedRes, listRes] = await Promise.all([
-          companyWorkspaceApi.listJobs(activeCompanyId, { status: "PUBLISHED", pageSize: 1 }),
-          companyWorkspaceApi.listJobs(activeCompanyId, { status: "DRAFT", pageSize: 1 }),
-          companyWorkspaceApi.listJobs(activeCompanyId, { status: "PAUSED", pageSize: 1 }),
-          companyWorkspaceApi.listJobs(activeCompanyId, { status: "CLOSED", pageSize: 1 }),
-          companyWorkspaceApi.listJobs(activeCompanyId, { pageSize: 100 }),
-        ]);
-
-        setJobCounts({
-          total: totalRes.pagination.total,
-          published: pubRes.pagination.total,
-          draft: draftRes.pagination.total,
-          paused: pausedRes.pagination.total,
-          closed: closedRes.pagination.total,
-        });
-        setJobs(listRes.data || []);
-        setLoadedCompanyId(activeCompanyId);
-      })
-      .catch((err) => setJobsError(toApiFailure(err)))
-      .finally(() => setJobsLoading(false));
-  };
-
-  const isDataReadyForExport =
-    Boolean(loadedCompanyId) &&
-    loadedCompanyId === activeCompanyId &&
-    Boolean(jobCounts) &&
-    !jobsLoading &&
-    !metricsLoading;
-
-  const handleExportCsv = () => {
-    if (!isDataReadyForExport || !jobCounts) return;
-    exportEmployerReportToCsv({
-      companyName: active?.name || "Doanh nghiệp",
-      selectedJobTitle,
-      jobCounts,
-      pipeline,
-      interviews,
-    });
-  };
-
-  const handleExportJson = () => {
-    if (!isDataReadyForExport || !jobCounts) return;
-    exportEmployerReportToJson({
-      companyId: active?.id || "",
-      companyName: active?.name || "Doanh nghiệp",
-      selectedJobId: selectedJobId === "ALL" ? null : selectedJobId,
-      selectedJobTitle,
-      jobCounts,
-      pipeline,
-      interviews,
-    });
-  };
+  if (!active) {
+    return (
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ color: "#64748b" }}>Vui lòng chọn một doanh nghiệp để xem báo cáo tuyển dụng.</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", paddingBottom: 48 }}>
+    <div style={{ maxWidth: 1280, margin: "0 auto", paddingBottom: 48 }}>
       <PageHeader
         title="Báo cáo tiến độ tuyển dụng"
-        subtitle={`Theo dõi hiệu quả tuyển dụng, luồng ứng viên và lịch phỏng vấn của doanh nghiệp: ${active?.name || ""}`}
+        subtitle={`Theo dõi tổng quan hiện trạng tin đăng, phễu hồ sơ ứng viên và lịch phỏng vấn của ${active.name}.`}
         actions={
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {/* JOB SELECTOR */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--color-surface, #fff)", border: "1px solid var(--color-border, #cbd5e1)", borderRadius: 8, padding: "4px 8px" }}>
-              <Filter size={16} color="#64748b" />
-              <select
-                aria-label="Lọc theo tin tuyển dụng"
-                value={selectedJobId}
-                onChange={(e) => setSelectedJobId(e.target.value)}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  outline: "none",
-                  cursor: "pointer",
-                  maxWidth: 220,
-                  textOverflow: "ellipsis",
-                }}
-              >
-                <option value="ALL">Tất cả tin tuyển dụng ({jobCounts?.total ?? jobs.length})</option>
-                {jobs.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    {j.title} ({j.status})
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <button
               type="button"
               className={`${ui.btn} ${ui.btnOutline}`}
-              onClick={handleRefresh}
-              disabled={jobsLoading || metricsLoading}
-              title="Làm mới toàn bộ số liệu"
+              onClick={() => loadReport(selectedPeriod, selectedJobId)}
+              disabled={loading}
+              title="Tải lại số liệu từ máy chủ"
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              <RefreshCw size={15} className={jobsLoading || metricsLoading ? "spin" : ""} />
+              <RefreshCw size={15} className={loading ? "spin" : ""} />
               <span>Làm mới</span>
             </button>
 
             <button
               type="button"
               className={`${ui.btn} ${ui.btnOutline}`}
-              onClick={handleExportCsv}
+              onClick={() => report && exportEmployerReportToCsv(report)}
               disabled={!isDataReadyForExport}
+              title={isDataReadyForExport ? "Tải xuống báo cáo dạng CSV" : "Đang đồng bộ số liệu doanh nghiệp hiện tại..."}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <Download size={15} />
@@ -344,8 +226,9 @@ export default function EmployerReportsPage() {
             <button
               type="button"
               className={`${ui.btn} ${ui.btnOutline}`}
-              onClick={handleExportJson}
+              onClick={() => report && exportEmployerReportToJson(report)}
               disabled={!isDataReadyForExport}
+              title={isDataReadyForExport ? "Tải xuống dữ liệu JSON" : "Đang đồng bộ số liệu doanh nghiệp hiện tại..."}
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
               <Download size={15} />
@@ -355,310 +238,382 @@ export default function EmployerReportsPage() {
         }
       />
 
-      {/* FILTER SUMMARY BADGE */}
+      <WritesNotice />
+
+      {/* FILTER TOOLBAR (PERIOD & JOB SELECTION) */}
       <div
         style={{
-          background: "var(--color-surface, #fff)",
-          border: "1px solid var(--color-border, #e2e8f0)",
-          borderRadius: 10,
-          padding: "12px 18px",
+          background: "#fff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: "16px 20px",
           marginBottom: 24,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: 12,
+          gap: 16,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
         }}
       >
-        <span style={{ fontSize: "0.875rem", color: "#475569" }}>
-          Phạm vi xem: <strong>{selectedJobTitle}</strong>.
-          Số liệu tin tuyển dụng phản ánh dữ liệu thực tế từ máy chủ.
-        </span>
-        <Badge tone="info">Doanh nghiệp: {active?.name}</Badge>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          {/* PERIOD FILTER */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Calendar size={18} color="#2563eb" />
+            <label htmlFor="employer-period-filter" style={{ fontSize: "0.875rem", fontWeight: 600, color: "#475569" }}>
+              Chu kỳ:
+            </label>
+            <select
+              id="employer-period-filter"
+              aria-label="Chu kỳ báo cáo"
+              className={ui.select}
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value as ReportPeriodKey)}
+              style={{ width: "auto", minWidth: 220, fontWeight: 500 }}
+            >
+              <option value="30d">30 ngày gần nhất (Mặc định)</option>
+              <option value="7d">7 ngày gần nhất</option>
+              <option value="90d">90 ngày gần nhất</option>
+              <option value="all">Toàn bộ thời gian (Tất cả)</option>
+            </select>
+          </div>
+
+          {/* JOB FILTER */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Filter size={18} color="#2563eb" />
+            <label htmlFor="employer-job-filter" style={{ fontSize: "0.875rem", fontWeight: 600, color: "#475569" }}>
+              Tin tuyển dụng:
+            </label>
+            <select
+              id="employer-job-filter"
+              aria-label="Lọc theo tin tuyển dụng"
+              className={ui.select}
+              value={selectedJobId}
+              onChange={(e) => setSelectedJobId(e.target.value)}
+              style={{ width: "auto", minWidth: 240, maxWidth: 360, fontWeight: 500 }}
+            >
+              <option value="ALL">Tất cả tin tuyển dụng</option>
+              {jobsList.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.title} ({job.status})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <Badge tone="success">Số liệu tổng hợp thực từ máy chủ</Badge>
       </div>
 
-      {/* LOADING & ERROR STATES */}
-      {jobsLoading ? (
-        <LoadingBlock rows={5} label="Đang nạp dữ liệu tin tuyển dụng từ máy chủ..." />
-      ) : jobsError ? (
-        <ApiErrorState error={jobsError} onRetry={handleRefresh} />
-      ) : !jobCounts ? (
+      {/* METRICS VIEW */}
+      {loading ? (
+        <LoadingBlock rows={5} label="Đang nạp báo cáo tiến độ tuyển dụng từ máy chủ..." />
+      ) : error ? (
+        <ApiErrorState error={error} onRetry={() => loadReport(selectedPeriod, selectedJobId)} />
+      ) : !report ? (
         <div style={{ textAlign: "center", padding: "48px 16px", background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0" }}>
-          <p style={{ color: "#64748b" }}>Không có dữ liệu tin tuyển dụng từ doanh nghiệp.</p>
+          <p style={{ color: "#64748b" }}>Không có dữ liệu báo cáo cho doanh nghiệp này.</p>
         </div>
       ) : (
         <>
-          {/* SECTION 1: JOBS STATUS OVERVIEW */}
+          {/* SCOPE CLARIFICATION BANNER */}
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              padding: "12px 18px",
+              marginBottom: 24,
+              fontSize: "0.875rem",
+              color: "#475569",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
+            <div>
+              Phạm vi báo cáo: <strong style={{ color: "#0f172a" }}>{report.companyName}</strong> | Tin tuyển dụng:{" "}
+              <strong style={{ color: "#0f172a" }}>{report.jobFilter.title}</strong>
+              <div style={{ fontSize: "0.8125rem", color: "#64748b", marginTop: 2 }}>
+                Khoảng thời gian:{" "}
+                <strong style={{ color: "#334155" }}>
+                  {report.period.startDate ? new Date(report.period.startDate).toLocaleDateString("vi-VN") : "Khởi tạo"} —{" "}
+                  {new Date(report.period.endDate).toLocaleDateString("vi-VN")}
+                </strong>
+                {" "}({REPORT_PERIOD_LABELS[report.period.key as ReportPeriodKey] ?? report.period.key})
+              </div>
+            </div>
+            <div style={{ fontSize: "0.8125rem", color: "#64748b" }}>
+              * Hiện trạng tin & luồng ứng viên là số liệu thực tế thời gian thực (Uncapped Aggregates).
+            </div>
+          </div>
+
+          {/* SECTION 1: JOBS SUMMARY */}
           <div style={{ marginBottom: 32 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div style={{ marginBottom: 12 }}>
               <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                1. Hiện trạng tin tuyển dụng (Job Postings Overview)
+                1. Hiện trạng tin tuyển dụng (Jobs Summary)
               </h2>
-              <Link
-                to="/employer/jobs"
-                style={{ fontSize: "0.875rem", fontWeight: 600, color: "#4f46e5", display: "inline-flex", alignItems: "center", gap: 4 }}
-              >
-                <span>Quản lý tin tuyển dụng</span>
-                <ArrowRight size={14} />
-              </Link>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", margin: "4px 0 0" }}>
+                Thống kê các trạng thái tin tuyển dụng của doanh nghiệp trong cơ sở dữ liệu.
+              </p>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" }}>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#64748b" }}>TỔNG SỐ TIN</span>
-                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0f172a", marginTop: 6 }}>
-                  {jobCounts.total}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 16,
+              }}
+            >
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#64748b" }}>TỔNG SỐ TIN</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0f172a", marginTop: 4 }}>
+                  {report.jobsSummary.total}
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Toàn bộ tin của doanh nghiệp</span>
               </div>
 
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" }}>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#16a34a" }}>ĐANG CÔNG KHAI</span>
-                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#16a34a", marginTop: 6 }}>
-                  {jobCounts.published}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#16a34a" }}>ĐANG CÔNG KHAI</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#16a34a", marginTop: 4 }}>
+                  {report.jobsSummary.published}
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Ứng viên đang nộp hồ sơ</span>
               </div>
 
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" }}>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#64748b" }}>BẢN NHÁP (DRAFT)</span>
-                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#64748b", marginTop: 6 }}>
-                  {jobCounts.draft}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#64748b" }}>BẢN NHÁP (DRAFT)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0f172a", marginTop: 4 }}>
+                  {report.jobsSummary.draft}
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Chưa đăng lên sàn</span>
               </div>
 
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" }}>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#d97706" }}>TẠM DỪNG (PAUSED)</span>
-                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#d97706", marginTop: 6 }}>
-                  {jobCounts.paused}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#d97706" }}>TẠM DỪNG (PAUSED)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#d97706", marginTop: 4 }}>
+                  {report.jobsSummary.paused}
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Tạm ngưng nhận hồ sơ</span>
               </div>
 
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" }}>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#dc2626" }}>ĐÃ ĐÓNG (CLOSED)</span>
-                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#dc2626", marginTop: 6 }}>
-                  {jobCounts.closed}
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#475569" }}>ĐÃ ĐÓNG (CLOSED)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#475569", marginTop: 4 }}>
+                  {report.jobsSummary.closed}
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Hoàn thành hoặc kết thúc</span>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#dc2626" }}>HẾT HẠN (EXPIRED)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#dc2626", marginTop: 4 }}>
+                  {report.jobsSummary.expired}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#94a3b8" }}>LƯU TRỮ (ARCHIVED)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#94a3b8", marginTop: 4 }}>
+                  {report.jobsSummary.archived}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* SECTION 2: CANDIDATE APPLICATION PIPELINE */}
+          {/* SECTION 2: CANDIDATE PIPELINE */}
           <div style={{ marginBottom: 32 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
               <div>
                 <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", margin: 0 }}>
-                  2. Phễu ứng viên & Luồng xét duyệt (Application Pipeline Funnel)
+                  2. Phễu ứng viên & Luồng xét duyệt (Application Pipeline)
                 </h2>
-                <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>
-                  Phân loại trạng thái luân chuyển hồ sơ ứng viên thực tế theo quy trình tuyển dụng chuẩn.
-                </span>
+                <p style={{ fontSize: "0.8125rem", color: "#64748b", margin: "4px 0 0" }}>
+                  Phân bố trạng thái thực tế của hồ sơ ứng tuyển và số lượt nộp hồ sơ phát sinh trong chu kỳ.
+                </p>
               </div>
-              <Link
-                to="/employer/applicants"
-                style={{ fontSize: "0.875rem", fontWeight: 600, color: "#4f46e5", display: "inline-flex", alignItems: "center", gap: 4 }}
-              >
-                <span>Xem danh sách ứng viên</span>
-                <ArrowRight size={14} />
-              </Link>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>Nộp trong chu kỳ:</span>
+                <Badge tone="info">{report.pipeline.periodSubmissions} hồ sơ</Badge>
+              </div>
             </div>
 
-            {metricsLoading ? (
-              <LoadingBlock rows={3} label="Đang kiểm tra chỉ số luồng hồ sơ ứng viên..." />
-            ) : metricsError ? (
-              <ApiErrorState error={metricsError} />
-            ) : aggregateAvailable && pipeline ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-                <div style={{ background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 10, padding: "16px" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#475569" }}>TỔNG TIẾP NHẬN</span>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0f172a", marginTop: 4 }}>
-                    {pipeline.total}
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Lượt nộp hồ sơ</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#2563eb" }}>MỚI TIẾP NHẬN</span>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#2563eb", marginTop: 4 }}>
-                    {pipeline.SUBMITTED}
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Chờ mở hồ sơ</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#d97706" }}>ĐANG XEM XÉT</span>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#d97706", marginTop: 4 }}>
-                    {pipeline.REVIEWING}
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Đang đánh giá CV</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#7c3aed" }}>ĐÃ CHỌN LỌC</span>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#7c3aed", marginTop: 4 }}>
-                    {pipeline.SHORTLISTED}
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Phù hợp tiêu chí</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#0891b2" }}>PHỎNG VẤN</span>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0891b2", marginTop: 4 }}>
-                    {pipeline.INTERVIEW}
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Vòng phỏng vấn</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#16a34a" }}>ĐỀ NGHỊ VIỆC LÀM</span>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#16a34a", marginTop: 4 }}>
-                    {pipeline.OFFERED}
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Đã gửi offer</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "16px" }}>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b" }}>TỪ CHỐI</span>
-                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#64748b", marginTop: 4 }}>
-                    {pipeline.REJECTED}
-                  </div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Không phù hợp</span>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b" }}>TỔNG HỒ SƠ</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0f172a", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.total}
                 </div>
               </div>
-            ) : (
-              <div
-                style={{
-                  background: "#fff",
-                  border: "1px dashed #cbd5e1",
-                  borderRadius: 12,
-                  padding: "28px 24px",
-                  textAlign: "center",
-                }}
-              >
-                <div style={{ display: "inline-flex", marginBottom: 10 }}>
-                  <Badge tone="warning">Chưa khả dụng trên máy chủ</Badge>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b" }}>BẢN NHÁP</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0f172a", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.DRAFT}
                 </div>
-                <h3 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#334155", margin: "4px 0" }}>
-                  Chỉ số phễu ứng viên tổng hợp toàn doanh nghiệp chưa khả dụng
-                </h3>
-                <p style={{ fontSize: "0.8125rem", color: "#64748b", maxWidth: 560, margin: "8px auto 0", lineHeight: 1.5 }}>
-                  Hệ thống không tổng hợp ước lượng từng phần để đảm bảo tính chính xác tuyệt đối. Vui lòng xem danh sách chi tiết theo từng tin tuyển dụng tại mục Quản lý ứng viên.
-                </p>
               </div>
-            )}
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#2563eb" }}>MỚI NỘP</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#2563eb", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.SUBMITTED}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#d97706" }}>ĐANG XEM XÉT</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#d97706", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.REVIEWING}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#0284c7" }}>ĐÃ CHỌN LỌC</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0284c7", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.SHORTLISTED}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#4f46e5" }}>PHỎNG VẤN</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#4f46e5", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.INTERVIEW}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#16a34a" }}>ĐỀ NGHỊ (OFFER)</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#16a34a", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.OFFERED}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#dc2626" }}>TỪ CHỐI</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#dc2626", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.REJECTED}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b" }}>RÚT HỒ SƠ</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#64748b", marginTop: 4 }}>
+                  {report.pipeline.currentCounts.WITHDRAWN}
+                </div>
+              </div>
+            </div>
+
+            {/* RECRUITMENT OUTCOMES / HIRES (UNAVAILABLE) */}
+            <div
+              style={{
+                marginTop: 16,
+                background: "#f8fafc",
+                border: "1px dashed #cbd5e1",
+                borderRadius: 10,
+                padding: "14px 18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: "0.875rem", color: "#334155" }}>Kết quả tuyển dụng hoàn tất (Hires):</strong>{" "}
+                <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>{report.pipeline.hires.note}</span>
+              </div>
+              <Badge tone="neutral">UNAVAILABLE</Badge>
+            </div>
           </div>
 
-          {/* SECTION 3: INTERVIEW SCHEDULING & OUTCOMES */}
+          {/* SECTION 3: INTERVIEW SCHEDULING */}
           <div style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>
-              3. Lịch phỏng vấn & Kết quả tổ chức (Interviews & Recruitment Outcomes)
-            </h2>
+            <div style={{ marginBottom: 12 }}>
+              <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                3. Quản lý lịch phỏng vấn (Interviews Summary)
+              </h2>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", margin: "4px 0 0" }}>
+                Thống kê các buổi phỏng vấn đã thiết lập cho ứng viên, độc lập với giai đoạn hồ sơ hiện tại.
+              </p>
+            </div>
 
-            {aggregateAvailable && interviews ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#64748b" }}>TỔNG SỐ BUỔI PHỎNG VẤN</span>
-                    <Calendar size={18} color="#4f46e5" />
-                  </div>
-                  <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0f172a" }}>
-                    {interviews.total}
-                  </div>
-                  <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>Tổng lịch đã thiết lập</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#0891b2" }}>LỊCH SẮP TỚI</span>
-                    <Clock size={18} color="#0891b2" />
-                  </div>
-                  <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0891b2" }}>
-                    {interviews.scheduled}
-                  </div>
-                  <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>Đang lên kế hoạch gặp ứng viên</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#16a34a" }}>ĐÃ HOÀN THÀNH</span>
-                    <CheckCircle2 size={18} color="#16a34a" />
-                  </div>
-                  <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#16a34a" }}>
-                    {interviews.completed}
-                  </div>
-                  <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>Đã trao đổi xong</span>
-                </div>
-
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#64748b" }}>LỊCH ĐÃ HỦY</span>
-                    <XCircle size={18} color="#64748b" />
-                  </div>
-                  <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#64748b" }}>
-                    {interviews.cancelled}
-                  </div>
-                  <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>Hủy do trùng lịch hoặc thay đổi</span>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 16,
+              }}
+            >
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#64748b" }}>TỔNG LỊCH PHỎNG VẤN</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#0f172a", marginTop: 4 }}>
+                  {report.interviewsSummary.total}
                 </div>
               </div>
-            ) : (
-              <div
-                style={{
-                  background: "#fff",
-                  border: "1px dashed #cbd5e1",
-                  borderRadius: 12,
-                  padding: "28px 24px",
-                  textAlign: "center",
-                }}
-              >
-                <div style={{ display: "inline-flex", marginBottom: 10 }}>
-                  <Badge tone="warning">Chưa khả dụng trên máy chủ</Badge>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#2563eb" }}>SẮP TỚI (SCHEDULED)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#2563eb", marginTop: 4 }}>
+                  {report.interviewsSummary.scheduled}
                 </div>
-                <h3 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#334155", margin: "4px 0" }}>
-                  Chỉ số lịch phỏng vấn tổng hợp chưa khả dụng
-                </h3>
-                <p style={{ fontSize: "0.8125rem", color: "#64748b", maxWidth: 560, margin: "8px auto 0", lineHeight: 1.5 }}>
-                  Chỉ số tổ chức phỏng vấn độc lập cần API thống kê tổng hợp từ máy chủ. Lịch phỏng vấn cụ thể của từng ứng viên được quản lý trực tiếp trong trang chi tiết ứng viên.
-                </p>
               </div>
-            )}
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#d97706" }}>ĐÃ DỜI (RESCHEDULED)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#d97706", marginTop: 4 }}>
+                  {report.interviewsSummary.rescheduled}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#16a34a" }}>HOÀN THÀNH (COMPLETED)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#16a34a", marginTop: 4 }}>
+                  {report.interviewsSummary.completed}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18 }}>
+                <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#dc2626" }}>ĐÃ HỦY (CANCELLED)</div>
+                <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#dc2626", marginTop: 4 }}>
+                  {report.interviewsSummary.cancelled}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* SECTION 4: COMMERCIAL PACKAGE STATUS */}
+          {/* SECTION 4: COMMERCIAL PACKAGE STATUS (EXPLICIT TRACKING) */}
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>
-              4. Gói dịch vụ & Chi phí tuyển dụng (Commercial Package Tracking)
+              4. Gói dịch vụ & Hạn mức thương mại (Commercial Package)
             </h2>
-
             <div
               style={{
                 background: "#f8fafc",
                 border: "1px dashed #cbd5e1",
                 borderRadius: 12,
-                padding: "20px 24px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 16,
+                padding: "20px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ background: "#e2e8f0", padding: 10, borderRadius: 10, color: "#475569" }}>
-                  <Package size={22} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "0.9375rem" }}>
-                    Gói dịch vụ hiện tại: Gói cơ bản doanh nghiệp FINDWORK (Miễn phí)
-                  </div>
-                  <div style={{ fontSize: "0.8125rem", color: "#64748b", marginTop: 4 }}>
-                    Toàn bộ tính năng đăng tin tuyển dụng, sàng lọc hồ sơ ứng viên và lên lịch phỏng vấn đang được cung cấp miễn phí trong giai đoạn hiện tại. Chưa tích hợp dịch vụ thu phí hoặc hạn mức đăng tin.
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Building2 size={20} color="#64748b" />
+                  <div>
+                    <h3 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#334155", margin: 0 }}>
+                      Gói dịch vụ doanh nghiệp
+                    </h3>
+                    <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Chưa triển khai gói dịch vụ thu phí</span>
                   </div>
                 </div>
+                <Badge tone="neutral">UNAVAILABLE</Badge>
               </div>
-              <Badge tone="neutral">Không phát sinh chi phí</Badge>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", lineHeight: 1.5, margin: "10px 0 0" }}>
+                {report.commercialPackage.note}
+              </p>
             </div>
           </div>
         </>

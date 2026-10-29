@@ -2,6 +2,7 @@ import { apiClient, getApiBaseUrl } from "../http/apiClient";
 import { isWorkspaceWritesEnabled } from "../../config/featureFlags";
 import { toApiFailure, writeBlockedFailure } from "./apiFailure";
 import { normalizePaged, type Paged } from "./apiTypes";
+import { normalizeAdminReport, type AdminReportSummaryDto } from "../../features/reports/reportFormatters";
 
 export interface AdminDashboardCounts {
   users: number;
@@ -334,6 +335,19 @@ export function normalizeAdminAudit(value: unknown): AdminAuditDto {
 }
 
 export const adminApi = {
+  getReportsSummary: (
+    params?: { period?: string; startDate?: string; endDate?: string },
+    signal?: AbortSignal,
+  ): Promise<AdminReportSummaryDto> =>
+    run(async () => {
+      const query: Record<string, string> = {};
+      if (params?.period) query.period = params.period;
+      if (params?.startDate) query.startDate = params.startDate;
+      if (params?.endDate) query.endDate = params.endDate;
+      const res = await apiClient.get("/admin/reports/summary", { params: query, signal });
+      return normalizeAdminReport(res.data);
+    }),
+
   getDashboard: (signal?: AbortSignal): Promise<AdminDashboardCounts> =>
     run(async () => {
       const res = await apiClient.get("/admin/dashboard", { signal });

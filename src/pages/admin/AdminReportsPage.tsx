@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   Users,
@@ -11,37 +12,41 @@ import {
   Download,
   CreditCard,
   Handshake,
+  Calendar,
 } from "lucide-react";
 import { Badge, LoadingBlock, PageHeader, ui } from "@/components/ui";
 import ApiErrorState from "@/components/ui/ApiErrorState";
-import { useAsyncData } from "@/hooks/useAsyncData";
-import { adminApi, type AdminDashboardCounts } from "@/services/api/adminApi";
+import { adminApi } from "@/services/api/adminApi";
 import { isWorkspaceWritesEnabled } from "@/config/featureFlags";
+import { toApiFailure, type ApiFailure } from "@/services/api/apiFailure";
 import {
+  type AdminReportSummaryDto,
+  type ReportPeriodKey,
+  REPORT_PERIOD_LABELS,
   buildAdminReportCsv,
   buildAdminReportJson,
 } from "@/features/reports/reportFormatters";
 
-export function exportAdminReportToCsv(data: AdminDashboardCounts): void {
+export function exportAdminReportToCsv(data: AdminReportSummaryDto): void {
   const csvContent = buildAdminReportCsv(data);
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `FINDWORK_Admin_Snapshot_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `FINDWORK_Admin_Report_${data.period.key}_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-export function exportAdminReportToJson(data: AdminDashboardCounts): void {
+export function exportAdminReportToJson(data: AdminReportSummaryDto): void {
   const payload = buildAdminReportJson(data);
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `FINDWORK_Admin_Snapshot_${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `FINDWORK_Admin_Report_${data.period.key}_${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -73,12 +78,41 @@ const WritesNotice = () =>
   );
 
 export default function AdminReportsPage() {
-  const stats = useAsyncData((signal) => adminApi.getDashboard(signal), []);
+  const [period, setPeriod] = useState<ReportPeriodKey>("30d");
+  const [report, setReport] = useState<AdminReportSummaryDto | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<ApiFailure | null>(null);
+  const requestRevision = useRef(0);
 
-  const d = stats.data;
-  const inactiveUsers = d ? Math.max(0, d.users - d.activeUsers) : 0;
-  const inactiveCompanies = d ? Math.max(0, d.companies - d.activeCompanies) : 0;
-  const nonPublishedJobs = d ? Math.max(0, d.jobs - d.publishedJobs) : 0;
+  const loadData = useCallback(async (periodToFetch: ReportPeriodKey) => {
+    const revision = ++requestRevision.current;
+    setLoading(true);
+    setError(null);
+    const controller = new AbortController();
+
+    try {
+      const data = await adminApi.getReportsSummary({ period: periodToFetch }, controller.signal);
+      if (revision === requestRevision.current) {
+        setReport(data);
+      }
+    } catch (err: unknown) {
+      if (revision === requestRevision.current) {
+        setError(toApiFailure(err));
+      }
+    } finally {
+      if (revision === requestRevision.current) {
+        setLoading(false);
+      }
+    }
+
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    loadData(period);
+  }, [period, loadData]);
+
+  const periodLabel = REPORT_PERIOD_LABELS[period] ?? period;
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", paddingBottom: 48 }}>
@@ -90,21 +124,22 @@ export default function AdminReportsPage() {
             <button
               type="button"
               className={`${ui.btn} ${ui.btnOutline}`}
-              onClick={stats.reload}
-              disabled={stats.loading}
+              onClick={() => loadData(period)}
+              disabled={loading}
               title="Tải lại số liệu từ máy chủ"
               style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              <RefreshCw size={15} className={stats.loading ? "spin" : ""} />
+              <RefreshCw size={15} className={loading ? "spin" : ""} />
               <span>Làm mới</span>
             </button>
 
-            {d && (
+            {report && (
               <>
                 <button
                   type="button"
                   className={`${ui.btn} ${ui.btnOutline}`}
-                  onClick={() => exportAdminReportToCsv(d)}
+                  onClick={() => exportAdminReportToCsv(report)}
+                  disabled={loading}
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   <Download size={15} />
@@ -114,7 +149,8 @@ export default function AdminReportsPage() {
                 <button
                   type="button"
                   className={`${ui.btn} ${ui.btnOutline}`}
-                  onClick={() => exportAdminReportToJson(d)}
+                  onClick={() => exportAdminReportToJson(report)}
+                  disabled={loading}
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   <Download size={15} />
@@ -128,49 +164,76 @@ export default function AdminReportsPage() {
 
       <WritesNotice />
 
-      {/* SNAPSHOT SCOPE CLARIFICATION BANNER */}
+      {/* PERIOD SELECTION TOOLBAR */}
       <div
         style={{
-          background: "var(--color-surface, #fff)",
-          border: "1px solid var(--color-border, #e2e8f0)",
-          borderRadius: 10,
-          padding: "14px 18px",
+          background: "#fff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: "16px 20px",
           marginBottom: 24,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           flexWrap: "wrap",
-          gap: 12,
+          gap: 16,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
         }}
       >
-        <div>
-          <span style={{ fontSize: "0.875rem", color: "#475569" }}>
-            Phạm vi hiển thị: <strong style={{ color: "#0f172a" }}>Hiện trạng tích lũy toàn hệ thống (All-Time Snapshot)</strong>.
-            Các khối thống kê dưới đây phân tách rõ ràng giữa <strong>Số liệu hiện trạng thời gian thực</strong> và <strong>Hàng đợi vận hành quản trị</strong>.
-          </span>
-          <div style={{ fontSize: "0.8125rem", color: "#64748b", marginTop: 4 }}>
-            * Báo cáo phân tích sự kiện theo chu kỳ (Period Events) đang được chuẩn bị và sẽ kích hoạt khi có API tổng hợp theo khoảng thời gian.
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#475569", fontWeight: 600, fontSize: "0.875rem" }}>
+            <Calendar size={18} color="#2563eb" />
+            <label htmlFor="admin-period-filter">Chu kỳ báo cáo:</label>
           </div>
+          <select
+            id="admin-period-filter"
+            aria-label="Chu kỳ báo cáo"
+            className={ui.select}
+            value={period}
+            onChange={(e) => setPeriod(e.target.value as ReportPeriodKey)}
+            style={{ width: "auto", minWidth: 230, fontWeight: 500 }}
+          >
+            <option value="30d">30 ngày gần nhất (Mặc định)</option>
+            <option value="7d">7 ngày gần nhất</option>
+            <option value="90d">90 ngày gần nhất</option>
+            <option value="all">Toàn bộ thời gian (Tất cả)</option>
+          </select>
+          {report?.period && (
+            <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>
+              Khoảng thời gian:{" "}
+              <strong style={{ color: "#334155" }}>
+                {report.period.startDate ? new Date(report.period.startDate).toLocaleDateString("vi-VN") : "Khởi tạo hệ thống"} —{" "}
+                {new Date(report.period.endDate).toLocaleDateString("vi-VN")}
+              </strong>
+            </span>
+          )}
         </div>
-        <Badge tone="info">Dữ liệu thực từ máy chủ</Badge>
+
+        <Badge tone="success">Số liệu tổng hợp cơ sở dữ liệu thời gian thực</Badge>
       </div>
 
       {/* METRICS CONTENT */}
-      {stats.loading ? (
+      {loading ? (
         <LoadingBlock rows={5} label="Đang nạp dữ liệu báo cáo vận hành quản trị từ máy chủ..." />
-      ) : stats.error ? (
-        <ApiErrorState error={stats.error} onRetry={stats.reload} />
-      ) : !d ? (
+      ) : error ? (
+        <ApiErrorState error={error} onRetry={() => loadData(period)} />
+      ) : !report ? (
         <div style={{ textAlign: "center", padding: "48px 16px", background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0" }}>
           <p style={{ color: "#64748b" }}>Không có dữ liệu báo cáo từ máy chủ.</p>
         </div>
       ) : (
         <>
-          {/* SECTION 1: CURRENT-STATE PLATFORM COUNTS */}
+          {/* SECTION 1: CURRENT-STATE PLATFORM COUNTS (DATABASE SNAPSHOT) */}
           <div style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>
-              1. Hiện trạng tích lũy toàn sàn (Platform Current-State Snapshot)
-            </h2>
+            <div style={{ marginBottom: 12 }}>
+              <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                1. Hiện trạng tích lũy toàn sàn (Platform Snapshot - Current DB State)
+              </h2>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", margin: "4px 0 0" }}>
+                Số liệu đếm tức thời trên toàn bộ cơ sở dữ liệu (Database Snapshot). Phản ánh trạng thái tại thời điểm hiện tại, không phụ thuộc vào chu kỳ lọc.
+              </p>
+            </div>
+
             <div
               style={{
                 display: "grid",
@@ -197,11 +260,12 @@ export default function AdminReportsPage() {
                   </div>
                 </div>
                 <div style={{ fontSize: "2rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.1, marginBottom: 8 }}>
-                  {d.users.toLocaleString("vi-VN")}
+                  {report.snapshot.users.total.toLocaleString("vi-VN")}
                 </div>
                 <div style={{ fontSize: "0.8125rem", color: "#64748b", marginBottom: 16 }}>
-                  <div>Hoạt động: <strong style={{ color: "#16a34a" }}>{d.activeUsers.toLocaleString("vi-VN")}</strong></div>
-                  <div>Tạm khóa / chờ: <strong style={{ color: "#d97706" }}>{inactiveUsers.toLocaleString("vi-VN")}</strong></div>
+                  <div>Hoạt động: <strong style={{ color: "#16a34a" }}>{report.snapshot.users.active.toLocaleString("vi-VN")}</strong></div>
+                  <div>Tạm khóa (SUSPENDED): <strong style={{ color: "#d97706" }}>{report.snapshot.users.suspended.toLocaleString("vi-VN")}</strong></div>
+                  <div>Vô hiệu hóa (DISABLED): <strong style={{ color: "#dc2626" }}>{report.snapshot.users.disabled.toLocaleString("vi-VN")}</strong></div>
                 </div>
                 <div style={{ marginTop: "auto", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
                   <Link
@@ -233,12 +297,15 @@ export default function AdminReportsPage() {
                   </div>
                 </div>
                 <div style={{ fontSize: "2rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.1, marginBottom: 8 }}>
-                  {d.companies.toLocaleString("vi-VN")}
+                  {report.snapshot.companies.total.toLocaleString("vi-VN")}
                 </div>
                 <div style={{ fontSize: "0.8125rem", color: "#64748b", marginBottom: 16 }}>
-                  <div>Đang hoạt động: <strong style={{ color: "#16a34a" }}>{d.activeCompanies.toLocaleString("vi-VN")}</strong></div>
-                  <div>Chờ xác minh pháp lý: <strong style={{ color: "#ea580c" }}>{d.pendingCompanies.toLocaleString("vi-VN")}</strong></div>
-                  <div>Tạm dừng / lưu trữ: <strong style={{ color: "#64748b" }}>{inactiveCompanies.toLocaleString("vi-VN")}</strong></div>
+                  <div>Đang hoạt động: <strong style={{ color: "#16a34a" }}>{report.snapshot.companies.active.toLocaleString("vi-VN")}</strong></div>
+                  <div>Đã xác minh (VERIFIED): <strong style={{ color: "#2563eb" }}>{report.snapshot.companies.verified.toLocaleString("vi-VN")}</strong></div>
+                  <div>Chờ xác minh (PENDING): <strong style={{ color: "#ea580c" }}>{report.snapshot.companies.pendingVerification.toLocaleString("vi-VN")}</strong></div>
+                  <div>Từ chối xác minh (REJECTED): <strong style={{ color: "#dc2626" }}>{report.snapshot.companies.rejectedVerification.toLocaleString("vi-VN")}</strong></div>
+                  <div>Chưa gửi hồ sơ (UNVERIFIED): <strong style={{ color: "#64748b" }}>{report.snapshot.companies.unverified.toLocaleString("vi-VN")}</strong></div>
+                  <div>Tạm dừng / Lưu trữ: <strong style={{ color: "#64748b" }}>{(report.snapshot.companies.suspended + report.snapshot.companies.archived).toLocaleString("vi-VN")}</strong></div>
                 </div>
                 <div style={{ marginTop: "auto", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
                   <Link
@@ -270,11 +337,15 @@ export default function AdminReportsPage() {
                   </div>
                 </div>
                 <div style={{ fontSize: "2rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.1, marginBottom: 8 }}>
-                  {d.jobs.toLocaleString("vi-VN")}
+                  {report.snapshot.jobs.total.toLocaleString("vi-VN")}
                 </div>
                 <div style={{ fontSize: "0.8125rem", color: "#64748b", marginBottom: 16 }}>
-                  <div>Đang công khai: <strong style={{ color: "#16a34a" }}>{d.publishedJobs.toLocaleString("vi-VN")}</strong></div>
-                  <div>Nháp / Tạm ẩn / Đóng: <strong style={{ color: "#64748b" }}>{nonPublishedJobs.toLocaleString("vi-VN")}</strong></div>
+                  <div>Đang công khai: <strong style={{ color: "#16a34a" }}>{report.snapshot.jobs.published.toLocaleString("vi-VN")}</strong></div>
+                  <div>Bản nháp (DRAFT): <strong style={{ color: "#64748b" }}>{report.snapshot.jobs.draft.toLocaleString("vi-VN")}</strong></div>
+                  <div>Tạm dừng (PAUSED): <strong style={{ color: "#d97706" }}>{report.snapshot.jobs.paused.toLocaleString("vi-VN")}</strong></div>
+                  <div>Đã đóng (CLOSED): <strong style={{ color: "#475569" }}>{report.snapshot.jobs.closed.toLocaleString("vi-VN")}</strong></div>
+                  <div>Hết hạn (EXPIRED): <strong style={{ color: "#dc2626" }}>{report.snapshot.jobs.expired.toLocaleString("vi-VN")}</strong></div>
+                  <div>Lưu trữ (ARCHIVED): <strong style={{ color: "#94a3b8" }}>{report.snapshot.jobs.archived.toLocaleString("vi-VN")}</strong></div>
                 </div>
                 <div style={{ marginTop: "auto", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
                   <Link
@@ -306,10 +377,10 @@ export default function AdminReportsPage() {
                   </div>
                 </div>
                 <div style={{ fontSize: "2rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.1, marginBottom: 8 }}>
-                  {d.applications.toLocaleString("vi-VN")}
+                  {report.snapshot.applications.total.toLocaleString("vi-VN")}
                 </div>
                 <div style={{ fontSize: "0.8125rem", color: "#64748b", marginBottom: 16 }}>
-                  Tổng số lượt nộp hồ sơ của ứng viên vào các tin tuyển dụng trên hệ thống FINDWORK.
+                  Tổng số lượt nộp hồ sơ của ứng viên vào các tin tuyển dụng trên hệ thống FINDWORK tích lũy từ trước tới nay.
                 </div>
                 <div style={{ marginTop: "auto", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
                   <Link
@@ -324,33 +395,119 @@ export default function AdminReportsPage() {
             </div>
           </div>
 
-          {/* SECTION 2: OPERATIONAL BACKLOG WORK */}
+          {/* SECTION 2: PERIOD EVENTS (EVENT-BASED METRICS) */}
+          <div style={{ marginBottom: 32 }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", margin: 0 }}>
+                  2. Biến động trong chu kỳ (Period Events: {periodLabel})
+                </h2>
+                <Badge tone="info">Sự kiện phát sinh</Badge>
+              </div>
+              <p style={{ fontSize: "0.8125rem", color: "#64748b", margin: "4px 0 0" }}>
+                Các sự kiện phát sinh trong khoảng thời gian đã chọn dựa trên nhật ký hệ thống và thời điểm ghi nhận thực tế (Event-based).
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 16,
+              }}
+            >
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
+                  Người dùng mới đăng ký
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#0f172a", marginTop: 4 }}>
+                  {report.periodEvents.newUsersRegistered.toLocaleString("vi-VN")}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
+                  Doanh nghiệp mới đăng ký
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#0f172a", marginTop: 4 }}>
+                  {report.periodEvents.newCompaniesRegistered.toLocaleString("vi-VN")}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#16a34a", textTransform: "uppercase" }}>
+                  Doanh nghiệp được duyệt
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#16a34a", marginTop: 4 }}>
+                  {report.periodEvents.companiesVerified.toLocaleString("vi-VN")}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#dc2626", textTransform: "uppercase" }}>
+                  Doanh nghiệp bị từ chối
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#dc2626", marginTop: 4 }}>
+                  {report.periodEvents.companiesRejected.toLocaleString("vi-VN")}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#2563eb", textTransform: "uppercase" }}>
+                  Tin đăng mới / công khai
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#2563eb", marginTop: 4 }}>
+                  {report.periodEvents.jobsPosted.toLocaleString("vi-VN")}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#4f46e5", textTransform: "uppercase" }}>
+                  Hồ sơ ứng tuyển mới nộp
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#4f46e5", marginTop: 4 }}>
+                  {report.periodEvents.applicationsSubmitted.toLocaleString("vi-VN")}
+                </div>
+              </div>
+
+              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#d97706", textTransform: "uppercase" }}>
+                  Tin bị Admin gỡ bỏ / đóng
+                </div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#d97706", marginTop: 4 }}>
+                  {report.periodEvents.jobsClosedByAdmin.toLocaleString("vi-VN")}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 3: OPERATIONAL BACKLOG WORK */}
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>
-              2. Hàng đợi vận hành cần xử lý (Pending Operational Work)
+              3. Hàng đợi vận hành cần xử lý (Pending Operational Work)
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
               {/* PENDING VERIFICATION COMPANIES */}
               <div
                 style={{
                   background: "#fff",
-                  border: d.pendingCompanies > 0 ? "1px solid #fed7aa" : "1px solid #e2e8f0",
+                  border: report.operationalBacklog.pendingVerificationQueue > 0 ? "1px solid #fed7aa" : "1px solid #e2e8f0",
                   borderRadius: 12,
                   padding: "20px",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <ShieldCheck size={20} color={d.pendingCompanies > 0 ? "#ea580c" : "#16a34a"} />
+                    <ShieldCheck size={20} color={report.operationalBacklog.pendingVerificationQueue > 0 ? "#ea580c" : "#16a34a"} />
                     <span style={{ fontWeight: 600, color: "#0f172a" }}>Doanh nghiệp chờ xét duyệt pháp lý</span>
                   </div>
-                  <Badge tone={d.pendingCompanies > 0 ? "warning" : "success"}>
-                    {d.pendingCompanies} đơn vị
+                  <Badge tone={report.operationalBacklog.pendingVerificationQueue > 0 ? "warning" : "success"}>
+                    {report.operationalBacklog.pendingVerificationQueue} đơn vị
                   </Badge>
                 </div>
                 <p style={{ fontSize: "0.875rem", color: "#64748b", margin: "8px 0 16px" }}>
-                  {d.pendingCompanies > 0
-                    ? `Hiện có ${d.pendingCompanies} doanh nghiệp đã gửi hồ sơ pháp lý chờ ban quản trị kiểm duyệt giấy phép kinh doanh.`
+                  {report.operationalBacklog.pendingVerificationQueue > 0
+                    ? `Hiện có ${report.operationalBacklog.pendingVerificationQueue} doanh nghiệp đang hoạt động đã gửi hồ sơ pháp lý chờ ban quản trị xét duyệt.`
                     : "Hàng đợi xác minh pháp lý doanh nghiệp hiện tại đã sạch. Không có hồ sơ tồn đọng."}
                 </p>
                 <Link
@@ -367,24 +524,24 @@ export default function AdminReportsPage() {
               <div
                 style={{
                   background: "#fff",
-                  border: inactiveUsers > 0 ? "1px solid #fed7aa" : "1px solid #e2e8f0",
+                  border: report.operationalBacklog.suspendedUsersQueue > 0 ? "1px solid #fed7aa" : "1px solid #e2e8f0",
                   borderRadius: 12,
                   padding: "20px",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Users size={20} color={inactiveUsers > 0 ? "#d97706" : "#16a34a"} />
+                    <Users size={20} color={report.operationalBacklog.suspendedUsersQueue > 0 ? "#d97706" : "#16a34a"} />
                     <span style={{ fontWeight: 600, color: "#0f172a" }}>Tài khoản người dùng cần rà soát</span>
                   </div>
-                  <Badge tone={inactiveUsers > 0 ? "warning" : "neutral"}>
-                    {inactiveUsers} tài khoản
+                  <Badge tone={report.operationalBacklog.suspendedUsersQueue > 0 ? "warning" : "neutral"}>
+                    {report.operationalBacklog.suspendedUsersQueue} tài khoản
                   </Badge>
                 </div>
                 <p style={{ fontSize: "0.875rem", color: "#64748b", margin: "8px 0 16px" }}>
-                  {inactiveUsers > 0
-                    ? `Có ${inactiveUsers} tài khoản ở trạng thái tạm khóa (SUSPENDED) hoặc vô hiệu hóa cần rà soát xử lý vi phạm quy chế.`
-                    : "Tất cả tài khoản người dùng trên hệ thống đều đang hoạt động bình thường."}
+                  {report.operationalBacklog.suspendedUsersQueue > 0
+                    ? `Có ${report.operationalBacklog.suspendedUsersQueue} tài khoản ở trạng thái tạm khóa (SUSPENDED) cần rà soát xử lý vi phạm quy chế.`
+                    : "Không có tài khoản người dùng nào đang bị tạm khóa."}
                 </p>
                 <Link
                   to="/admin/users?status=SUSPENDED"
@@ -395,13 +552,46 @@ export default function AdminReportsPage() {
                   <ArrowRight size={14} />
                 </Link>
               </div>
+
+              {/* SUSPENDED COMPANIES */}
+              <div
+                style={{
+                  background: "#fff",
+                  border: report.operationalBacklog.suspendedCompaniesQueue > 0 ? "1px solid #fed7aa" : "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  padding: "20px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Building2 size={20} color={report.operationalBacklog.suspendedCompaniesQueue > 0 ? "#d97706" : "#16a34a"} />
+                    <span style={{ fontWeight: 600, color: "#0f172a" }}>Doanh nghiệp tạm dừng cần rà soát</span>
+                  </div>
+                  <Badge tone={report.operationalBacklog.suspendedCompaniesQueue > 0 ? "warning" : "neutral"}>
+                    {report.operationalBacklog.suspendedCompaniesQueue} đơn vị
+                  </Badge>
+                </div>
+                <p style={{ fontSize: "0.875rem", color: "#64748b", margin: "8px 0 16px" }}>
+                  {report.operationalBacklog.suspendedCompaniesQueue > 0
+                    ? `Có ${report.operationalBacklog.suspendedCompaniesQueue} doanh nghiệp ở trạng thái tạm dừng (SUSPENDED) cần ban quản trị rà soát.`
+                    : "Không có doanh nghiệp nào đang bị tạm dừng hoạt động."}
+                </p>
+                <Link
+                  to="/admin/companies?status=SUSPENDED"
+                  className={`${ui.btn} ${ui.btnOutline}`}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.875rem" }}
+                >
+                  <span>Xem danh sách doanh nghiệp tạm dừng</span>
+                  <ArrowRight size={14} />
+                </Link>
+              </div>
             </div>
           </div>
 
-          {/* SECTION 3: UNFINISHED COMMERCIAL MODULES (EXPLICIT TRACKING) */}
+          {/* SECTION 4: UNFINISHED COMMERCIAL MODULES (EXPLICIT TRACKING) */}
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>
-              3. Theo dõi phân hệ kinh doanh thương mại (Commercial Feature Tracking)
+              4. Phân hệ kinh doanh thương mại (Commercial Status Tracking)
             </h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
               {/* REVENUE & BILLING */}
@@ -413,19 +603,22 @@ export default function AdminReportsPage() {
                   padding: "20px",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <div style={{ background: "#e2e8f0", padding: 8, borderRadius: 8, color: "#64748b" }}>
-                    <CreditCard size={18} />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ background: "#e2e8f0", padding: 8, borderRadius: 8, color: "#64748b" }}>
+                      <CreditCard size={18} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#334155", margin: 0 }}>
+                        Doanh thu & Giao dịch thanh toán
+                      </h3>
+                      <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Chưa triển khai ghi nhận doanh thu</span>
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#334155", margin: 0 }}>
-                      Doanh thu & Giao dịch thanh toán
-                    </h3>
-                    <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Chưa triển khai gói thu phí</span>
-                  </div>
+                  <Badge tone="neutral">UNAVAILABLE</Badge>
                 </div>
                 <p style={{ fontSize: "0.8125rem", color: "#64748b", lineHeight: 1.5, margin: "10px 0 0" }}>
-                  Chưa triển khai gói dịch vụ thu phí hoặc cổng thanh toán trên phiên bản hiện tại (Theo lộ trình thương mại hóa sàn FINDWORK). Toàn bộ các dịch vụ tuyển dụng và ứng tuyển đang được cung cấp miễn phí.
+                  {report.commercialStatus.revenueAndBilling.note}
                 </p>
               </div>
 
@@ -438,19 +631,22 @@ export default function AdminReportsPage() {
                   padding: "20px",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <div style={{ background: "#e2e8f0", padding: 8, borderRadius: 8, color: "#64748b" }}>
-                    <Handshake size={18} />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ background: "#e2e8f0", padding: 8, borderRadius: 8, color: "#64748b" }}>
+                      <Handshake size={18} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#334155", margin: 0 }}>
+                        Hợp tác đối tác doanh nghiệp
+                      </h3>
+                      <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Chương trình mở rộng</span>
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#334155", margin: 0 }}>
-                      Hợp tác đối tác doanh nghiệp
-                    </h3>
-                    <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Kế hoạch mở rộng</span>
-                  </div>
+                  <Badge tone="neutral">UNAVAILABLE</Badge>
                 </div>
                 <p style={{ fontSize: "0.8125rem", color: "#64748b", lineHeight: 1.5, margin: "10px 0 0" }}>
-                  Chương trình đối tác liên kết doanh nghiệp và cổng kết nối API đối tác ngoài đang trong kế hoạch mở rộng giai đoạn tiếp theo của nền tảng.
+                  {report.commercialStatus.enterprisePartnerships.note}
                 </p>
               </div>
             </div>

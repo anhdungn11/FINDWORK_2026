@@ -1,3 +1,4 @@
+import { normalizeCompanyRecruitmentReport, type CompanyRecruitmentReportDto } from "../../features/reports/reportFormatters";
 import { apiClient, getApiBaseUrl } from "../http/apiClient";
 import { isWorkspaceWritesEnabled } from "../../config/featureFlags";
 import { toApiFailure, writeBlockedFailure } from "./apiFailure";
@@ -94,6 +95,24 @@ const items = (value: unknown): unknown[] => {
 
 /** Company workspace — đầy đủ các endpoint theo hợp đồng Backend. Quyền do Backend kiểm soát. */
 export const companyWorkspaceApi = {
+  getRecruitmentReport: (
+    companyId: string,
+    params?: { period?: string; jobId?: string; startDate?: string; endDate?: string },
+    signal?: AbortSignal,
+  ): Promise<CompanyRecruitmentReportDto> =>
+    run(async () => {
+      const query: Record<string, string> = {};
+      if (params?.period) query.period = params.period;
+      if (params?.jobId) query.jobId = params.jobId;
+      if (params?.startDate) query.startDate = params.startDate;
+      if (params?.endDate) query.endDate = params.endDate;
+      const res = await apiClient.get(`/companies/${encodeURIComponent(companyId)}/reports/recruitment`, {
+        params: query,
+        signal,
+      });
+      return normalizeCompanyRecruitmentReport(res.data);
+    }),
+
   listMine: (signal?: AbortSignal): Promise<MyCompanyDto[]> =>
     run(async () => items((await apiClient.get("/companies/me", { signal })).data).map(normalizeMyCompany)),
 

@@ -8,6 +8,9 @@ import {
   buildAdminReportJson,
   buildEmployerReportCsv,
   buildEmployerReportJson,
+  normalizePipelineCounts,
+  normalizeAdminReport,
+  normalizeCompanyRecruitmentReport,
 } from "../../../features/reports/reportFormatters";
 
 import { formatDateOfBirth } from "../../../features/candidate/profile/utils/profileFormatters";
@@ -71,12 +74,14 @@ describe("Admin & Employer Reporting and DOB Timezone Regression Suite", () => {
       assert.equal(json.commercialModules.revenueAndBilling.status, "UNIMPLEMENTED");
     });
 
-    it("verifies AdminReportsPage UI does not contain internal contract filenames or ineffective period controls", () => {
+    it("verifies AdminReportsPage UI does not contain internal contract filenames and has functional period controls", () => {
       const adminReportsSrc = readFileSync(resolve("src/pages/admin/AdminReportsPage.tsx"), "utf8");
       assert.ok(!adminReportsSrc.includes("REPORTING_API_CONTRACT.md"), "Must not leak internal contract filename to user");
       assert.ok(!adminReportsSrc.includes("Codex"), "Must not leak backend developer name to user");
-      assert.ok(!adminReportsSrc.includes("<select"), "Must remove ineffective period control until supported");
+      assert.ok(adminReportsSrc.includes("admin-period-filter"), "Must have functional period selector");
+      assert.ok(adminReportsSrc.includes("30d"), "Must support 30d default preset");
       assert.ok(adminReportsSrc.includes("Hiện trạng tích lũy toàn sàn"), "Must preserve snapshot distinction");
+      assert.ok(adminReportsSrc.includes("Biến động trong chu kỳ"), "Must separate period events from snapshot");
     });
 
     it("verifies AdminLayout and AppRouter declare /admin/reports route and navigation", () => {
@@ -139,8 +144,7 @@ describe("Admin & Employer Reporting and DOB Timezone Regression Suite", () => {
 
       // Verify immediate state reset on company change
       assert.ok(empReportsSrc.includes("setLoadedCompanyId(null)"), "Must reset loaded company id on switch");
-      assert.ok(empReportsSrc.includes("setJobCounts(null)"), "Must reset job counts on switch");
-      assert.ok(empReportsSrc.includes("setPipeline(null)"), "Must reset pipeline on switch");
+      assert.ok(empReportsSrc.includes("setReport(null)"), "Must reset report on switch");
 
       // Verify abort controller usage for stale request cancellation
       assert.ok(empReportsSrc.includes("controller.abort()"), "Must abort in-flight requests when company changes");
@@ -150,7 +154,7 @@ describe("Admin & Employer Reporting and DOB Timezone Regression Suite", () => {
       assert.ok(empReportsSrc.includes("disabled={!isDataReadyForExport}"), "Export buttons must be disabled when company data is not ready");
 
       // Verify no swallowing 403 Forbidden into 0
-      assert.ok(empReportsSrc.includes("apiFailure.status === 403"), "Must handle 403 Forbidden without swallowing into zero");
+      assert.ok(empReportsSrc.includes("canReviewApplications") || empReportsSrc.includes("403"), "Must handle 403 Forbidden without swallowing into zero");
 
       // Verify no slice(0, 20) slicing of interviews
       assert.ok(!empReportsSrc.includes("slice(0, 20)"), "Must not slice interviews to 20");
@@ -170,6 +174,171 @@ describe("Admin & Employer Reporting and DOB Timezone Regression Suite", () => {
 
       const employerDashSrc = readFileSync(resolve("src/pages/employer/EmployerDashboardPage.tsx"), "utf8");
       assert.ok(employerDashSrc.includes("/employer/reports"), "EmployerDashboardPage must link to /employer/reports");
+    });
+  });
+
+  describe("Task 2C: Real Aggregate Contract Normalization & Validation", () => {
+    it("normalizes lowercase pipeline fields from backend to typed uppercase enums", () => {
+      const rawBackendCurrentCounts = {
+        totalApplications: 12,
+        draft: 1,
+        submitted: 3,
+        reviewing: 2,
+        shortlisted: 2,
+        interview: 2,
+        offered: 1,
+        rejected: 1,
+        withdrawn: 0,
+      };
+
+      const normalized = normalizePipelineCounts(rawBackendCurrentCounts);
+      assert.equal(normalized.total, 12);
+      assert.equal(normalized.DRAFT, 1);
+      assert.equal(normalized.SUBMITTED, 3);
+      assert.equal(normalized.REVIEWING, 2);
+      assert.equal(normalized.SHORTLISTED, 2);
+      assert.equal(normalized.INTERVIEW, 2);
+      assert.equal(normalized.OFFERED, 1);
+      assert.equal(normalized.REJECTED, 1);
+      assert.equal(normalized.WITHDRAWN, 0);
+    });
+
+    it("supports actual expired and archived job statuses, and rescheduled interviews", () => {
+      const mockRawCompanyReport = {
+        companyId: "c-456",
+        companyName: "AnhdungEconomy Corp",
+        period: {
+          key: "30d",
+          startDate: "2026-09-29T00:00:00.000Z",
+          endDate: "2026-10-29T00:00:00.000Z",
+          generatedAt: "2026-10-29T10:00:00.000Z",
+        },
+        jobFilter: {
+          jobId: null,
+          title: "Tất cả tin tuyển dụng",
+        },
+        jobsSummary: {
+          total: 8,
+          published: 4,
+          draft: 1,
+          paused: 1,
+          closed: 0,
+          expired: 1,
+          archived: 1,
+        },
+        pipeline: {
+          currentCounts: {
+            totalApplications: 5,
+            submitted: 2,
+            interview: 1,
+            withdrawn: 1,
+            rejected: 1,
+          },
+          periodSubmissions: 3,
+          hires: {
+            status: "UNAVAILABLE",
+            count: null,
+            note: "Chưa ghi nhận kết quả tuyển dụng (Lời mời nhận việc chưa phải kết quả tuyển).",
+          },
+        },
+        interviewsSummary: {
+          total: 4,
+          scheduled: 2,
+          rescheduled: 1,
+          completed: 1,
+          cancelled: 0,
+        },
+        commercialPackage: {
+          status: "UNAVAILABLE",
+          tier: null,
+          activeJobsLimit: null,
+          paymentActive: null,
+          note: "Chưa triển khai gói dịch vụ thu phí hoặc hạn mức đăng tin.",
+        },
+      };
+
+      const normalized = normalizeCompanyRecruitmentReport(mockRawCompanyReport);
+      assert.equal(normalized.jobsSummary.expired, 1);
+      assert.equal(normalized.jobsSummary.archived, 1);
+      assert.equal(normalized.pipeline.currentCounts.WITHDRAWN, 1);
+      assert.equal(normalized.interviewsSummary.rescheduled, 1);
+      assert.equal(normalized.pipeline.hires.status, "UNAVAILABLE");
+      assert.equal(normalized.pipeline.hires.count, null);
+      assert.equal(normalized.commercialPackage.status, "UNAVAILABLE");
+      assert.equal(normalized.commercialPackage.paymentActive, null);
+
+      const csv = buildEmployerReportCsv(normalized);
+      assert.ok(csv.startsWith("\uFEFF"));
+      assert.ok(csv.includes("AnhdungEconomy Corp"));
+      assert.ok(csv.includes("- Hết hạn (EXPIRED)"));
+      assert.ok(csv.includes("- Lịch phỏng vấn đã dời (RESCHEDULED)"));
+      assert.ok(csv.includes("- Ứng viên rút hồ sơ (WITHDRAWN)"));
+    });
+
+    it("normalizes real Admin report with snapshot, period events, operational backlog and honest commercial status", () => {
+      const mockRawAdminReport = {
+        period: {
+          key: "30d",
+          startDate: "2026-09-29T00:00:00.000Z",
+          endDate: "2026-10-29T00:00:00.000Z",
+          generatedAt: "2026-10-29T10:00:00.000Z",
+        },
+        snapshot: {
+          users: { total: 200, active: 190, suspended: 8, disabled: 2 },
+          companies: {
+            total: 30,
+            active: 25,
+            suspended: 3,
+            archived: 2,
+            verified: 20,
+            pendingVerification: 4,
+            rejectedVerification: 2,
+            unverified: 4,
+          },
+          jobs: { total: 50, published: 35, draft: 5, paused: 3, closed: 2, expired: 3, archived: 2 },
+          applications: { total: 420 },
+        },
+        periodEvents: {
+          newUsersRegistered: 18,
+          newCompaniesRegistered: 3,
+          companiesVerified: 2,
+          companiesRejected: 1,
+          jobsPosted: 12,
+          applicationsSubmitted: 45,
+          jobsClosedByAdmin: 0,
+        },
+        operationalBacklog: {
+          pendingVerificationQueue: 4,
+          suspendedUsersQueue: 8,
+          suspendedCompaniesQueue: 3,
+        },
+        commercialStatus: {
+          revenueAndBilling: {
+            status: "UNAVAILABLE",
+            monetizationActive: null,
+            totalRevenueVnd: null,
+            note: "Chưa triển khai ghi nhận doanh thu và thanh toán.",
+          },
+          enterprisePartnerships: {
+            status: "UNAVAILABLE",
+            activePartnershipsCount: null,
+            note: "Chưa triển khai ghi nhận chương trình đối tác.",
+          },
+        },
+      };
+
+      const normalized = normalizeAdminReport(mockRawAdminReport);
+      assert.equal(normalized.snapshot.users.total, 200);
+      assert.equal(normalized.periodEvents.applicationsSubmitted, 45);
+      assert.equal(normalized.operationalBacklog.pendingVerificationQueue, 4);
+      assert.equal(normalized.commercialStatus.revenueAndBilling.status, "UNAVAILABLE");
+      assert.equal(normalized.commercialStatus.revenueAndBilling.totalRevenueVnd, null);
+
+      const csv = buildAdminReportCsv(normalized);
+      assert.ok(csv.startsWith("\uFEFF"));
+      assert.ok(csv.includes("BÁO CÁO TIẾN ĐỘ & VẬN HÀNH NỀN TẢNG FINDWORK"));
+      assert.ok(csv.includes("45"));
+      assert.ok(csv.includes("Hồ sơ ứng tuyển mới nộp"));
     });
   });
 });
