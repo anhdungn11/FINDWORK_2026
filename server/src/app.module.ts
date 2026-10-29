@@ -22,6 +22,7 @@ import { CareerDiscoveryModule } from "./modules/career-discovery/career-discove
 import { AiModule } from "./modules/ai/ai.module";
 import { InterviewModule } from "./modules/interviews/interview.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
+import { ReportingModule } from "./modules/reporting/reporting.module";
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { MessagingModule } from "./modules/messaging/messaging.module";
     JobsModule,
     ApplicationsModule,
     AdminModule,
+    ReportingModule,
   ],
 })
 export class AppModule implements NestModule {
