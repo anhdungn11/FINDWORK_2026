@@ -21,8 +21,24 @@ process reset jobs in this version.
    `EMAIL_WORKER_ENABLED=false` in the worker environment. Keep invitation and
    recruitment workers stopped. The API may keep its separate existing
    configuration for queueing reset requests.
-4. Start only `npm run start:password-reset-email-worker` from this build's
-   `server` directory. Observe a newly requested, authorized reset in the
+4. From this build's `server` directory, run the private launcher preflight
+   after setting the exact UTC cutoff in the current shell:
+
+   ```powershell
+   $env:FINDWORK_RESET_AUTO_NOT_BEFORE = 'YYYY-MM-DDTHH:mm:ss.sssZ'
+   & 'C:\nvm4w\nodejs\node.exe' scripts/launch-password-reset-auto.cjs preflight
+   ```
+
+   Review the database identity, migration count, and excluded queue counts.
+   Only after separate activation approval, use the same shell and cutoff:
+
+   ```powershell
+   $env:FINDWORK_RESET_AUTO_ACTIVATE = 'YES'
+   & 'C:\nvm4w\nodejs\node.exe' scripts/launch-password-reset-auto.cjs start
+   ```
+
+   The launcher reads the existing private base, Resend, and crypto environment
+   files without changing them. Observe a newly requested, authorized reset in the
    outbox and confirm receipt in the intended mailbox before broad release.
    Do not use old queued jobs as the first delivery test.
 
@@ -37,8 +53,21 @@ outside this worker's scope.
 
 ## Rollback
 
-Stop the password reset worker process and set
-`EMAIL_PASSWORD_RESET_AUTO_WORKER_ENABLED=false` for its next launch. Leave
+Use the PID record written by the launcher and verify the command line before
+stopping that exact process:
+
+```powershell
+$recordPath = Join-Path $env:TEMP 'findwork-reset-auto-worker.pid.json'
+$record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+$workerProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $($record.pid)"
+if (-not $workerProcess -or $workerProcess.CommandLine -notmatch 'password-reset-email-worker.main.js') { throw 'Worker PID identity mismatch' }
+Stop-Process -Id $record.pid
+Wait-Process -Id $record.pid -Timeout 15
+Remove-Item -LiteralPath $recordPath
+```
+
+Unset `FINDWORK_RESET_AUTO_ACTIVATE` in the shell and keep
+`EMAIL_PASSWORD_RESET_AUTO_WORKER_ENABLED=false` for any later launch. Leave
 all outbox rows and tokens intact for review. Requests may continue to queue
 while API reset delivery remains enabled; if delivery must pause completely,
 disable reset request queueing in a separately reviewed API configuration

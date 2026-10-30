@@ -142,6 +142,14 @@ async function main() {
     await worker.processOne(undefined, new Date(cutoff));
     assert.equal((await db.passwordResetOutbox.findUniqueOrThrow({ where: { id: retried.id } })).status, "SENT");
     assert.equal(calls, 2);
+    const exhausted = await job();
+    await db.passwordResetOutbox.update({ where: { id: exhausted.id }, data: { maxAttempts: 1 } });
+    behavior = async () => { throw new EmailProviderError("HTTP_429", true); };
+    await worker.processOne(undefined, new Date(cutoff));
+    const exhaustedState = await db.passwordResetOutbox.findUniqueOrThrow({ where: { id: exhausted.id } });
+    assert.equal(exhaustedState.status, "FAILED");
+    assert.equal(exhaustedState.attemptCount, 1);
+    assert.equal(exhaustedState.lastErrorCode, "RESET_RETRY_EXHAUSTED");
     const uncertain = await job();
     behavior = async () => { throw new EmailProviderError("HTTP_503", true); };
     await worker.processOne(undefined, new Date(cutoff));
@@ -161,12 +169,12 @@ async function main() {
     const quarantined = await db.passwordResetOutbox.findUniqueOrThrow({ where: { id: leased.id } });
     assert.equal(quarantined.status, "FAILED");
     assert.equal(quarantined.lastErrorCode, "RESET_LEASE_OUTCOME_UNCERTAIN");
-    assert.equal(deliveries.length, 6);
+    assert.equal(deliveries.length, 7);
     assert.equal((await db.passwordResetOutbox.findUniqueOrThrow({ where: { id: old.id } })).status,
       "QUEUED");
     assert.equal((await db.emailOutbox.findUniqueOrThrow({ where: { id: verifyId } })).status, "QUEUED");
     console.log(JSON.stringify({ disposable: name, cases: ["cutoff", "delivery", "expired", "revoked",
-      "consumed", "recipient isolation", "concurrency", "429 retry", "503 uncertain",
+      "consumed", "recipient isolation", "concurrency", "429 retry", "retry limit", "503 uncertain",
       "transport uncertain", "expired lease"], fakeDeliveries: deliveries.length }));
   } finally {
     if (db) await db.$disconnect().catch(() => {});

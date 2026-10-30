@@ -49,11 +49,18 @@ export class PasswordResetWorker {
     const next = await this.db.passwordResetOutbox.findFirst({ where: { ...scope,
       status: "QUEUED", nextAttemptAt: { lte: now }, attemptCount: { lt: 8 } },
       orderBy: [{ nextAttemptAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-      select: { id: true } });
+      select: { id: true, attemptCount: true, maxAttempts: true } });
     if (!next) return false;
+    if (next.attemptCount >= next.maxAttempts) {
+      await this.db.passwordResetOutbox.updateMany({ where: { ...scope, id: next.id,
+        status: "QUEUED", attemptCount: { gte: next.maxAttempts } },
+        data: { status: "FAILED", ...scrub, lastErrorCode: "RESET_ATTEMPTS_EXHAUSTED" } });
+      return true;
+    }
     const owner = randomUUID();
     const claimed = await this.db.passwordResetOutbox.updateMany({ where: { ...scope, id: next.id,
-      status: "QUEUED", nextAttemptAt: { lte: new Date() }, attemptCount: { lt: 8 } },
+      status: "QUEUED", nextAttemptAt: { lte: new Date() },
+      attemptCount: { lt: Math.min(next.maxAttempts, 8) } },
       data: { status: "PROCESSING", claimedBy: owner,
         leaseUntil: new Date(Date.now() + 120_000), attemptCount: { increment: 1 } } });
     if (claimed.count !== 1) return true;
@@ -128,7 +135,7 @@ export class PasswordResetWorker {
             nextAttemptAt: new Date(Date.now() + base + Math.floor(Math.random() * base * 0.25)),
             lastErrorCode: known?.errorCode ?? "RESET_PRE_SEND_ERROR" } });
       } else await this.finish(job.id, owner, "FAILED",
-        known && !known.retryable ? known.errorCode : providerAttempted
+        safeRetry ? "RESET_RETRY_EXHAUSTED" : known && !known.retryable ? known.errorCode : providerAttempted
           ? "RESET_PROVIDER_OUTCOME_UNCERTAIN" : "RESET_PRE_SEND_EXHAUSTED");
     }
     return true;
