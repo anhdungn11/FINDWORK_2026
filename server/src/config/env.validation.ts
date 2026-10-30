@@ -20,6 +20,8 @@ export interface ValidatedEnvironment {
   EMAIL_INVITATION_DELIVERY_ENABLED: string;
   EMAIL_INVITATION_URL: string;
   EMAIL_PASSWORD_RESET_ENABLED: string;
+  EMAIL_PASSWORD_RESET_AUTO_WORKER_ENABLED: string;
+  EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE: string;
   EMAIL_RESET_URL: string;
   EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED: string;
   EMAIL_APPLICATION_URL: string;
@@ -170,6 +172,21 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
   }
   const invitationUrl = String(raw.EMAIL_INVITATION_URL ?? "");
   const resetEnabled = String(raw.EMAIL_PASSWORD_RESET_ENABLED ?? "false");
+  const resetAutoWorkerEnabled = String(raw.EMAIL_PASSWORD_RESET_AUTO_WORKER_ENABLED ?? "false");
+  const resetAutoNotBefore = String(raw.EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE ?? "");
+  if (resetAutoWorkerEnabled !== "true" && resetAutoWorkerEnabled !== "false") {
+    throw new Error("EMAIL_PASSWORD_RESET_AUTO_WORKER_ENABLED invalid");
+  }
+  if (resetAutoWorkerEnabled === "true") {
+    if (resetEnabled !== "true" || workerEnabled !== "false" || mode !== "resend") {
+      throw new Error("Automatic reset worker requires reset delivery and the general worker disabled");
+    }
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(resetAutoNotBefore) ||
+        !Number.isFinite(Date.parse(resetAutoNotBefore)) ||
+        new Date(resetAutoNotBefore).toISOString() !== resetAutoNotBefore) {
+      throw new Error("EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE must be an exact UTC timestamp");
+    }
+  }
   const resetUrl = String(raw.EMAIL_RESET_URL ?? "");
   const recruitmentEnabled = String(raw.EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED ?? "false");
   const applicationUrl = String(raw.EMAIL_APPLICATION_URL ?? "");
@@ -247,6 +264,8 @@ function emailDeliveryConfig(raw: Record<string, unknown>, env: NodeEnvironment)
     EMAIL_INVITATION_DELIVERY_ENABLED: invitationEnabled,
     EMAIL_INVITATION_URL: invitationUrl,
     EMAIL_PASSWORD_RESET_ENABLED: resetEnabled,
+    EMAIL_PASSWORD_RESET_AUTO_WORKER_ENABLED: resetAutoWorkerEnabled,
+    EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE: resetAutoNotBefore,
     EMAIL_RESET_URL: resetUrl,
     EMAIL_RECRUITMENT_NOTIFICATIONS_ENABLED: recruitmentEnabled,
     EMAIL_APPLICATION_URL: applicationUrl,

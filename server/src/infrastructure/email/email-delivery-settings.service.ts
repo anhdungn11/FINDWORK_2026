@@ -31,6 +31,17 @@ export class EmailDeliverySettings {
   get passwordResetEnabled(): boolean {
     return this.config.get<string>("EMAIL_PASSWORD_RESET_ENABLED", "false") === "true";
   }
+  get automaticPasswordResetWorkerEnabled(): boolean {
+    return this.config.get<string>("EMAIL_PASSWORD_RESET_AUTO_WORKER_ENABLED", "false") === "true";
+  }
+  get automaticPasswordResetNotBefore(): Date {
+    const value = this.config.get<string>("EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE", "");
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ||
+        !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) {
+      throw new Error("EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE_INVALID");
+    }
+    return new Date(value);
+  }
   get resetUrl(): string {
     return this.config.get<string>("EMAIL_RESET_URL", "");
   }
@@ -96,6 +107,13 @@ export class EmailDeliverySettings {
   assertWorkerReady(): void {
     this.assertCanQueue();
     if (!this.workerEnabled) throw new Error("EMAIL_WORKER_DISABLED");
+  }
+  assertAutomaticPasswordResetWorkerReady(): Date {
+    if (!this.automaticPasswordResetWorkerEnabled || this.workerEnabled) {
+      throw new Error("EMAIL_PASSWORD_RESET_AUTO_WORKER_DISABLED");
+    }
+    this.assertCanQueuePasswordReset();
+    return this.automaticPasswordResetNotBefore;
   }
   assertInvitationWorkerReady(): void {
     this.assertCanQueueInvitation();

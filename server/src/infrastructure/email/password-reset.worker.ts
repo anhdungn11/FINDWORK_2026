@@ -24,34 +24,46 @@ export class PasswordResetWorker {
   constructor(private readonly db: PrismaService, private readonly settings: EmailDeliverySettings,
     private readonly crypto: EmailCryptoService, private readonly provider: EmailProviderService) {}
 
-  async processOne(jobId?: string): Promise<boolean> {
+  async processOne(jobId?: string, notBefore?: Date): Promise<boolean> {
     if (!this.settings.passwordResetEnabled) return false;
     this.settings.assertCanQueuePasswordReset();
     this.crypto.assertReady();
-    const exactJob = jobId ? { id: jobId } : {};
-    const keys = await this.db.passwordResetOutbox.findMany({ where: { ...exactJob,
-      status: { in: ["QUEUED", "PROCESSING"] } }, distinct: ["encryptionKeyId"],
+    if (notBefore && (!Number.isFinite(notBefore.getTime()) || jobId)) {
+      throw new Error("RESET_WORKER_SCOPE_INVALID");
+    }
+    const scope = { ...(jobId && { id: jobId }), ...(notBefore && { createdAt: { gte: notBefore } }) };
+    const now = new Date();
+    const keys = await this.db.passwordResetOutbox.findMany({ where: { ...scope,
+      status: "QUEUED", nextAttemptAt: { lte: now }, attemptCount: { lt: 8 } },
+      distinct: ["encryptionKeyId"],
       select: { encryptionKeyId: true } });
     for (const row of keys) this.crypto.assertKeyAvailable(row.encryptionKeyId!);
-    await this.db.passwordResetOutbox.updateMany({ where: { ...exactJob, status: "PROCESSING",
-      leaseUntil: { lt: new Date() }, attemptCount: { gte: 8 } },
-      data: { status: "FAILED", ...scrub, lastErrorCode: "LEASE_EXHAUSTED" } });
-    const next = await this.db.passwordResetOutbox.findFirst({ where: { ...exactJob, attemptCount: { lt: 8 }, OR: [
-      { status: "QUEUED", nextAttemptAt: { lte: new Date() } },
-      { status: "PROCESSING", leaseUntil: { lt: new Date() } },
-    ] }, orderBy: [{ nextAttemptAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+    // A prior process may have reached the provider before its lease expired.
+    // Never reclaim and resend a job whose outcome is unknown.
+    await this.db.passwordResetOutbox.updateMany({ where: { ...scope, status: "PROCESSING",
+      OR: [{ leaseUntil: { lt: now } }, { leaseUntil: null }] },
+      data: { status: "FAILED", ...scrub, lastErrorCode: "RESET_LEASE_OUTCOME_UNCERTAIN" } });
+    await this.db.passwordResetOutbox.updateMany({ where: { ...scope, status: "QUEUED",
+      attemptCount: { gte: 8 } },
+      data: { status: "FAILED", ...scrub, lastErrorCode: "RESET_ATTEMPTS_EXHAUSTED" } });
+    const next = await this.db.passwordResetOutbox.findFirst({ where: { ...scope,
+      status: "QUEUED", nextAttemptAt: { lte: now }, attemptCount: { lt: 8 } },
+      orderBy: [{ nextAttemptAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
       select: { id: true } });
     if (!next) return false;
     const owner = randomUUID();
-    const claimed = await this.db.passwordResetOutbox.updateMany({ where: { id: next.id,
-      attemptCount: { lt: 8 }, OR: [
-        { status: "QUEUED", nextAttemptAt: { lte: new Date() } },
-        { status: "PROCESSING", leaseUntil: { lt: new Date() } },
-      ] }, data: { status: "PROCESSING", claimedBy: owner,
+    const claimed = await this.db.passwordResetOutbox.updateMany({ where: { ...scope, id: next.id,
+      status: "QUEUED", nextAttemptAt: { lte: new Date() }, attemptCount: { lt: 8 } },
+      data: { status: "PROCESSING", claimedBy: owner,
         leaseUntil: new Date(Date.now() + 120_000), attemptCount: { increment: 1 } } });
     if (claimed.count !== 1) return true;
     const job = await this.db.passwordResetOutbox.findUniqueOrThrow({ where: { id: next.id } });
+    let providerAttempted = false;
     try {
+      if (job.attemptCount > job.maxAttempts) {
+        await this.finish(job.id, owner, "FAILED", "RESET_ATTEMPTS_EXHAUSTED");
+        return true;
+      }
       let value: unknown;
       try {
         value = this.crypto.decrypt(job.id, "RESET_PASSWORD", job.tokenId, {
@@ -64,7 +76,8 @@ export class PasswordResetWorker {
       }
       if (!validPayload(value) || value.tokenId !== job.tokenId ||
           value.expiresAt <= new Date().toISOString() ||
-          job.idempotencyKey !== `reset:${job.tokenId}`) {
+          job.idempotencyKey !== `reset:${job.tokenId}` ||
+          value.resetBaseUrl !== this.settings.resetUrl || value.sender !== this.settings.sender) {
         await this.finish(job.id, owner, "CANCELLED", "RESET_PAYLOAD_INELIGIBLE");
         return true;
       }
@@ -96,6 +109,7 @@ export class PasswordResetWorker {
         return true;
       }
       baseUrl.hash = new URLSearchParams({ token: value.rawToken }).toString();
+      providerAttempted = true;
       const sent = await this.provider.sendPasswordReset({ to: value.recipient, from: value.sender,
         resetUrl: baseUrl.toString(), idempotencyKey: job.idempotencyKey });
       await this.db.passwordResetOutbox.updateMany({ where: this.owned(job.id, owner),
@@ -103,13 +117,19 @@ export class PasswordResetWorker {
           lastErrorCode: null } });
     } catch (error) {
       const known = error instanceof EmailProviderError ? error : null;
-      if ((known?.retryable ?? true) && job.attemptCount < job.maxAttempts) {
+      // Only explicit rate limiting or a concurrent idempotency response is
+      // safe to retry. Timeouts, 5xx and malformed success may have sent mail.
+      const safeRetry = !providerAttempted || (known?.retryable === true &&
+        (known.errorCode === "HTTP_429" || known.errorCode === "HTTP_409"));
+      if (safeRetry && job.attemptCount < Math.min(job.maxAttempts, 8)) {
         const base = Math.min(3_600_000, 10_000 * 2 ** Math.min(job.attemptCount - 1, 8));
         await this.db.passwordResetOutbox.updateMany({ where: this.owned(job.id, owner),
           data: { status: "QUEUED", claimedBy: null, leaseUntil: null,
             nextAttemptAt: new Date(Date.now() + base + Math.floor(Math.random() * base * 0.25)),
-            lastErrorCode: known?.errorCode ?? "RESET_PROCESSING_ERROR" } });
-      } else await this.finish(job.id, owner, "FAILED", known?.errorCode ?? "RESET_PROCESSING_ERROR");
+            lastErrorCode: known?.errorCode ?? "RESET_PRE_SEND_ERROR" } });
+      } else await this.finish(job.id, owner, "FAILED",
+        known && !known.retryable ? known.errorCode : providerAttempted
+          ? "RESET_PROVIDER_OUTCOME_UNCERTAIN" : "RESET_PRE_SEND_EXHAUSTED");
     }
     return true;
   }

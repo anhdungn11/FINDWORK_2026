@@ -3,6 +3,7 @@ import { PrismaService } from "../src/infrastructure/prisma/prisma.service";
 import { EmailDeliverySettings } from "../src/infrastructure/email/email-delivery-settings.service";
 import { EmailCryptoService } from "../src/infrastructure/email/email-crypto.service";
 import { EmailProviderService } from "../src/infrastructure/email/email-provider.service";
+import { validateEnvironment } from "../src/config/env.validation";
 
 const approvedId = "11111111-1111-4111-8111-111111111111";
 
@@ -51,5 +52,32 @@ describe("password reset exact-ID worker selection", () => {
     await expect(disabled.processOne(approvedId)).resolves.toBe(false);
     expect(db.passwordResetOutbox.findMany).not.toHaveBeenCalled();
     expect(provider.sendPasswordReset).not.toHaveBeenCalled();
+  });
+});
+
+describe("automatic reset worker startup gate", () => {
+  const base = {
+    NODE_ENV: "test", DATABASE_URL: "postgresql://fake:fake@127.0.0.1:5432/findwork_disposable?schema=public",
+    JWT_ACCESS_SECRET: "fake-test-jwt-secret-long-enough-12345",
+    REFRESH_TOKEN_PEPPER: "fake-test-refresh-pepper-long-enough-12345",
+    EMAIL_DELIVERY_MODE: "resend", EMAIL_WORKER_ENABLED: "false",
+    EMAIL_PASSWORD_RESET_ENABLED: "true", EMAIL_ACTIVE_KEY_ID: "test",
+    EMAIL_KEYRING_JSON: JSON.stringify({ test: Buffer.alloc(32, 1).toString("base64") }),
+    EMAIL_RESEND_API_KEY: "fake-provider-key-123456", EMAIL_FROM: "test@example.invalid",
+    EMAIL_VERIFY_URL: "http://127.0.0.1:5177/verify-email",
+    EMAIL_RESET_URL: "http://127.0.0.1:5177/reset-password",
+  };
+
+  it("requires an explicit UTC cutoff and keeps the general worker disabled", () => {
+    const enabled = { ...base, EMAIL_PASSWORD_RESET_AUTO_WORKER_ENABLED: "true" };
+    expect(() => validateEnvironment(enabled)).toThrow("EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE");
+    expect(() => validateEnvironment({ ...enabled,
+      EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE: "2026-10-30T02:00:00.000Z",
+      EMAIL_WORKER_ENABLED: "true" })).toThrow("general worker disabled");
+    const settings = new EmailDeliverySettings({ get: (key: string, fallback?: unknown) =>
+      validateEnvironment({ ...enabled, EMAIL_PASSWORD_RESET_AUTO_NOT_BEFORE: "2026-10-30T02:00:00.000Z" })[key] ?? fallback,
+    } as never);
+    expect(settings.assertAutomaticPasswordResetWorkerReady().toISOString())
+      .toBe("2026-10-30T02:00:00.000Z");
   });
 });

@@ -12,6 +12,7 @@
     "start:prod": "node dist/main.js",
     "start:invitation-maintenance": "node dist/workers/invitation-maintenance.main.js",
     "start:invitation-email-worker": "node dist/workers/invitation-email-worker.main.js",
+    "start:password-reset-email-worker": "node dist/workers/password-reset-email-worker.main.js",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
     "test:cov": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
